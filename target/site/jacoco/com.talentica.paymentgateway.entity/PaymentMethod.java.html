@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentMethod.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">PaymentMethod.java</span></div><h1>PaymentMethod.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Entity representing a tokenized payment method for a customer.
+ * Payment methods store tokenized payment information for secure reuse.
+ */
+@Entity
+@Table(name = &quot;payment_methods&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;paymentToken&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_payment_methods_customer_id&quot;, columnList = &quot;customer_id&quot;),
+           @Index(name = &quot;idx_payment_methods_token&quot;, columnList = &quot;paymentToken&quot;),
+           @Index(name = &quot;idx_payment_methods_active&quot;, columnList = &quot;isActive&quot;)
+       })
+public class PaymentMethod extends BaseEntity {
+
+    @NotNull(message = &quot;Customer is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;customer_id&quot;, nullable = false)
+    private Customer customer;
+
+    @NotBlank(message = &quot;Payment token is required&quot;)
+    @Size(max = 255, message = &quot;Payment token must not exceed 255 characters&quot;)
+    @Column(name = &quot;payment_token&quot;, nullable = false, unique = true, length = 255)
+    private String paymentToken;
+
+<span class="fc" id="L35">    @NotBlank(message = &quot;Payment type is required&quot;)</span>
+    @Size(max = 50, message = &quot;Payment type must not exceed 50 characters&quot;)
+    @Column(name = &quot;payment_type&quot;, nullable = false, length = 50)
+    private String paymentType = &quot;CREDIT_CARD&quot;;
+
+    @Size(max = 4, message = &quot;Card last four must not exceed 4 characters&quot;)
+    @Pattern(regexp = &quot;\\d{4}&quot;, message = &quot;Card last four must be 4 digits&quot;)
+    @Column(name = &quot;card_last_four&quot;, length = 4)
+    private String cardLastFour;
+
+    @Size(max = 50, message = &quot;Card brand must not exceed 50 characters&quot;)
+    @Column(name = &quot;card_brand&quot;, length = 50)
+    private String cardBrand;
+
+    @Min(value = 1, message = &quot;Card expiry month must be between 1 and 12&quot;)
+    @Max(value = 12, message = &quot;Card expiry month must be between 1 and 12&quot;)
+    @Column(name = &quot;card_expiry_month&quot;)
+    private Integer cardExpiryMonth;
+
+    @Min(value = 2024, message = &quot;Card expiry year must be current year or later&quot;)
+    @Column(name = &quot;card_expiry_year&quot;)
+    private Integer cardExpiryYear;
+
+    @Size(max = 255, message = &quot;Cardholder name must not exceed 255 characters&quot;)
+    @Column(name = &quot;cardholder_name&quot;, length = 255)
+    private String cardholderName;
+
+<span class="fc" id="L62">    @Column(name = &quot;is_default&quot;, nullable = false)</span>
+<span class="fc" id="L63">    private Boolean isDefault = false;</span>
+
+<span class="fc" id="L65">    @Column(name = &quot;is_active&quot;, nullable = false)</span>
+<span class="fc" id="L66">    private Boolean isActive = true;</span>
+
+    // Credit card fields for processing (encrypted/tokenized in real implementation)
+    @Column(name = &quot;card_number&quot;, length = 255)
+    private String cardNumber;
+
+    @Column(name = &quot;expiry_month&quot;, length = 2)
+    private String expiryMonth;
+
+    @Column(name = &quot;expiry_year&quot;, length = 4)
+    private String expiryYear;
+
+    @Column(name = &quot;cvv&quot;, length = 4)
+    private String cvv;
+
+    // Relationships
+<span class="fc" id="L82">    @OneToMany(mappedBy = &quot;paymentMethod&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Transaction&gt; transactions = new ArrayList&lt;&gt;();
+
+<span class="fc" id="L85">    @OneToMany(mappedBy = &quot;paymentMethod&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Subscription&gt; subscriptions = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public PaymentMethod() {
+<span class="fc" id="L90">        super();</span>
+<span class="fc" id="L91">    }</span>
+
+    public PaymentMethod(Customer customer, String paymentToken, String paymentType) {
+<span class="fc" id="L94">        this();</span>
+<span class="fc" id="L95">        this.customer = customer;</span>
+<span class="fc" id="L96">        this.paymentToken = paymentToken;</span>
+<span class="fc" id="L97">        this.paymentType = paymentType;</span>
+<span class="fc" id="L98">    }</span>
+
+    // Getters and Setters
+    public Customer getCustomer() {
+<span class="fc" id="L102">        return customer;</span>
+    }
+
+    public void setCustomer(Customer customer) {
+<span class="fc" id="L106">        this.customer = customer;</span>
+<span class="fc" id="L107">    }</span>
+
+    public String getPaymentToken() {
+<span class="fc" id="L110">        return paymentToken;</span>
+    }
+
+    public void setPaymentToken(String paymentToken) {
+<span class="fc" id="L114">        this.paymentToken = paymentToken;</span>
+<span class="fc" id="L115">    }</span>
+
+    public String getPaymentMethodId() {
+<span class="fc" id="L118">        return paymentToken;</span>
+    }
+
+    public String getPaymentType() {
+<span class="fc" id="L122">        return paymentType;</span>
+    }
+
+    public void setPaymentType(String paymentType) {
+<span class="fc" id="L126">        this.paymentType = paymentType;</span>
+<span class="fc" id="L127">    }</span>
+
+    public String getType() {
+<span class="fc" id="L130">        return paymentType;</span>
+    }
+
+    public String getCardLastFour() {
+<span class="fc" id="L134">        return cardLastFour;</span>
+    }
+
+    public void setCardLastFour(String cardLastFour) {
+<span class="fc" id="L138">        this.cardLastFour = cardLastFour;</span>
+<span class="fc" id="L139">    }</span>
+
+    public String getLast4() {
+<span class="fc" id="L142">        return cardLastFour;</span>
+    }
+
+    public String getCardBrand() {
+<span class="fc" id="L146">        return cardBrand;</span>
+    }
+
+    public void setCardBrand(String cardBrand) {
+<span class="fc" id="L150">        this.cardBrand = cardBrand;</span>
+<span class="fc" id="L151">    }</span>
+
+    public Integer getCardExpiryMonth() {
+<span class="fc" id="L154">        return cardExpiryMonth;</span>
+    }
+
+    public void setCardExpiryMonth(Integer cardExpiryMonth) {
+<span class="fc" id="L158">        this.cardExpiryMonth = cardExpiryMonth;</span>
+<span class="fc" id="L159">    }</span>
+
+    public Integer getCardExpiryYear() {
+<span class="fc" id="L162">        return cardExpiryYear;</span>
+    }
+
+    public void setCardExpiryYear(Integer cardExpiryYear) {
+<span class="fc" id="L166">        this.cardExpiryYear = cardExpiryYear;</span>
+<span class="fc" id="L167">    }</span>
+
+    public String getCardholderName() {
+<span class="fc" id="L170">        return cardholderName;</span>
+    }
+
+    public void setCardholderName(String cardholderName) {
+<span class="fc" id="L174">        this.cardholderName = cardholderName;</span>
+<span class="fc" id="L175">    }</span>
+
+    public Boolean getIsDefault() {
+<span class="fc" id="L178">        return isDefault;</span>
+    }
+
+    public void setIsDefault(Boolean isDefault) {
+<span class="fc" id="L182">        this.isDefault = isDefault;</span>
+<span class="fc" id="L183">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L186">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L190">        this.isActive = isActive;</span>
+<span class="fc" id="L191">    }</span>
+
+    public String getCardNumber() {
+<span class="fc" id="L194">        return cardNumber;</span>
+    }
+
+    public void setCardNumber(String cardNumber) {
+<span class="fc" id="L198">        this.cardNumber = cardNumber;</span>
+<span class="fc" id="L199">    }</span>
+
+    public String getExpiryMonth() {
+<span class="fc" id="L202">        return expiryMonth;</span>
+    }
+
+    public void setExpiryMonth(String expiryMonth) {
+<span class="fc" id="L206">        this.expiryMonth = expiryMonth;</span>
+<span class="fc" id="L207">    }</span>
+
+    public String getExpiryYear() {
+<span class="fc" id="L210">        return expiryYear;</span>
+    }
+
+    public void setExpiryYear(String expiryYear) {
+<span class="fc" id="L214">        this.expiryYear = expiryYear;</span>
+<span class="fc" id="L215">    }</span>
+
+    public String getCvv() {
+<span class="fc" id="L218">        return cvv;</span>
+    }
+
+    public void setCvv(String cvv) {
+<span class="fc" id="L222">        this.cvv = cvv;</span>
+<span class="fc" id="L223">    }</span>
+
+    public List&lt;Transaction&gt; getTransactions() {
+<span class="fc" id="L226">        return transactions;</span>
+    }
+
+    public void setTransactions(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L230">        this.transactions = transactions;</span>
+<span class="fc" id="L231">    }</span>
+
+    public List&lt;Subscription&gt; getSubscriptions() {
+<span class="fc" id="L234">        return subscriptions;</span>
+    }
+
+    public void setSubscriptions(List&lt;Subscription&gt; subscriptions) {
+<span class="fc" id="L238">        this.subscriptions = subscriptions;</span>
+<span class="fc" id="L239">    }</span>
+
+    // Utility methods
+    public String getMaskedCardNumber() {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (cardLastFour != null) {</span>
+<span class="fc" id="L244">            return &quot;**** **** **** &quot; + cardLastFour;</span>
+        }
+<span class="nc" id="L246">        return null;</span>
+    }
+
+    public String getExpiryDateFormatted() {
+<span class="nc bnc" id="L250" title="All 4 branches missed.">        if (cardExpiryMonth != null &amp;&amp; cardExpiryYear != null) {</span>
+<span class="nc" id="L251">            return String.format(&quot;%02d/%d&quot;, cardExpiryMonth, cardExpiryYear % 100);</span>
+        }
+<span class="nc" id="L253">        return null;</span>
+    }
+
+    public boolean isExpired() {
+<span class="nc bnc" id="L257" title="All 4 branches missed.">        if (cardExpiryMonth == null || cardExpiryYear == null) {</span>
+<span class="nc" id="L258">            return false;</span>
+        }
+        
+<span class="nc" id="L261">        java.time.LocalDate now = java.time.LocalDate.now();</span>
+<span class="nc" id="L262">        java.time.LocalDate expiry = java.time.LocalDate.of(cardExpiryYear, cardExpiryMonth, 1)</span>
+<span class="nc" id="L263">                .plusMonths(1).minusDays(1); // Last day of expiry month</span>
+        
+<span class="nc" id="L265">        return now.isAfter(expiry);</span>
+    }
+
+    public String getDisplayName() {
+<span class="fc" id="L269">        StringBuilder displayName = new StringBuilder();</span>
+        
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (cardBrand != null) {</span>
+<span class="fc" id="L272">            displayName.append(cardBrand);</span>
+        } else {
+<span class="nc" id="L274">            displayName.append(paymentType);</span>
+        }
+        
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (cardLastFour != null) {</span>
+<span class="fc" id="L278">            displayName.append(&quot; ending in &quot;).append(cardLastFour);</span>
+        }
+        
+<span class="fc" id="L281">        return displayName.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

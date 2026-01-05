@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.talentica.paymentgateway.service.PaymentServiceUnitTest
+-------------------------------------------------------------------------------
+Tests run: 43, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 1.039 s - in com.talentica.paymentgateway.service.PaymentServiceUnitTest

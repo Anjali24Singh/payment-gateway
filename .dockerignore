@@ -1,0 +1,112 @@
+# Dockerignore for Payment Gateway
+# This file optimizes build performance and security
+
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build outputs and caches
+target/
+*.class
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# Test outputs
+test-results/
+coverage-report/
+*.log
+
+# Documentation
+README.md
+*.md
+docs/
+chats/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Development environment
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+env.template
+
+# Docker files (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes and deployment
+k8s/
+deployment/
+charts/
+
+# Security and secrets
+*.pem
+*.key
+*.crt
+secrets/
+certs/
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+tmp/
+
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# IDE artifacts
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+bin/
+
+# Spring Boot
+spring.log
+application-*.properties
+!application.properties
+
+# Maven
+dependency-reduced-pom.xml
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar

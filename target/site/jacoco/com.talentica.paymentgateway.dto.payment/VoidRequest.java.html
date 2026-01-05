@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VoidRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">VoidRequest.java</span></div><h1>VoidRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Void request DTO for cancelling authorized transactions before capture.
+ * Used to release held funds without completing the transaction.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="pc bnc" id="L19" title="All 54 branches missed.">@Data</span>
+<span class="nc" id="L20">@Builder</span>
+<span class="fc" id="L21">@NoArgsConstructor</span>
+<span class="nc" id="L22">@AllArgsConstructor</span>
+@Schema(description = &quot;Void request for cancelling authorized transactions&quot;)
+public class VoidRequest {
+
+    @NotBlank(message = &quot;Transaction ID is required&quot;)
+    @Size(max = 255, message = &quot;Transaction ID must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Original transaction ID to void&quot;, example = &quot;auth_1234567890&quot;, required = true)
+    @JsonProperty(&quot;transactionId&quot;)
+<span class="fc" id="L30">    private String transactionId;</span>
+
+    @Size(max = 255, message = &quot;Reason must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Reason for voiding the transaction&quot;, example = &quot;Order cancelled by customer&quot;)
+    @JsonProperty(&quot;reason&quot;)
+<span class="fc" id="L35">    private String reason;</span>
+
+    @Size(max = 255, message = &quot;Description must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Void description&quot;, example = &quot;Void authorization for cancelled Order #12345&quot;)
+    @JsonProperty(&quot;description&quot;)
+<span class="fc" id="L40">    private String description;</span>
+
+    @Size(max = 25, message = &quot;Reference number must not exceed 25 characters&quot;)
+    @Schema(description = &quot;Internal reference number for the void&quot;, example = &quot;VOID-2024-001&quot;)
+    @JsonProperty(&quot;referenceNumber&quot;)
+<span class="fc" id="L45">    private String referenceNumber;</span>
+
+<span class="pc" id="L47">    @Schema(description = &quot;Notify customer about the void&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;notifyCustomer&quot;)
+<span class="pc" id="L49">    private Boolean notifyCustomer = true;</span>
+
+    @Size(max = 255, message = &quot;Idempotency key must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Idempotency key to prevent duplicate voids&quot;)
+    @JsonProperty(&quot;idempotencyKey&quot;)
+<span class="fc" id="L54">    private String idempotencyKey;</span>
+
+    // Backward compatibility methods
+    public String getOriginalTransactionId() {
+<span class="fc" id="L58">        return transactionId;</span>
+    }
+
+    public void setOriginalTransactionId(String originalTransactionId) {
+<span class="fc" id="L62">        this.transactionId = originalTransactionId;</span>
+<span class="fc" id="L63">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

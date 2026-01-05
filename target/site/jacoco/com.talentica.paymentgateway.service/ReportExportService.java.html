@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReportExportService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">ReportExportService.java</span></div><h1>ReportExportService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.analytics.TransactionReportResponse;
+import com.talentica.paymentgateway.entity.Transaction;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * Service for exporting reports in various formats (CSV, PDF, Excel).
+ * Handles data transformation and file generation for analytics exports.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L22">@Slf4j</span>
+@Service
+<span class="fc" id="L24">public class ReportExportService {</span>
+
+<span class="fc" id="L26">    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;</span>
+
+    /**
+     * Export transaction data to CSV format.
+     */
+    public byte[] exportToCSV(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L32">        log.info(&quot;Exporting {} transactions to CSV&quot;, transactions.size());</span>
+        
+<span class="fc" id="L34">        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();</span>
+<span class="fc" id="L35">             PrintWriter writer = new PrintWriter(outputStream)) {</span>
+            
+            // Write CSV header
+<span class="fc" id="L38">            writer.println(&quot;Transaction ID,Customer ID,Amount,Currency,Status,Type,Created At,Processed At&quot;);</span>
+            
+            // Write transaction data
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            for (Transaction transaction : transactions) {</span>
+<span class="fc" id="L42">                writer.println(String.format(&quot;%s,%s,%s,%s,%s,%s,%s,%s&quot;,</span>
+<span class="fc" id="L43">                    escapeCsvValue(transaction.getTransactionId()),</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">                    transaction.getCustomer() != null ? transaction.getCustomer().getId().toString() : &quot;&quot;,</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                    transaction.getAmount() != null ? transaction.getAmount().toString() : &quot;0&quot;,</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                    transaction.getCurrency() != null ? transaction.getCurrency() : &quot;USD&quot;,</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                    transaction.getStatus() != null ? transaction.getStatus().toString() : &quot;&quot;,</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                    transaction.getTransactionType() != null ? transaction.getTransactionType().toString() : &quot;&quot;,</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                    transaction.getCreatedAt() != null ? transaction.getCreatedAt().format(DATE_FORMATTER) : &quot;&quot;,</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                    transaction.getProcessedAt() != null ? transaction.getProcessedAt().format(DATE_FORMATTER) : &quot;&quot;</span>
+                ));
+<span class="fc" id="L52">            }</span>
+            
+<span class="fc" id="L54">            writer.flush();</span>
+<span class="fc" id="L55">            return outputStream.toByteArray();</span>
+            
+<span class="nc" id="L57">        } catch (IOException e) {</span>
+<span class="nc" id="L58">            log.error(&quot;Error exporting transactions to CSV&quot;, e);</span>
+<span class="nc" id="L59">            throw new RuntimeException(&quot;Failed to export CSV&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Export transaction data to PDF format.
+     */
+    public byte[] exportToPDF(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L67">        log.info(&quot;Exporting {} transactions to PDF&quot;, transactions.size());</span>
+        
+        // In a real implementation, you would use a PDF library like iText or PDFBox
+        // For now, return a simple text-based representation
+<span class="fc" id="L71">        StringBuilder pdfContent = new StringBuilder();</span>
+<span class="fc" id="L72">        pdfContent.append(&quot;TRANSACTION REPORT\n&quot;);</span>
+<span class="fc" id="L73">        pdfContent.append(&quot;=================\n\n&quot;);</span>
+        
+<span class="fc" id="L75">        BigDecimal totalAmount = BigDecimal.ZERO;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (Transaction transaction : transactions) {</span>
+<span class="fc" id="L77">            pdfContent.append(String.format(&quot;Transaction: %s\n&quot;, transaction.getTransactionId()));</span>
+<span class="fc" id="L78">            pdfContent.append(String.format(&quot;Amount: %s %s\n&quot;, </span>
+<span class="fc" id="L79">                transaction.getAmount(), transaction.getCurrency()));</span>
+<span class="fc" id="L80">            pdfContent.append(String.format(&quot;Status: %s\n&quot;, transaction.getStatus()));</span>
+<span class="fc" id="L81">            pdfContent.append(String.format(&quot;Date: %s\n&quot;, </span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                transaction.getCreatedAt() != null ? transaction.getCreatedAt().format(DATE_FORMATTER) : &quot;N/A&quot;));</span>
+<span class="fc" id="L83">            pdfContent.append(&quot;\n&quot;);</span>
+            
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (transaction.getAmount() != null) {</span>
+<span class="fc" id="L86">                totalAmount = totalAmount.add(transaction.getAmount());</span>
+            }
+<span class="fc" id="L88">        }</span>
+        
+<span class="fc" id="L90">        pdfContent.append(String.format(&quot;Total Amount: %s\n&quot;, totalAmount));</span>
+<span class="fc" id="L91">        pdfContent.append(String.format(&quot;Total Transactions: %d\n&quot;, transactions.size()));</span>
+        
+<span class="fc" id="L93">        return pdfContent.toString().getBytes();</span>
+    }
+
+    /**
+     * Export analytics summary to various formats.
+     */
+    public byte[] exportSummary(TransactionReportResponse.TransactionAggregations aggregations, String format) {
+<span class="fc" id="L100">        log.info(&quot;Exporting aggregations summary to {}&quot;, format);</span>
+        
+<span class="fc" id="L102">        StringBuilder content = new StringBuilder();</span>
+<span class="fc" id="L103">        content.append(&quot;ANALYTICS SUMMARY\n&quot;);</span>
+<span class="fc" id="L104">        content.append(&quot;================\n\n&quot;);</span>
+<span class="fc" id="L105">        content.append(String.format(&quot;Total Transactions: %d\n&quot;, aggregations.getTotalTransactions()));</span>
+<span class="fc" id="L106">        content.append(String.format(&quot;Successful Transactions: %d\n&quot;, aggregations.getSuccessfulTransactions()));</span>
+<span class="fc" id="L107">        content.append(String.format(&quot;Failed Transactions: %d\n&quot;, aggregations.getFailedTransactions()));</span>
+<span class="fc" id="L108">        content.append(String.format(&quot;Total Volume: %s\n&quot;, aggregations.getTotalVolume()));</span>
+<span class="fc" id="L109">        content.append(String.format(&quot;Average Amount: %s\n&quot;, aggregations.getAverageAmount()));</span>
+        
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (aggregations.getStatusBreakdown() != null) {</span>
+<span class="fc" id="L112">            content.append(&quot;\nStatus Breakdown:\n&quot;);</span>
+<span class="fc" id="L113">            aggregations.getStatusBreakdown().forEach((status, count) -&gt; </span>
+<span class="fc" id="L114">                content.append(String.format(&quot;  %s: %d\n&quot;, status, count)));</span>
+        }
+        
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (aggregations.getTypeBreakdown() != null) {</span>
+<span class="fc" id="L118">            content.append(&quot;\nType Breakdown:\n&quot;);</span>
+<span class="fc" id="L119">            aggregations.getTypeBreakdown().forEach((type, count) -&gt; </span>
+<span class="fc" id="L120">                content.append(String.format(&quot;  %s: %d\n&quot;, type, count)));</span>
+        }
+        
+<span class="fc" id="L123">        return content.toString().getBytes();</span>
+    }
+
+    /**
+     * Generate export filename based on type and current timestamp.
+     */
+    public String generateFileName(String exportType, String reportType) {
+<span class="fc" id="L130">        String timestamp = DateTimeFormatter.ofPattern(&quot;yyyyMMdd_HHmmss&quot;).format(java.time.LocalDateTime.now());</span>
+<span class="fc" id="L131">        return String.format(&quot;%s_report_%s.%s&quot;, reportType, timestamp, exportType.toLowerCase());</span>
+    }
+
+    /**
+     * Get MIME type for export format.
+     */
+    public String getMimeType(String exportFormat) {
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        switch (exportFormat.toUpperCase()) {</span>
+            case &quot;CSV&quot;:
+<span class="fc" id="L140">                return &quot;text/csv&quot;;</span>
+            case &quot;PDF&quot;:
+<span class="fc" id="L142">                return &quot;application/pdf&quot;;</span>
+            case &quot;EXCEL&quot;:
+            case &quot;XLS&quot;:
+            case &quot;XLSX&quot;:
+<span class="fc" id="L146">                return &quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;;</span>
+            default:
+<span class="fc" id="L148">                return &quot;application/octet-stream&quot;;</span>
+        }
+    }
+
+    /**
+     * Estimate file size based on data and format.
+     */
+    public long estimateFileSize(int recordCount, String format) {
+<span class="fc bfc" id="L156" title="All 4 branches covered.">        switch (format.toUpperCase()) {</span>
+            case &quot;CSV&quot;:
+<span class="fc" id="L158">                return recordCount * 200L; // ~200 bytes per row estimate</span>
+            case &quot;PDF&quot;:
+<span class="fc" id="L160">                return recordCount * 300L; // ~300 bytes per row estimate</span>
+            case &quot;EXCEL&quot;:
+<span class="fc" id="L162">                return recordCount * 150L; // ~150 bytes per row estimate</span>
+            default:
+<span class="fc" id="L164">                return recordCount * 250L; // Default estimate</span>
+        }
+    }
+
+    // Helper methods
+
+    private String escapeCsvValue(String value) {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L172">            return &quot;&quot;;</span>
+        }
+        
+        // Escape CSV special characters
+<span class="pc bpc" id="L176" title="3 of 8 branches missed.">        if (value.contains(&quot;,&quot;) || value.contains(&quot;\&quot;&quot;) || value.contains(&quot;\n&quot;) || value.contains(&quot;\r&quot;)) {</span>
+<span class="fc" id="L177">            return &quot;\&quot;&quot; + value.replace(&quot;\&quot;&quot;, &quot;\&quot;\&quot;&quot;) + &quot;\&quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L180">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

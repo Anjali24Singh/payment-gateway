@@ -1,0 +1,324 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Payment Gateway - Production Dashboard",
+    "tags": ["payment-gateway", "production", "fintech"],
+    "style": "dark",
+    "timezone": "UTC",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"payment-gateway\"}",
+            "legendFormat": "Service Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "DOWN"}}, "type": "value"},
+              {"options": {"1": {"text": "UP"}}, "type": "value"}
+            ]
+          }
+        },
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Request Rate (RPS)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"payment-gateway\"}[5m]))",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"payment-gateway\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"payment-gateway\"}[5m])) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Payment Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(payment_operations_total{status=\"success\"}[5m])) / sum(rate(payment_operations_total[5m])) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 95},
+                {"color": "yellow", "value": 98},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Response Time Distribution",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"payment-gateway\"}[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"payment-gateway\"}[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"payment-gateway\"}[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Active Requests",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(http_requests_active{job=\"payment-gateway\"})",
+            "legendFormat": "Active Requests"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 4, "x": 12, "y": 4}
+      },
+      {
+        "id": 7,
+        "title": "Payment Operations by Type",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(payment_operations_total[5m])) by (operation)",
+            "legendFormat": "{{ operation }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Payment Methods Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(increase(payment_operations_total[1h])) by (payment_method)",
+            "legendFormat": "{{ payment_method }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12}
+      },
+      {
+        "id": 9,
+        "title": "Database Connection Pool",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "hikaricp_connections_active{pool=\"HikariPool-1\"}",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "hikaricp_connections_idle{pool=\"HikariPool-1\"}",
+            "legendFormat": "Idle Connections"
+          },
+          {
+            "expr": "hikaricp_connections_max{pool=\"HikariPool-1\"}",
+            "legendFormat": "Max Connections"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 20}
+      },
+      {
+        "id": 10,
+        "title": "JVM Memory Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "jvm_memory_used_bytes{job=\"payment-gateway\",area=\"heap\"}",
+            "legendFormat": "Heap Used"
+          },
+          {
+            "expr": "jvm_memory_max_bytes{job=\"payment-gateway\",area=\"heap\"}",
+            "legendFormat": "Heap Max"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 20}
+      },
+      {
+        "id": 11,
+        "title": "Redis Operations",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(redis_operations_total{job=\"payment-gateway\"}[5m])) by (operation)",
+            "legendFormat": "{{ operation }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 28}
+      },
+      {
+        "id": 12,
+        "title": "Top Error Endpoints",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(http_requests_total{job=\"payment-gateway\",status=~\"5..\"}[5m])) by (uri))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "table"
+            }
+          }
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true},
+              "renameByName": {
+                "uri": "Endpoint",
+                "Value": "Error Rate (req/s)"
+              }
+            }
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 28}
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "changes(prometheus_config_last_reload_success_timestamp[5m])",
+          "iconColor": "green",
+          "textFormat": "Deployment"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"payment-gateway\"}, instance)",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    }
+  }
+}

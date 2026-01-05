@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">PaymentController.java</span></div><h1>PaymentController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.payment.*;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.service.PaymentService;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+import com.talentica.paymentgateway.service.RequestTrackingService;
+import com.talentica.paymentgateway.service.MetricsService;
+
+/**
+ * REST Controller for payment processing operations.
+ * Provides endpoints for all payment-related functionality including:
+ * - Purchase transactions (auth + capture)
+ * - Authorization-only transactions
+ * - Capture of authorized transactions
+ * - Void/cancel transactions
+ * - Refund transactions (full and partial)
+ * - Transaction status inquiry
+ * 
+ * All endpoints support idempotency and include comprehensive error handling.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L42">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/payments&quot;)
+@Tag(name = &quot;Payment Processing&quot;, description = &quot;Core payment processing operations&quot;)
+@SecurityRequirement(name = &quot;Bearer Authentication&quot;)
+public class PaymentController {
+
+    private final PaymentService paymentService;
+    private final MetricsService metricsService;
+    private final RequestTrackingService requestTrackingService;
+
+<span class="fc" id="L53">    public PaymentController(PaymentService paymentService, MetricsService metricsService, RequestTrackingService requestTrackingService) {</span>
+<span class="fc" id="L54">        this.paymentService = paymentService;</span>
+<span class="fc" id="L55">        this.metricsService = metricsService;</span>
+<span class="fc" id="L56">        this.requestTrackingService = requestTrackingService;</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Process a direct purchase transaction (auth + capture in one step).
+     * This is the most common payment operation for immediate fund capture.
+     */
+    @PostMapping(&quot;/purchase&quot;)
+    @Operation(
+        summary = &quot;Process a purchase transaction&quot;,
+        description = &quot;Processes a direct purchase transaction (authorization + capture in one step). &quot; +
+                     &quot;This immediately charges the customer's payment method and is suitable for most e-commerce transactions.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Purchase processed successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentErrorResponse.class))),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized - Invalid or missing API key&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentErrorResponse.class))),
+        @ApiResponse(responseCode = &quot;422&quot;, description = &quot;Payment processing failed&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentErrorResponse.class))),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentErrorResponse.class)))
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;?&gt; processPurchase(@Valid @RequestBody PurchaseRequest request) {
+        
+        // Correlation ID and Idempotency Key are automatically handled by RequestTrackingFilter
+<span class="fc" id="L90">        String correlationId = requestTrackingService.getCurrentCorrelationId();</span>
+<span class="fc" id="L91">        String idempotencyKey = requestTrackingService.getCurrentIdempotencyKey();</span>
+        
+        // Set idempotency key in request if auto-generated
+<span class="pc bpc" id="L94" title="3 of 4 branches missed.">        if (idempotencyKey != null &amp;&amp; request.getIdempotencyKey() == null) {</span>
+<span class="nc" id="L95">            request.setIdempotencyKey(idempotencyKey);</span>
+        }
+<span class="fc" id="L97">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L100">            log.info(&quot;Processing purchase request - Amount: {}, Currency: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L101">                       request.getAmount(), request.getCurrency(), correlationId);</span>
+
+<span class="fc" id="L103">            PaymentResponse response = paymentService.processPurchase(request);</span>
+            
+<span class="fc" id="L105">            log.info(&quot;Purchase completed successfully - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L106">                       response.getTransactionId(), response.getStatus());</span>
+
+<span class="fc" id="L108">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L110">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L111">            log.error(&quot;Purchase failed - Error: {}, CorrelationId: {}&quot;, e.getMessage(), correlationId);</span>
+            
+<span class="fc" id="L113">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L114">                &quot;PAYMENT_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;PAYMENT_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L116">            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);</span>
+
+<span class="fc" id="L118">        } catch (Exception e) {</span>
+<span class="fc" id="L119">            log.error(&quot;Unexpected error during purchase - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L120">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="fc" id="L122">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="fc" id="L125">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L127">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Process an authorization-only transaction.
+     * This holds funds on the customer's payment method without capturing them.
+     */
+    @PostMapping(&quot;/authorize&quot;)
+    @Operation(
+        summary = &quot;Process an authorization transaction&quot;,
+        description = &quot;Processes an authorization-only transaction that holds funds without capturing them. &quot; +
+                     &quot;Useful for pre-orders or when final amount needs to be confirmed before capture.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Authorization processed successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;422&quot;, description = &quot;Authorization failed&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; processAuthorization(
+            @Valid @RequestBody AuthorizeRequest request,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L156">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L158">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L161">            log.info(&quot;Processing authorization request - Amount: {}, Currency: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L162">                       request.getAmount(), request.getCurrency(), correlationId);</span>
+
+<span class="fc" id="L164">            PaymentResponse response = paymentService.processAuthorization(request);</span>
+            
+<span class="fc" id="L166">            log.info(&quot;Authorization completed successfully - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L167">                       response.getTransactionId(), response.getStatus());</span>
+
+<span class="fc" id="L169">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L171">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L172">            log.error(&quot;Authorization failed - Error: {}, CorrelationId: {}&quot;, e.getMessage(), correlationId);</span>
+            
+<span class="fc" id="L174">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L175">                &quot;AUTHORIZATION_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;AUTHORIZATION_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L177">            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);</span>
+
+<span class="nc" id="L179">        } catch (Exception e) {</span>
+<span class="nc" id="L180">            log.error(&quot;Unexpected error during authorization - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L181">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L183">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L186">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L188">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Capture a previously authorized transaction.
+     * This completes the payment process by actually charging the customer.
+     */
+    @PostMapping(&quot;/capture&quot;)
+    @Operation(
+        summary = &quot;Capture an authorized transaction&quot;,
+        description = &quot;Captures funds from a previously authorized transaction. &quot; +
+                     &quot;The authorization must be in AUTHORIZED status and within the capture window.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Capture processed successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Original authorization not found&quot;),
+        @ApiResponse(responseCode = &quot;422&quot;, description = &quot;Capture failed&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; processCapture(
+            @Valid @RequestBody CaptureRequest request,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L218">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L220">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L223">            log.info(&quot;Processing capture request - AuthTransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L224">                       request.getAuthorizationTransactionId(), request.getAmount(), correlationId);</span>
+
+<span class="fc" id="L226">            PaymentResponse response = paymentService.processCapture(request);</span>
+            
+<span class="fc" id="L228">            log.info(&quot;Capture completed successfully - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L229">                       response.getTransactionId(), response.getStatus());</span>
+
+<span class="fc" id="L231">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L233">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L234">            log.error(&quot;Capture failed - Error: {}, CorrelationId: {}&quot;, e.getMessage(), correlationId);</span>
+            
+            // Determine appropriate status code based on error
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            HttpStatus status = e.getMessage().contains(&quot;not found&quot;) ? </span>
+<span class="pc" id="L238">                HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;</span>
+            
+<span class="fc" id="L240">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L241">                &quot;CAPTURE_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;CAPTURE_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L243">            return ResponseEntity.status(status).body(errorResponse);</span>
+
+<span class="nc" id="L245">        } catch (Exception e) {</span>
+<span class="nc" id="L246">            log.error(&quot;Unexpected error during capture - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L247">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L249">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L252">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L254">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Void/cancel an authorized transaction.
+     * This cancels the authorization and releases the held funds.
+     */
+    @PostMapping(&quot;/void&quot;)
+    @Operation(
+        summary = &quot;Void an authorized transaction&quot;,
+        description = &quot;Voids (cancels) an authorized transaction, releasing any held funds. &quot; +
+                     &quot;Only transactions in AUTHORIZED status can be voided.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Void processed successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Original transaction not found&quot;),
+        @ApiResponse(responseCode = &quot;422&quot;, description = &quot;Void failed&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; processVoid(
+            @Valid @RequestBody VoidRequest request,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L284">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L286">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L289">            log.info(&quot;Processing void request - OriginalTransactionId: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L290">                       request.getOriginalTransactionId(), correlationId);</span>
+
+<span class="fc" id="L292">            PaymentResponse response = paymentService.processVoid(request);</span>
+            
+<span class="fc" id="L294">            log.info(&quot;Void completed successfully - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L295">                       response.getTransactionId(), response.getStatus());</span>
+
+<span class="fc" id="L297">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L299">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L300">            log.error(&quot;Void failed - Error: {}, CorrelationId: {}&quot;, e.getMessage(), correlationId);</span>
+            
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            HttpStatus status = e.getMessage().contains(&quot;not found&quot;) ? </span>
+<span class="pc" id="L303">                HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;</span>
+            
+<span class="fc" id="L305">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L306">                &quot;VOID_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;VOID_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L308">            return ResponseEntity.status(status).body(errorResponse);</span>
+
+<span class="nc" id="L310">        } catch (Exception e) {</span>
+<span class="nc" id="L311">            log.error(&quot;Unexpected error during void - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L312">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L314">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L317">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L319">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Process a refund transaction.
+     * This refunds funds from a previously captured transaction.
+     */
+    @PostMapping(&quot;/refund&quot;)
+    @Operation(
+        summary = &quot;Process a refund transaction&quot;,
+        description = &quot;Processes a refund transaction for a previously captured payment. &quot; +
+                     &quot;Supports both full refunds (amount not specified) and partial refunds.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Refund processed successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Original transaction not found&quot;),
+        @ApiResponse(responseCode = &quot;422&quot;, description = &quot;Refund failed&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; processRefund(
+            @Valid @RequestBody RefundRequest request,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L349">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L351">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L354">            log.info(&quot;Processing refund request - OriginalTransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L355">                       request.getOriginalTransactionId(), request.getAmount(), correlationId);</span>
+
+<span class="fc" id="L357">            PaymentResponse response = paymentService.processRefund(request);</span>
+            
+<span class="fc" id="L359">            log.info(&quot;Refund completed successfully - TransactionId: {}, Status: {}, Amount: {}&quot;, </span>
+<span class="fc" id="L360">                       response.getTransactionId(), response.getStatus(), response.getAmount());</span>
+
+<span class="fc" id="L362">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L364">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L365">            log.error(&quot;Refund failed - Error: {}, CorrelationId: {}&quot;, e.getMessage(), correlationId);</span>
+            
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            HttpStatus status = e.getMessage().contains(&quot;not found&quot;) ? </span>
+<span class="pc" id="L368">                HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;</span>
+            
+<span class="fc" id="L370">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L371">                &quot;REFUND_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;REFUND_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L373">            return ResponseEntity.status(status).body(errorResponse);</span>
+
+<span class="nc" id="L375">        } catch (Exception e) {</span>
+<span class="nc" id="L376">            log.error(&quot;Unexpected error during refund - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L377">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L379">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L382">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L384">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Get transaction status and details.
+     * This retrieves the current status of any transaction.
+     */
+    @GetMapping(&quot;/{transactionId}&quot;)
+    @Operation(
+        summary = &quot;Get transaction status&quot;,
+        description = &quot;Retrieves the current status and details of a transaction by its ID.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Transaction status retrieved successfully&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, 
+                                     schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Transaction not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; getTransactionStatus(
+            @Parameter(description = &quot;Transaction ID&quot;, required = true)
+            @PathVariable String transactionId,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L412">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L414">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L417">            log.info(&quot;Getting transaction status - TransactionId: {}, CorrelationId: {}&quot;, </span>
+                       transactionId, correlationId);
+
+<span class="fc" id="L420">            PaymentResponse response = paymentService.getTransactionStatus(transactionId);</span>
+            
+<span class="fc" id="L422">            log.info(&quot;Transaction status retrieved - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L423">                       transactionId, response.getStatus());</span>
+
+<span class="fc" id="L425">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L427">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L428">            log.error(&quot;Failed to get transaction status - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L429">                        e.getMessage(), correlationId);</span>
+            
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            HttpStatus status = e.getMessage().contains(&quot;not found&quot;) ? </span>
+<span class="pc" id="L432">                HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR;</span>
+            
+<span class="fc" id="L434">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L435">                &quot;TRANSACTION_NOT_FOUND&quot;, e.getMessage(), e.getMessage(), &quot;INQUIRY_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L437">            return ResponseEntity.status(status).body(errorResponse);</span>
+
+<span class="nc" id="L439">        } catch (Exception e) {</span>
+<span class="nc" id="L440">            log.error(&quot;Unexpected error getting transaction status - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L441">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L443">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L446">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L448">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Validate payment method without processing a transaction.
+     * This can be used to validate customer payment information before checkout.
+     */
+    @PostMapping(&quot;/validate&quot;)
+    @Operation(
+        summary = &quot;Validate payment method&quot;,
+        description = &quot;Validates payment method information without processing a transaction. &quot; +
+                     &quot;Useful for pre-validating customer payment details.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Payment method is valid&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid payment method&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Unauthorized&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PreAuthorize(&quot;hasRole('MERCHANT') or hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;?&gt; validatePaymentMethod(
+            @Valid @RequestBody PaymentMethodRequest paymentMethod,
+            @RequestHeader(value = &quot;X-Correlation-ID&quot;, required = false) String correlationId) {
+        
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="fc" id="L474">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+        }
+<span class="fc" id="L476">        MDC.put(&quot;correlationId&quot;, correlationId);</span>
+
+        try {
+<span class="fc" id="L479">            log.info(&quot;Validating payment method - Type: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L480">                       paymentMethod.getType(), correlationId);</span>
+
+<span class="fc" id="L482">            paymentService.validatePaymentMethod(paymentMethod);</span>
+            
+<span class="fc" id="L484">            log.info(&quot;Payment method validation successful - Type: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L485">                       paymentMethod.getType(), correlationId);</span>
+
+<span class="fc" id="L487">            return ResponseEntity.ok().body(new PaymentValidationResponse(true, &quot;Payment method is valid&quot;));</span>
+
+<span class="fc" id="L489">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L490">            log.error(&quot;Payment method validation failed - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L491">                        e.getMessage(), correlationId);</span>
+            
+<span class="fc" id="L493">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L494">                &quot;VALIDATION_FAILED&quot;, e.getMessage(), e.getMessage(), &quot;VALIDATION_ERROR&quot;, correlationId);</span>
+            
+<span class="fc" id="L496">            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+
+<span class="nc" id="L498">        } catch (Exception e) {</span>
+<span class="nc" id="L499">            log.error(&quot;Unexpected error during validation - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L500">                        e.getMessage(), correlationId, e);</span>
+            
+<span class="nc" id="L502">            PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+                &quot;INTERNAL_ERROR&quot;, &quot;An unexpected error occurred&quot;, &quot;An unexpected error occurred&quot;, &quot;SYSTEM_ERROR&quot;, correlationId);
+            
+<span class="nc" id="L505">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        } finally {
+<span class="fc" id="L507">            MDC.clear();</span>
+        }
+    }
+
+    /**
+     * Simple response class for payment validation endpoint.
+     */
+    public static class PaymentValidationResponse {
+        private boolean valid;
+        private String message;
+
+<span class="fc" id="L518">        public PaymentValidationResponse(boolean valid, String message) {</span>
+<span class="fc" id="L519">            this.valid = valid;</span>
+<span class="fc" id="L520">            this.message = message;</span>
+<span class="fc" id="L521">        }</span>
+
+        public boolean isValid() {
+<span class="fc" id="L524">            return valid;</span>
+        }
+
+        public String getMessage() {
+<span class="fc" id="L528">            return message;</span>
+        }
+    }
+
+    @Operation(summary = &quot;Get transaction details from Authorize.Net directly&quot;, 
+               description = &quot;Queries Authorize.Net directly for transaction details to verify integration&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Transaction details retrieved successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PaymentResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Transaction not found in Authorize.Net&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Error querying Authorize.Net&quot;)
+    })
+    @GetMapping(&quot;/authnet/{authnetTransactionId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;PaymentResponse&gt; getAuthNetTransactionDetails(
+            @Parameter(description = &quot;Authorize.Net Transaction ID&quot;) @PathVariable String authnetTransactionId) {
+        
+<span class="fc" id="L545">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L547">        log.info(&quot;Querying Authorize.Net directly - AuthNet TransactionId: {}, CorrelationId: {}&quot;, </span>
+                   authnetTransactionId, correlationId);
+
+        try {
+<span class="fc" id="L551">            PaymentResponse response = paymentService.getAuthNetTransactionDetails(authnetTransactionId);</span>
+            
+<span class="fc" id="L553">            log.info(&quot;AuthNet transaction details retrieved - AuthNet ID: {}, Status: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L554">                       authnetTransactionId, response.getStatus(), correlationId);</span>
+
+<span class="fc" id="L556">            return ResponseEntity.ok()</span>
+<span class="fc" id="L557">                               .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L558">                               .body(response);</span>
+                               
+<span class="fc" id="L560">        } catch (Exception e) {</span>
+<span class="fc" id="L561">            log.error(&quot;Failed to retrieve transaction from Authorize.Net - AuthNet ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L562">                        authnetTransactionId, e.getMessage(), correlationId);</span>
+            
+<span class="fc" id="L564">            PaymentResponse errorResponse = new PaymentResponse();</span>
+<span class="fc" id="L565">            errorResponse.setAuthnetTransactionId(authnetTransactionId);</span>
+<span class="fc" id="L566">            errorResponse.setSuccess(false);</span>
+<span class="fc" id="L567">            errorResponse.setResponseReasonText(&quot;Failed to retrieve from Authorize.Net: &quot; + e.getMessage());</span>
+<span class="fc" id="L568">            errorResponse.setCorrelationId(correlationId);</span>
+            
+<span class="fc" id="L570">            return ResponseEntity.status(HttpStatus.NOT_FOUND)</span>
+<span class="fc" id="L571">                               .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L572">                               .body(errorResponse);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

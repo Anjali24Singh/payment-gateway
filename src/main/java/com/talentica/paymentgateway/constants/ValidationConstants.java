@@ -1,0 +1,58 @@
+package com.talentica.paymentgateway.constants;
+
+/**
+ * Validation-related constants for input validation.
+ * Centralizes regex patterns, constraints, and error messages.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public final class ValidationConstants {
+
+    private ValidationConstants() {
+        throw new UnsupportedOperationException("This is a constants class and cannot be instantiated");
+    }
+
+    // Password Validation
+    public static final String PASSWORD_REGEX = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
+    public static final String PASSWORD_MESSAGE = "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character";
+    public static final int PASSWORD_MIN_LENGTH = 8;
+    public static final int PASSWORD_MAX_LENGTH = 128;
+
+    // Email Validation
+    public static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
+    public static final int EMAIL_MAX_LENGTH = 255;
+
+    // Phone Number Validation
+    public static final String PHONE_REGEX = "^\\+?[1-9]\\d{1,14}$";
+    public static final String PHONE_MESSAGE = "Phone number must be in E.164 format";
+    public static final int PHONE_MAX_LENGTH = 20;
+
+    // Name Validation
+    public static final int NAME_MIN_LENGTH = 1;
+    public static final int NAME_MAX_LENGTH = 100;
+
+    // Credit Card Validation
+    public static final String CARD_NUMBER_REGEX = "^\\d{13,19}$";
+    public static final String CVV_REGEX = "^\\d{3,4}$";
+    public static final int CARD_NUMBER_MIN_LENGTH = 13;
+    public static final int CARD_NUMBER_MAX_LENGTH = 19;
+
+    // Amount Validation
+    public static final String AMOUNT_MIN = "0.01";
+    public static final String AMOUNT_MAX = "999999.99";
+    public static final int AMOUNT_PRECISION = 12;
+    public static final int AMOUNT_SCALE = 2;
+
+    // String Length Constraints
+    public static final int SHORT_STRING_MAX = 50;
+    public static final int MEDIUM_STRING_MAX = 255;
+    public static final int LONG_STRING_MAX = 1000;
+    public static final int DESCRIPTION_MAX_LENGTH = 500;
+    public static final int TRANSACTION_ID_MAX_LENGTH = 100;
+    public static final int REFERENCE_ID_MAX_LENGTH = 100;
+
+    // API Key Validation
+    public static final int API_KEY_LENGTH = 32;
+    public static final String API_KEY_PREFIX = "pgw_";
+}

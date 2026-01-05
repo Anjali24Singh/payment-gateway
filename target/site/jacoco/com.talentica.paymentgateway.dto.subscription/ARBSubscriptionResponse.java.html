@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARBSubscriptionResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">ARBSubscriptionResponse.java</span></div><h1>ARBSubscriptionResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.math.BigDecimal;
+
+/**
+ * Response DTO for Authorize.Net ARB subscription operations.
+ */
+@Schema(description = &quot;Response for ARB subscription operations&quot;)
+public class ARBSubscriptionResponse {
+
+    @Schema(description = &quot;Authorize.Net ARB subscription ID&quot;, example = &quot;7654321&quot;)
+    private String arbSubscriptionId;
+
+    @Schema(description = &quot;Customer identifier&quot;, example = &quot;CUST001&quot;)
+    private String customerId;
+
+    @Schema(description = &quot;Customer name&quot;, example = &quot;John Doe-Updated&quot;)
+    private String customerName;
+
+    @Schema(description = &quot;Customer email&quot;, example = &quot;john.doe.updated@example.com&quot;)
+    private String customerEmail;
+
+    @Schema(description = &quot;Subscription plan code&quot;, example = &quot;SUCCESS_PLAN&quot;)
+    private String planCode;
+
+    @Schema(description = &quot;Subscription plan name&quot;, example = &quot;Success Monthly Plan&quot;)
+    private String planName;
+
+    @Schema(description = &quot;Plan amount&quot;, example = &quot;39.99&quot;)
+    private BigDecimal planAmount;
+
+    @Schema(description = &quot;Currency&quot;, example = &quot;USD&quot;)
+    private String currency;
+
+    @Schema(description = &quot;Billing interval unit&quot;, example = &quot;MONTH&quot;)
+    private String intervalUnit;
+
+    @Schema(description = &quot;Billing interval count&quot;, example = &quot;1&quot;)
+    private Integer intervalCount;
+
+    @Schema(description = &quot;Subscription status&quot;, example = &quot;ACTIVE&quot;)
+    private String status;
+
+    @Schema(description = &quot;Response message&quot;, example = &quot;ARB subscription created successfully&quot;)
+    private String message;
+
+    // Constructors
+<span class="fc" id="L50">    public ARBSubscriptionResponse() {}</span>
+
+    // Getters and Setters
+    public String getArbSubscriptionId() {
+<span class="fc" id="L54">        return arbSubscriptionId;</span>
+    }
+
+    public void setArbSubscriptionId(String arbSubscriptionId) {
+<span class="fc" id="L58">        this.arbSubscriptionId = arbSubscriptionId;</span>
+<span class="fc" id="L59">    }</span>
+
+    public String getCustomerId() {
+<span class="fc" id="L62">        return customerId;</span>
+    }
+
+    public void setCustomerId(String customerId) {
+<span class="fc" id="L66">        this.customerId = customerId;</span>
+<span class="fc" id="L67">    }</span>
+
+    public String getCustomerName() {
+<span class="fc" id="L70">        return customerName;</span>
+    }
+
+    public void setCustomerName(String customerName) {
+<span class="fc" id="L74">        this.customerName = customerName;</span>
+<span class="fc" id="L75">    }</span>
+
+    public String getCustomerEmail() {
+<span class="fc" id="L78">        return customerEmail;</span>
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+<span class="fc" id="L82">        this.customerEmail = customerEmail;</span>
+<span class="fc" id="L83">    }</span>
+
+    public String getPlanCode() {
+<span class="fc" id="L86">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L90">        this.planCode = planCode;</span>
+<span class="fc" id="L91">    }</span>
+
+    public String getPlanName() {
+<span class="fc" id="L94">        return planName;</span>
+    }
+
+    public void setPlanName(String planName) {
+<span class="fc" id="L98">        this.planName = planName;</span>
+<span class="fc" id="L99">    }</span>
+
+    public BigDecimal getPlanAmount() {
+<span class="fc" id="L102">        return planAmount;</span>
+    }
+
+    public void setPlanAmount(BigDecimal planAmount) {
+<span class="fc" id="L106">        this.planAmount = planAmount;</span>
+<span class="fc" id="L107">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L110">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L114">        this.currency = currency;</span>
+<span class="fc" id="L115">    }</span>
+
+    public String getIntervalUnit() {
+<span class="fc" id="L118">        return intervalUnit;</span>
+    }
+
+    public void setIntervalUnit(String intervalUnit) {
+<span class="fc" id="L122">        this.intervalUnit = intervalUnit;</span>
+<span class="fc" id="L123">    }</span>
+
+    public Integer getIntervalCount() {
+<span class="fc" id="L126">        return intervalCount;</span>
+    }
+
+    public void setIntervalCount(Integer intervalCount) {
+<span class="fc" id="L130">        this.intervalCount = intervalCount;</span>
+<span class="fc" id="L131">    }</span>
+
+    public String getStatus() {
+<span class="fc" id="L134">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="fc" id="L138">        this.status = status;</span>
+<span class="fc" id="L139">    }</span>
+
+    public String getMessage() {
+<span class="fc" id="L142">        return message;</span>
+    }
+
+    public void setMessage(String message) {
+<span class="fc" id="L146">        this.message = message;</span>
+<span class="fc" id="L147">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L151">        return &quot;ARBSubscriptionResponse{&quot; +</span>
+                &quot;arbSubscriptionId='&quot; + arbSubscriptionId + '\'' +
+                &quot;, customerId='&quot; + customerId + '\'' +
+                &quot;, customerName='&quot; + customerName + '\'' +
+                &quot;, customerEmail='&quot; + customerEmail + '\'' +
+                &quot;, planCode='&quot; + planCode + '\'' +
+                &quot;, planName='&quot; + planName + '\'' +
+                &quot;, planAmount=&quot; + planAmount +
+                &quot;, currency='&quot; + currency + '\'' +
+                &quot;, intervalUnit='&quot; + intervalUnit + '\'' +
+                &quot;, intervalCount=&quot; + intervalCount +
+                &quot;, status='&quot; + status + '\'' +
+                &quot;, message='&quot; + message + '\'' +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

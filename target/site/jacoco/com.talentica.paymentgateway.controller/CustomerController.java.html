@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">CustomerController.java</span></div><h1>CustomerController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.customer.*;
+import com.talentica.paymentgateway.dto.payment.PaymentMethodRequest;
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.service.AuthorizeNetCustomerService;
+import com.talentica.paymentgateway.service.CustomerService;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import net.authorize.api.contract.v1.CustomerPaymentProfileMaskedType;
+import net.authorize.api.contract.v1.CustomerProfileMaskedType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST Controller for Authorize.Net Customer Information Manager (CIM) operations
+ */
+<span class="fc" id="L27">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/api/customers&quot;)
+@CrossOrigin(origins = &quot;*&quot;)
+<span class="fc" id="L31">public class CustomerController {</span>
+
+    @Autowired
+    private AuthorizeNetCustomerService authorizeNetCustomerService;
+
+    @Autowired
+    private CustomerService customerService;
+
+    /**
+     * Create a new customer profile in Authorize.Net CIM
+     */
+    @PostMapping(&quot;/profiles&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; createCustomerProfile(
+            @Valid @RequestBody CustomerProfileRequest request) {
+        
+<span class="fc" id="L47">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L48">        log.info(&quot;Creating customer profile - Customer ID: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L49">                   request.getCustomerId(), correlationId);</span>
+
+        try {
+            // Create or get existing customer from local database
+<span class="fc" id="L53">            Customer customer = customerService.findByCustomerId(request.getCustomerId());</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (customer == null) {</span>
+<span class="fc" id="L55">                customer = new Customer();</span>
+<span class="fc" id="L56">                customer.setCustomerReference(request.getCustomerId());</span>
+<span class="fc" id="L57">                customer.setEmail(request.getEmail());</span>
+<span class="fc" id="L58">                customer.setFirstName(request.getFirstName());</span>
+<span class="fc" id="L59">                customer.setLastName(request.getLastName());</span>
+<span class="fc" id="L60">                customer.setBillingAddressLine1(request.getBillingAddressLine1());</span>
+<span class="fc" id="L61">                customer.setBillingCity(request.getBillingCity());</span>
+<span class="fc" id="L62">                customer.setBillingState(request.getBillingState());</span>
+<span class="fc" id="L63">                customer.setBillingPostalCode(request.getBillingPostalCode());</span>
+<span class="fc" id="L64">                customer.setBillingCountry(request.getBillingCountry());</span>
+<span class="fc" id="L65">                customer = customerService.createCustomer(customer);</span>
+            }
+
+            // Create customer profile in Authorize.Net
+<span class="fc" id="L69">            String customerProfileId = authorizeNetCustomerService.createCustomerProfile(customer, null);</span>
+            
+            // Update local customer with Authorize.Net profile ID
+<span class="fc" id="L72">            customer.setAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="fc" id="L73">            customerService.updateCustomer(customer);</span>
+
+<span class="fc" id="L75">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L76">            response.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L77">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L78">            response.put(&quot;customerId&quot;, customer.getCustomerId());</span>
+<span class="fc" id="L79">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L81">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L83">        } catch (Exception e) {</span>
+<span class="fc" id="L84">            log.error(&quot;Failed to create customer profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="fc" id="L85">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L86">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L87">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="fc" id="L88">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L89">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Get customer profile from Authorize.Net CIM
+     */
+    @GetMapping(&quot;/profiles/{customerProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getCustomerProfile(
+            @PathVariable String customerProfileId) {
+        
+<span class="fc" id="L101">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L102">        log.info(&quot;Retrieving customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+<span class="fc" id="L106">            CustomerProfileMaskedType profile = authorizeNetCustomerService.getCustomerProfile(customerProfileId);</span>
+            
+<span class="fc" id="L108">            CustomerProfileResponse response = new CustomerProfileResponse();</span>
+<span class="fc" id="L109">            response.setCustomerProfileId(profile.getCustomerProfileId());</span>
+<span class="fc" id="L110">            response.setMerchantCustomerId(profile.getMerchantCustomerId());</span>
+<span class="fc" id="L111">            response.setEmail(profile.getEmail());</span>
+<span class="fc" id="L112">            response.setDescription(profile.getDescription());</span>
+
+            // Convert payment profiles
+<span class="fc" id="L115">            List&lt;CustomerPaymentProfileResponse&gt; paymentProfiles = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (profile.getPaymentProfiles() != null) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                for (var pp : profile.getPaymentProfiles()) {</span>
+<span class="nc" id="L118">                    CustomerPaymentProfileResponse ppResponse = new CustomerPaymentProfileResponse();</span>
+<span class="nc" id="L119">                    ppResponse.setCustomerPaymentProfileId(pp.getCustomerPaymentProfileId());</span>
+<span class="nc" id="L120">                    ppResponse.setCustomerProfileId(customerProfileId);</span>
+                    
+<span class="nc bnc" id="L122" title="All 4 branches missed.">                    if (pp.getPayment() != null &amp;&amp; pp.getPayment().getCreditCard() != null) {</span>
+<span class="nc" id="L123">                        ppResponse.setCardNumber(pp.getPayment().getCreditCard().getCardNumber());</span>
+<span class="nc" id="L124">                        ppResponse.setExpirationDate(pp.getPayment().getCreditCard().getExpirationDate());</span>
+<span class="nc" id="L125">                        ppResponse.setCardType(pp.getPayment().getCreditCard().getCardType());</span>
+                    }
+                    
+<span class="nc" id="L128">                    paymentProfiles.add(ppResponse);</span>
+<span class="nc" id="L129">                }</span>
+            }
+<span class="fc" id="L131">            response.setPaymentProfiles(paymentProfiles);</span>
+
+<span class="fc" id="L133">            Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L134">            result.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L135">            result.put(&quot;profile&quot;, response);</span>
+<span class="fc" id="L136">            result.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L138">            return ResponseEntity.ok(result);</span>
+
+<span class="fc" id="L140">        } catch (Exception e) {</span>
+<span class="fc" id="L141">            log.error(&quot;Failed to retrieve customer profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="fc" id="L142">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L143">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L144">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="fc" id="L145">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L146">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Update customer profile in Authorize.Net CIM
+     */
+    @PutMapping(&quot;/profiles/{customerProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; updateCustomerProfile(
+            @PathVariable String customerProfileId,
+            @Valid @RequestBody CustomerProfileRequest request) {
+        
+<span class="fc" id="L159">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L160">        log.info(&quot;Updating customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+            // Get customer from local database
+<span class="fc" id="L165">            Customer customer = customerService.findByAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (customer == null) {</span>
+<span class="fc" id="L167">                customer = customerService.findByCustomerId(request.getCustomerId());</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                if (customer == null) {</span>
+<span class="fc" id="L169">                    Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L170">                    errorResponse.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L171">                    errorResponse.put(&quot;error&quot;, &quot;Customer not found&quot;);</span>
+<span class="fc" id="L172">                    errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L173">                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);</span>
+                }
+            }
+
+            // Update customer data
+<span class="fc" id="L178">            customer.setEmail(request.getEmail());</span>
+<span class="fc" id="L179">            customer.setFirstName(request.getFirstName());</span>
+<span class="fc" id="L180">            customer.setLastName(request.getLastName());</span>
+<span class="fc" id="L181">            customer.setBillingAddressLine1(request.getBillingAddressLine1());</span>
+<span class="fc" id="L182">            customer.setBillingCity(request.getBillingCity());</span>
+<span class="fc" id="L183">            customer.setBillingState(request.getBillingState());</span>
+<span class="fc" id="L184">            customer.setBillingPostalCode(request.getBillingPostalCode());</span>
+<span class="fc" id="L185">            customer.setBillingCountry(request.getBillingCountry());</span>
+
+            // Update in Authorize.Net
+<span class="fc" id="L188">            boolean success = authorizeNetCustomerService.updateCustomerProfile(customerProfileId, customer);</span>
+            
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (success) {</span>
+<span class="fc" id="L191">                customerService.updateCustomer(customer);</span>
+            }
+
+<span class="fc" id="L194">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L195">            response.put(&quot;success&quot;, success);</span>
+<span class="fc" id="L196">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L197">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L199">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L201">        } catch (Exception e) {</span>
+<span class="nc" id="L202">            log.error(&quot;Failed to update customer profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L203">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L204">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L205">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L206">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L207">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Delete customer profile from Authorize.Net CIM
+     */
+    @DeleteMapping(&quot;/profiles/{customerProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; deleteCustomerProfile(
+            @PathVariable String customerProfileId) {
+        
+<span class="fc" id="L219">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L220">        log.info(&quot;Deleting customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+<span class="fc" id="L224">            boolean success = authorizeNetCustomerService.deleteCustomerProfile(customerProfileId);</span>
+            
+            // Update local customer to remove Authorize.Net profile ID
+<span class="fc" id="L227">            Customer customer = customerService.findByAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (customer != null) {</span>
+<span class="fc" id="L229">                customer.setAuthorizeNetCustomerProfileId(null);</span>
+<span class="fc" id="L230">                customerService.updateCustomer(customer);</span>
+            }
+
+<span class="fc" id="L233">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L234">            response.put(&quot;success&quot;, success);</span>
+<span class="fc" id="L235">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L236">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L238">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L240">        } catch (Exception e) {</span>
+<span class="nc" id="L241">            log.error(&quot;Failed to delete customer profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L242">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L243">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L244">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L245">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L246">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Create payment profile for a customer
+     */
+    @PostMapping(&quot;/profiles/{customerProfileId}/payment-profiles&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; createPaymentProfile(
+            @PathVariable String customerProfileId,
+            @Valid @RequestBody PaymentProfileRequest request) {
+        
+<span class="fc" id="L259">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L260">        log.info(&quot;Creating payment profile - Customer Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+            // Get customer from local database
+<span class="fc" id="L265">            Customer customer = customerService.findByAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (customer == null) {</span>
+<span class="fc" id="L267">                Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L268">                errorResponse.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L269">                errorResponse.put(&quot;error&quot;, &quot;Customer profile not found&quot;);</span>
+<span class="fc" id="L270">                errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L271">                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);</span>
+            }
+
+            // Convert PaymentProfileRequest to PaymentMethodRequest
+<span class="fc" id="L275">            PaymentMethodRequest paymentMethod = new PaymentMethodRequest();</span>
+<span class="fc" id="L276">            paymentMethod.setType(&quot;CREDIT_CARD&quot;);</span>
+<span class="fc" id="L277">            paymentMethod.setCardNumber(request.getCardNumber());</span>
+<span class="fc" id="L278">            paymentMethod.setExpiryMonth(request.getExpiryMonth());</span>
+<span class="fc" id="L279">            paymentMethod.setExpiryYear(request.getExpiryYear());</span>
+<span class="fc" id="L280">            paymentMethod.setCvv(request.getCvv());</span>
+
+            // Create payment profile in Authorize.Net
+<span class="fc" id="L283">            String paymentProfileId = authorizeNetCustomerService.createPaymentProfile(</span>
+                customerProfileId, paymentMethod, customer);
+
+<span class="fc" id="L286">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L287">            response.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L288">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L289">            response.put(&quot;paymentProfileId&quot;, paymentProfileId);</span>
+<span class="fc" id="L290">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L292">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L294">        } catch (Exception e) {</span>
+<span class="nc" id="L295">            log.error(&quot;Failed to create payment profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L296">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L297">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L298">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L299">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L300">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Get payment profile details
+     */
+    @GetMapping(&quot;/profiles/{customerProfileId}/payment-profiles/{paymentProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getPaymentProfile(
+            @PathVariable String customerProfileId,
+            @PathVariable String paymentProfileId) {
+        
+<span class="fc" id="L313">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L314">        log.info(&quot;Retrieving payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="fc" id="L318">            CustomerPaymentProfileMaskedType paymentProfile = </span>
+<span class="fc" id="L319">                authorizeNetCustomerService.getCustomerPaymentProfile(customerProfileId, paymentProfileId);</span>
+
+<span class="fc" id="L321">            CustomerPaymentProfileResponse response = new CustomerPaymentProfileResponse();</span>
+<span class="fc" id="L322">            response.setCustomerPaymentProfileId(paymentProfile.getCustomerPaymentProfileId());</span>
+<span class="fc" id="L323">            response.setCustomerProfileId(customerProfileId);</span>
+            
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">            if (paymentProfile.getPayment() != null &amp;&amp; paymentProfile.getPayment().getCreditCard() != null) {</span>
+<span class="fc" id="L326">                response.setCardNumber(paymentProfile.getPayment().getCreditCard().getCardNumber());</span>
+<span class="fc" id="L327">                response.setExpirationDate(paymentProfile.getPayment().getCreditCard().getExpirationDate());</span>
+<span class="fc" id="L328">                response.setCardType(paymentProfile.getPayment().getCreditCard().getCardType());</span>
+            }
+
+<span class="fc" id="L331">            Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L332">            result.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L333">            result.put(&quot;paymentProfile&quot;, response);</span>
+<span class="fc" id="L334">            result.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L336">            return ResponseEntity.ok(result);</span>
+
+<span class="nc" id="L338">        } catch (Exception e) {</span>
+<span class="nc" id="L339">            log.error(&quot;Failed to retrieve payment profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L340">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L341">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L342">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L343">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L344">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Update payment profile
+     */
+    @PutMapping(&quot;/profiles/{customerProfileId}/payment-profiles/{paymentProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; updatePaymentProfile(
+            @PathVariable String customerProfileId,
+            @PathVariable String paymentProfileId,
+            @Valid @RequestBody PaymentProfileRequest request) {
+        
+<span class="fc" id="L358">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L359">        log.info(&quot;Updating payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+            // Get customer from local database
+<span class="fc" id="L364">            Customer customer = customerService.findByAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (customer == null) {</span>
+<span class="nc" id="L366">                Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L367">                errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L368">                errorResponse.put(&quot;error&quot;, &quot;Customer profile not found&quot;);</span>
+<span class="nc" id="L369">                errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L370">                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);</span>
+            }
+
+            // Convert PaymentProfileRequest to PaymentMethodRequest
+<span class="fc" id="L374">            PaymentMethodRequest paymentMethod = new PaymentMethodRequest();</span>
+<span class="fc" id="L375">            paymentMethod.setType(&quot;CREDIT_CARD&quot;);</span>
+<span class="fc" id="L376">            paymentMethod.setCardNumber(request.getCardNumber());</span>
+<span class="fc" id="L377">            paymentMethod.setExpiryMonth(request.getExpiryMonth());</span>
+<span class="fc" id="L378">            paymentMethod.setExpiryYear(request.getExpiryYear());</span>
+<span class="fc" id="L379">            paymentMethod.setCvv(request.getCvv());</span>
+
+            // Update payment profile in Authorize.Net
+<span class="fc" id="L382">            boolean success = authorizeNetCustomerService.updateCustomerPaymentProfile(</span>
+                customerProfileId, paymentProfileId, paymentMethod, customer);
+
+<span class="fc" id="L385">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L386">            response.put(&quot;success&quot;, success);</span>
+<span class="fc" id="L387">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L388">            response.put(&quot;paymentProfileId&quot;, paymentProfileId);</span>
+<span class="fc" id="L389">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L391">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L393">        } catch (Exception e) {</span>
+<span class="nc" id="L394">            log.error(&quot;Failed to update payment profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L395">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L396">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L397">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L398">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L399">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Delete payment profile
+     */
+    @DeleteMapping(&quot;/profiles/{customerProfileId}/payment-profiles/{paymentProfileId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; deletePaymentProfile(
+            @PathVariable String customerProfileId,
+            @PathVariable String paymentProfileId) {
+        
+<span class="fc" id="L412">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L413">        log.info(&quot;Deleting payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="fc" id="L417">            boolean success = authorizeNetCustomerService.deleteCustomerPaymentProfile(</span>
+                customerProfileId, paymentProfileId);
+
+<span class="fc" id="L420">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L421">            response.put(&quot;success&quot;, success);</span>
+<span class="fc" id="L422">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L423">            response.put(&quot;paymentProfileId&quot;, paymentProfileId);</span>
+<span class="fc" id="L424">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L426">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L428">        } catch (Exception e) {</span>
+<span class="nc" id="L429">            log.error(&quot;Failed to delete payment profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="nc" id="L430">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L431">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="nc" id="L432">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L433">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="nc" id="L434">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+
+    /**
+     * Validate payment profile
+     */
+    @PostMapping(&quot;/profiles/{customerProfileId}/payment-profiles/{paymentProfileId}/validate&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('MERCHANT') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; validatePaymentProfile(
+            @PathVariable String customerProfileId,
+            @PathVariable String paymentProfileId) {
+        
+<span class="fc" id="L447">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L448">        log.info(&quot;Validating payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="fc" id="L452">            boolean isValid = authorizeNetCustomerService.validateCustomerPaymentProfile(</span>
+                customerProfileId, paymentProfileId);
+
+<span class="fc" id="L455">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L456">            response.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L457">            response.put(&quot;valid&quot;, isValid);</span>
+<span class="fc" id="L458">            response.put(&quot;customerProfileId&quot;, customerProfileId);</span>
+<span class="fc" id="L459">            response.put(&quot;paymentProfileId&quot;, paymentProfileId);</span>
+<span class="fc" id="L460">            response.put(&quot;correlationId&quot;, correlationId);</span>
+
+<span class="fc" id="L462">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L464">        } catch (Exception e) {</span>
+<span class="fc" id="L465">            log.error(&quot;Failed to validate payment profile - CorrelationId: {}&quot;, correlationId, e);</span>
+<span class="fc" id="L466">            Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L467">            errorResponse.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L468">            errorResponse.put(&quot;error&quot;, e.getMessage());</span>
+<span class="fc" id="L469">            errorResponse.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L470">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

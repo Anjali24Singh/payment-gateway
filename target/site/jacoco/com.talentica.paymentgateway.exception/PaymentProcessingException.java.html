@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentProcessingException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.exception</a> &gt; <span class="el_source">PaymentProcessingException.java</span></div><h1>PaymentProcessingException.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.exception;
+
+import com.talentica.paymentgateway.dto.payment.PaymentErrorResponse;
+
+/**
+ * Exception thrown when payment processing fails.
+ * Provides detailed error information and correlation tracking.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public class PaymentProcessingException extends RuntimeException {
+
+    private final String correlationId;
+    private final String errorCode;
+    private final PaymentErrorResponse errorResponse;
+
+    /**
+     * Constructs a PaymentProcessingException with a message and correlation ID.
+     */
+    public PaymentProcessingException(String message, String correlationId) {
+<span class="fc" id="L22">        super(message);</span>
+<span class="fc" id="L23">        this.correlationId = correlationId;</span>
+<span class="fc" id="L24">        this.errorCode = &quot;PAYMENT_PROCESSING_ERROR&quot;;</span>
+<span class="fc" id="L25">        this.errorResponse = null;</span>
+<span class="fc" id="L26">    }</span>
+
+    /**
+     * Constructs a PaymentProcessingException with a message, cause, and correlation ID.
+     */
+    public PaymentProcessingException(String message, Throwable cause, String correlationId) {
+<span class="fc" id="L32">        super(message, cause);</span>
+<span class="fc" id="L33">        this.correlationId = correlationId;</span>
+<span class="fc" id="L34">        this.errorCode = &quot;PAYMENT_PROCESSING_ERROR&quot;;</span>
+<span class="fc" id="L35">        this.errorResponse = null;</span>
+<span class="fc" id="L36">    }</span>
+
+    /**
+     * Constructs a PaymentProcessingException with detailed error information.
+     */
+    public PaymentProcessingException(String message, String errorCode, String correlationId) {
+<span class="nc" id="L42">        super(message);</span>
+<span class="nc" id="L43">        this.correlationId = correlationId;</span>
+<span class="nc" id="L44">        this.errorCode = errorCode;</span>
+<span class="nc" id="L45">        this.errorResponse = null;</span>
+<span class="nc" id="L46">    }</span>
+
+    /**
+     * Constructs a PaymentProcessingException with a message, error code, and cause.
+     */
+    public PaymentProcessingException(String message, String errorCode, Throwable cause) {
+<span class="fc" id="L52">        super(message, cause);</span>
+<span class="fc" id="L53">        this.correlationId = null;</span>
+<span class="fc" id="L54">        this.errorCode = errorCode;</span>
+<span class="fc" id="L55">        this.errorResponse = null;</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Constructs a PaymentProcessingException with a PaymentErrorResponse.
+     */
+    public PaymentProcessingException(PaymentErrorResponse errorResponse) {
+<span class="fc" id="L62">        super(errorResponse.getMessage());</span>
+<span class="fc" id="L63">        this.correlationId = errorResponse.getCorrelationId();</span>
+<span class="fc" id="L64">        this.errorCode = errorResponse.getCode();</span>
+<span class="fc" id="L65">        this.errorResponse = errorResponse;</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Gets the correlation ID for tracking this error.
+     */
+    public String getCorrelationId() {
+<span class="fc" id="L72">        return correlationId;</span>
+    }
+
+    /**
+     * Gets the error code.
+     */
+    public String getErrorCode() {
+<span class="fc" id="L79">        return errorCode;</span>
+    }
+
+    /**
+     * Gets the detailed error response.
+     */
+    public PaymentErrorResponse getErrorResponse() {
+<span class="fc" id="L86">        return errorResponse;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L91">        return &quot;PaymentProcessingException{&quot; +</span>
+<span class="fc" id="L92">                &quot;message='&quot; + getMessage() + '\'' +</span>
+                &quot;, correlationId='&quot; + correlationId + '\'' +
+                &quot;, errorCode='&quot; + errorCode + '\'' +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

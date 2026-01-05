@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">TransactionType.java</span></div><h1>TransactionType.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+/**
+ * Enumeration representing different types of payment transactions.
+ * These types correspond to standard payment processing operations.
+ */
+<span class="fc" id="L7">public enum TransactionType {</span>
+    /**
+     * Direct purchase transaction (authorize and capture in one step)
+     */
+<span class="fc" id="L11">    PURCHASE,</span>
+    
+    /**
+     * Authorization only (reserve funds without capturing)
+     */
+<span class="fc" id="L16">    AUTHORIZE,</span>
+    
+    /**
+     * Capture previously authorized transaction
+     */
+<span class="fc" id="L21">    CAPTURE,</span>
+    
+    /**
+     * Void a transaction (cancel before settlement)
+     */
+<span class="fc" id="L26">    VOID,</span>
+    
+    /**
+     * Full refund of a settled transaction
+     */
+<span class="fc" id="L31">    REFUND,</span>
+    
+    /**
+     * Partial refund of a settled transaction
+     */
+<span class="fc" id="L36">    PARTIAL_REFUND</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

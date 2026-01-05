@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.talentica.paymentgateway.controller.SubscriptionControllerUnitTest
+-------------------------------------------------------------------------------
+Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.315 s - in com.talentica.paymentgateway.controller.SubscriptionControllerUnitTest

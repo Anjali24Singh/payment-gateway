@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentMethodRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.repository</a> &gt; <span class="el_source">PaymentMethodRepository.java</span></div><h1>PaymentMethodRepository.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.repository;
+
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.entity.PaymentMethod;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Repository interface for PaymentMethod entity.
+ * Provides data access methods for payment method management.
+ */
+@Repository
+public interface PaymentMethodRepository extends JpaRepository&lt;PaymentMethod, UUID&gt; {
+
+    /**
+     * Find payment method by token.
+     */
+    Optional&lt;PaymentMethod&gt; findByPaymentToken(String paymentToken);
+
+    /**
+     * Find payment method by payment method ID (alias for payment token).
+     */
+    default Optional&lt;PaymentMethod&gt; findByPaymentMethodId(String paymentMethodId) {
+<span class="nc" id="L31">        return findByPaymentToken(paymentMethodId);</span>
+    }
+
+    /**
+     * Check if payment token exists.
+     */
+    boolean existsByPaymentToken(String paymentToken);
+
+    /**
+     * Find payment methods by customer.
+     */
+    List&lt;PaymentMethod&gt; findByCustomer(Customer customer);
+
+    /**
+     * Find payment methods by customer ID.
+     */
+    List&lt;PaymentMethod&gt; findByCustomerId(UUID customerId);
+
+    /**
+     * Find active payment methods by customer.
+     */
+    List&lt;PaymentMethod&gt; findByCustomerAndIsActiveTrue(Customer customer);
+
+    /**
+     * Find active payment methods by customer ID.
+     */
+    List&lt;PaymentMethod&gt; findByCustomerIdAndIsActiveTrue(UUID customerId);
+
+    /**
+     * Find default payment method for customer.
+     */
+    Optional&lt;PaymentMethod&gt; findByCustomerAndIsDefaultTrueAndIsActiveTrue(Customer customer);
+
+    /**
+     * Find default payment method by customer ID.
+     */
+    Optional&lt;PaymentMethod&gt; findByCustomerIdAndIsDefaultTrueAndIsActiveTrue(UUID customerId);
+
+    /**
+     * Find payment methods by type.
+     */
+    List&lt;PaymentMethod&gt; findByPaymentType(String paymentType);
+
+    /**
+     * Find payment methods by card brand.
+     */
+    List&lt;PaymentMethod&gt; findByCardBrand(String cardBrand);
+
+    /**
+     * Find payment methods by card last four digits.
+     */
+    List&lt;PaymentMethod&gt; findByCardLastFour(String cardLastFour);
+
+    /**
+     * Find payment methods expiring soon.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE &quot; +
+           &quot;pm.cardExpiryYear = EXTRACT(YEAR FROM CURRENT_DATE) AND &quot; +
+           &quot;pm.cardExpiryMonth &lt;= EXTRACT(MONTH FROM CURRENT_DATE) + :monthsAhead AND &quot; +
+           &quot;pm.isActive = true&quot;)
+    List&lt;PaymentMethod&gt; findExpiringSoon(@Param(&quot;monthsAhead&quot;) int monthsAhead);
+
+    /**
+     * Find expired payment methods.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE &quot; +
+           &quot;(pm.cardExpiryYear &lt; EXTRACT(YEAR FROM CURRENT_DATE) OR &quot; +
+           &quot;(pm.cardExpiryYear = EXTRACT(YEAR FROM CURRENT_DATE) AND pm.cardExpiryMonth &lt; EXTRACT(MONTH FROM CURRENT_DATE))) AND &quot; +
+           &quot;pm.isActive = true&quot;)
+    List&lt;PaymentMethod&gt; findExpiredPaymentMethods();
+
+    /**
+     * Find payment methods by cardholder name.
+     */
+    List&lt;PaymentMethod&gt; findByCardholderNameContainingIgnoreCase(String cardholderName);
+
+    /**
+     * Find all active payment methods.
+     */
+    List&lt;PaymentMethod&gt; findByIsActiveTrue();
+
+    /**
+     * Find all default payment methods.
+     */
+    List&lt;PaymentMethod&gt; findByIsDefaultTrue();
+
+    /**
+     * Count payment methods by customer.
+     */
+    long countByCustomerId(UUID customerId);
+
+    /**
+     * Count active payment methods by customer.
+     */
+    long countByCustomerIdAndIsActiveTrue(UUID customerId);
+
+    /**
+     * Count payment methods by type.
+     */
+    long countByPaymentType(String paymentType);
+
+    /**
+     * Count payment methods by card brand.
+     */
+    long countByCardBrand(String cardBrand);
+
+    /**
+     * Find payment methods created within date range.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE pm.createdAt BETWEEN :startDate AND :endDate&quot;)
+    List&lt;PaymentMethod&gt; findPaymentMethodsCreatedBetween(@Param(&quot;startDate&quot;) ZonedDateTime startDate,
+                                                        @Param(&quot;endDate&quot;) ZonedDateTime endDate);
+
+    /**
+     * Find payment methods by customer and type.
+     */
+    List&lt;PaymentMethod&gt; findByCustomerAndPaymentType(Customer customer, String paymentType);
+
+    /**
+     * Find payment methods with transactions.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE SIZE(pm.transactions) &gt; 0&quot;)
+    List&lt;PaymentMethod&gt; findPaymentMethodsWithTransactions();
+
+    /**
+     * Find unused payment methods.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE SIZE(pm.transactions) = 0&quot;)
+    List&lt;PaymentMethod&gt; findUnusedPaymentMethods();
+
+    /**
+     * Find payment methods used in the last N days.
+     */
+    @Query(&quot;SELECT DISTINCT pm FROM PaymentMethod pm JOIN pm.transactions t &quot; +
+           &quot;WHERE t.createdAt &gt;= :cutoffDate&quot;)
+    List&lt;PaymentMethod&gt; findRecentlyUsedPaymentMethods(@Param(&quot;cutoffDate&quot;) ZonedDateTime cutoffDate);
+
+    /**
+     * Find payment methods not used since specified date.
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE pm.id NOT IN &quot; +
+           &quot;(SELECT DISTINCT t.paymentMethod.id FROM Transaction t WHERE t.createdAt &gt;= :cutoffDate AND t.paymentMethod IS NOT NULL)&quot;)
+    List&lt;PaymentMethod&gt; findPaymentMethodsNotUsedSince(@Param(&quot;cutoffDate&quot;) ZonedDateTime cutoffDate);
+
+    /**
+     * Set default payment method for customer.
+     */
+    @Query(&quot;UPDATE PaymentMethod pm SET pm.isDefault = CASE WHEN pm.id = :paymentMethodId THEN true ELSE false END &quot; +
+           &quot;WHERE pm.customer.id = :customerId&quot;)
+    void setDefaultPaymentMethod(@Param(&quot;customerId&quot;) UUID customerId, @Param(&quot;paymentMethodId&quot;) UUID paymentMethodId);
+
+    /**
+     * Deactivate payment method.
+     */
+    @Query(&quot;UPDATE PaymentMethod pm SET pm.isActive = false WHERE pm.id = :paymentMethodId&quot;)
+    void deactivatePaymentMethod(@Param(&quot;paymentMethodId&quot;) UUID paymentMethodId);
+
+    /**
+     * Activate payment method.
+     */
+    @Query(&quot;UPDATE PaymentMethod pm SET pm.isActive = true WHERE pm.id = :paymentMethodId&quot;)
+    void activatePaymentMethod(@Param(&quot;paymentMethodId&quot;) UUID paymentMethodId);
+
+    /**
+     * Remove default flag from all payment methods for customer.
+     */
+    @Query(&quot;UPDATE PaymentMethod pm SET pm.isDefault = false WHERE pm.customer.id = :customerId&quot;)
+    void clearDefaultPaymentMethods(@Param(&quot;customerId&quot;) UUID customerId);
+
+    /**
+     * Find payment methods by expiry year.
+     */
+    List&lt;PaymentMethod&gt; findByCardExpiryYear(Integer cardExpiryYear);
+
+    /**
+     * Find payment methods by expiry month and year.
+     */
+    List&lt;PaymentMethod&gt; findByCardExpiryMonthAndCardExpiryYear(Integer cardExpiryMonth, Integer cardExpiryYear);
+
+    /**
+     * Find customers with multiple payment methods.
+     */
+    @Query(&quot;SELECT pm.customer.id, COUNT(pm) FROM PaymentMethod pm WHERE pm.isActive = true &quot; +
+           &quot;GROUP BY pm.customer.id HAVING COUNT(pm) &gt; 1&quot;)
+    List&lt;Object[]&gt; findCustomersWithMultiplePaymentMethods();
+
+    /**
+     * Find most used payment method types.
+     */
+    @Query(&quot;SELECT pm.paymentType, COUNT(t) as usageCount FROM PaymentMethod pm &quot; +
+           &quot;LEFT JOIN pm.transactions t GROUP BY pm.paymentType ORDER BY usageCount DESC&quot;)
+    List&lt;Object[]&gt; getPaymentMethodUsageStatistics();
+
+    /**
+     * Find most used card brands.
+     */
+    @Query(&quot;SELECT pm.cardBrand, COUNT(t) as usageCount FROM PaymentMethod pm &quot; +
+           &quot;LEFT JOIN pm.transactions t WHERE pm.cardBrand IS NOT NULL &quot; +
+           &quot;GROUP BY pm.cardBrand ORDER BY usageCount DESC&quot;)
+    List&lt;Object[]&gt; getCardBrandUsageStatistics();
+
+    /**
+     * Find payment methods that should be cleaned up (inactive and unused).
+     */
+    @Query(&quot;SELECT pm FROM PaymentMethod pm WHERE pm.isActive = false AND &quot; +
+           &quot;SIZE(pm.transactions) = 0 AND pm.createdAt &lt; :cutoffDate&quot;)
+    List&lt;PaymentMethod&gt; findPaymentMethodsForCleanup(@Param(&quot;cutoffDate&quot;) ZonedDateTime cutoffDate);
+
+    /**
+     * Get payment method statistics by customer.
+     */
+    @Query(&quot;SELECT &quot; +
+           &quot;COUNT(*) as totalMethods, &quot; +
+           &quot;COUNT(CASE WHEN pm.isActive = true THEN 1 END) as activeMethods, &quot; +
+           &quot;COUNT(CASE WHEN pm.isDefault = true THEN 1 END) as defaultMethods &quot; +
+           &quot;FROM PaymentMethod pm WHERE pm.customer.id = :customerId&quot;)
+    Object[] getPaymentMethodStatisticsByCustomer(@Param(&quot;customerId&quot;) UUID customerId);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

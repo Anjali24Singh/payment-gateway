@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">NotificationService.java</span></div><h1>NotificationService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.entity.Subscription;
+import com.talentica.paymentgateway.entity.SubscriptionInvoice;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service for sending notifications related to subscription billing.
+ * In a production environment, this would integrate with email services,
+ * SMS providers, and other notification channels.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L16">@Slf4j</span>
+@Service
+<span class="fc" id="L18">public class NotificationService {</span>
+
+    /**
+     * Sends billing success notification.
+     */
+    public void sendBillingSuccessNotification(Subscription subscription, SubscriptionInvoice invoice) {
+<span class="fc" id="L24">        log.info(&quot;Sending billing success notification for subscription: {} - Invoice: {}&quot;, </span>
+<span class="fc" id="L25">                   subscription.getSubscriptionId(), invoice.getInvoiceNumber());</span>
+        
+        // In production, this would send actual email/SMS notifications
+        // For now, we just log the notification
+<span class="fc" id="L29">    }</span>
+
+    /**
+     * Sends payment failed notification.
+     */
+    public void sendPaymentFailedNotification(Subscription subscription, SubscriptionInvoice invoice) {
+<span class="fc" id="L35">        log.info(&quot;Sending payment failed notification for subscription: {} - Invoice: {}&quot;, </span>
+<span class="fc" id="L36">                   subscription.getSubscriptionId(), invoice.getInvoiceNumber());</span>
+<span class="fc" id="L37">    }</span>
+
+    /**
+     * Sends payment retry notification.
+     */
+    public void sendPaymentRetryNotification(Subscription subscription, SubscriptionInvoice invoice, int attemptNumber) {
+<span class="fc" id="L43">        log.info(&quot;Sending payment retry notification for subscription: {} - Attempt: {}&quot;, </span>
+<span class="fc" id="L44">                   subscription.getSubscriptionId(), attemptNumber);</span>
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * Sends payment retry success notification.
+     */
+    public void sendPaymentRetrySuccessNotification(Subscription subscription, SubscriptionInvoice invoice) {
+<span class="fc" id="L51">        log.info(&quot;Sending payment retry success notification for subscription: {}&quot;, </span>
+<span class="fc" id="L52">                   subscription.getSubscriptionId());</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Sends subscription cancelled notification.
+     */
+    public void sendSubscriptionCancelledNotification(Subscription subscription, String reason) {
+<span class="fc" id="L59">        log.info(&quot;Sending subscription cancelled notification for subscription: {} - Reason: {}&quot;, </span>
+<span class="fc" id="L60">                   subscription.getSubscriptionId(), reason);</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Sends trial expiration notification.
+     */
+    public void sendTrialExpirationNotification(Subscription subscription) {
+<span class="fc" id="L67">        log.info(&quot;Sending trial expiration notification for subscription: {}&quot;, </span>
+<span class="fc" id="L68">                   subscription.getSubscriptionId());</span>
+<span class="fc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

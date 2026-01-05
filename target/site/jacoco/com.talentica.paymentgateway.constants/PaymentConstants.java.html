@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentConstants.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.constants</a> &gt; <span class="el_source">PaymentConstants.java</span></div><h1>PaymentConstants.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.constants;
+
+/**
+ * Payment and transaction-related constants.
+ * Centralizes payment processor codes, statuses, and transaction types.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public final class PaymentConstants {
+
+<span class="nc" id="L12">    private PaymentConstants() {</span>
+<span class="nc" id="L13">        throw new UnsupportedOperationException(&quot;This is a constants class and cannot be instantiated&quot;);</span>
+    }
+
+    // Transaction Types
+    public static final String TRANSACTION_TYPE_PURCHASE = &quot;PURCHASE&quot;;
+    public static final String TRANSACTION_TYPE_AUTHORIZE = &quot;AUTHORIZE&quot;;
+    public static final String TRANSACTION_TYPE_CAPTURE = &quot;CAPTURE&quot;;
+    public static final String TRANSACTION_TYPE_REFUND = &quot;REFUND&quot;;
+    public static final String TRANSACTION_TYPE_VOID = &quot;VOID&quot;;
+
+    // Payment Statuses
+    public static final String STATUS_PENDING = &quot;PENDING&quot;;
+    public static final String STATUS_AUTHORIZED = &quot;AUTHORIZED&quot;;
+    public static final String STATUS_CAPTURED = &quot;CAPTURED&quot;;
+    public static final String STATUS_REFUNDED = &quot;REFUNDED&quot;;
+    public static final String STATUS_VOIDED = &quot;VOIDED&quot;;
+    public static final String STATUS_FAILED = &quot;FAILED&quot;;
+    public static final String STATUS_DECLINED = &quot;DECLINED&quot;;
+
+    // Payment Method Types
+    public static final String PAYMENT_METHOD_CREDIT_CARD = &quot;CREDIT_CARD&quot;;
+    public static final String PAYMENT_METHOD_BANK_ACCOUNT = &quot;BANK_ACCOUNT&quot;;
+    public static final String PAYMENT_METHOD_TOKEN = &quot;TOKEN&quot;;
+
+    // Card Brands
+    public static final String CARD_BRAND_VISA = &quot;VISA&quot;;
+    public static final String CARD_BRAND_MASTERCARD = &quot;MASTERCARD&quot;;
+    public static final String CARD_BRAND_AMEX = &quot;AMEX&quot;;
+    public static final String CARD_BRAND_DISCOVER = &quot;DISCOVER&quot;;
+    public static final String CARD_BRAND_UNKNOWN = &quot;UNKNOWN&quot;;
+
+    // Currency Codes
+    public static final String CURRENCY_USD = &quot;USD&quot;;
+    public static final String CURRENCY_EUR = &quot;EUR&quot;;
+    public static final String CURRENCY_GBP = &quot;GBP&quot;;
+
+    // Error Codes
+    public static final String ERROR_CARD_DECLINED = &quot;CARD_DECLINED&quot;;
+    public static final String ERROR_INSUFFICIENT_FUNDS = &quot;INSUFFICIENT_FUNDS&quot;;
+    public static final String ERROR_INVALID_CARD = &quot;INVALID_CARD&quot;;
+    public static final String ERROR_INVALID_EXPIRY = &quot;INVALID_EXPIRY&quot;;
+    public static final String ERROR_INVALID_CVV = &quot;INVALID_CVV&quot;;
+    public static final String ERROR_INVALID_AMOUNT = &quot;INVALID_AMOUNT&quot;;
+    public static final String ERROR_PROCESSING_ERROR = &quot;PROCESSING_ERROR&quot;;
+    public static final String ERROR_AVS_MISMATCH = &quot;AVS_MISMATCH&quot;;
+    public static final String ERROR_DUPLICATE_TRANSACTION = &quot;DUPLICATE_TRANSACTION&quot;;
+
+    // Transaction ID Prefixes
+    public static final String TRANSACTION_ID_PREFIX = &quot;txn_&quot;;
+    public static final String AUTH_CODE_PREFIX = &quot;auth_&quot;;
+
+    // Timeout and Retry Settings
+    public static final int DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
+    public static final int MAX_RETRY_ATTEMPTS = 3;
+    public static final long RETRY_DELAY_MILLISECONDS = 1000;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

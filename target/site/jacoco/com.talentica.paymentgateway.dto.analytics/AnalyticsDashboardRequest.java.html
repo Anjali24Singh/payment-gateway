@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsDashboardRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.analytics</a> &gt; <span class="el_source">AnalyticsDashboardRequest.java</span></div><h1>AnalyticsDashboardRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.analytics;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.ZonedDateTime;
+
+/**
+ * DTO for analytics dashboard requests with time period configuration.
+ * Supports real-time metrics and configurable time ranges.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Analytics dashboard request for real-time metrics&quot;)
+public class AnalyticsDashboardRequest {
+    
+    @Schema(description = &quot;Start date for the analytics period&quot;)
+    @NotNull(message = &quot;Start date is required&quot;)
+    private ZonedDateTime startDate;
+    
+    @Schema(description = &quot;End date for the analytics period&quot;)
+    @NotNull(message = &quot;End date is required&quot;)
+    private ZonedDateTime endDate;
+    
+<span class="fc" id="L26">    @Schema(description = &quot;Time zone for date calculations&quot;)</span>
+    private String timeZone = &quot;UTC&quot;;
+    
+<span class="fc" id="L29">    @Schema(description = &quot;Include real-time metrics&quot;)</span>
+<span class="fc" id="L30">    private Boolean includeRealTime = true;</span>
+    
+<span class="fc" id="L32">    @Schema(description = &quot;Include historical comparisons&quot;)</span>
+<span class="fc" id="L33">    private Boolean includeComparisons = false;</span>
+    
+<span class="fc" id="L35">    @Schema(description = &quot;Include detailed breakdowns&quot;)</span>
+<span class="fc" id="L36">    private Boolean includeBreakdowns = true;</span>
+    
+<span class="fc" id="L38">    @Schema(description = &quot;Refresh interval in seconds for real-time data&quot;)</span>
+<span class="fc" id="L39">    private Integer refreshInterval = 30;</span>
+    
+<span class="fc" id="L41">    @Schema(description = &quot;Metrics resolution (HOUR, DAY, WEEK, MONTH)&quot;)</span>
+    private String resolution = &quot;DAY&quot;;
+    
+    // Constructors
+<span class="fc" id="L45">    public AnalyticsDashboardRequest() {}</span>
+    
+<span class="fc" id="L47">    public AnalyticsDashboardRequest(ZonedDateTime startDate, ZonedDateTime endDate) {</span>
+<span class="fc" id="L48">        this.startDate = startDate;</span>
+<span class="fc" id="L49">        this.endDate = endDate;</span>
+<span class="fc" id="L50">    }</span>
+    
+    // Getters and Setters
+    public ZonedDateTime getStartDate() {
+<span class="fc" id="L54">        return startDate;</span>
+    }
+    
+    public void setStartDate(ZonedDateTime startDate) {
+<span class="fc" id="L58">        this.startDate = startDate;</span>
+<span class="fc" id="L59">    }</span>
+    
+    public ZonedDateTime getEndDate() {
+<span class="fc" id="L62">        return endDate;</span>
+    }
+    
+    public void setEndDate(ZonedDateTime endDate) {
+<span class="fc" id="L66">        this.endDate = endDate;</span>
+<span class="fc" id="L67">    }</span>
+    
+    public String getTimeZone() {
+<span class="fc" id="L70">        return timeZone;</span>
+    }
+    
+    public void setTimeZone(String timeZone) {
+<span class="fc" id="L74">        this.timeZone = timeZone;</span>
+<span class="fc" id="L75">    }</span>
+    
+    public Boolean getIncludeRealTime() {
+<span class="fc" id="L78">        return includeRealTime;</span>
+    }
+    
+    public void setIncludeRealTime(Boolean includeRealTime) {
+<span class="fc" id="L82">        this.includeRealTime = includeRealTime;</span>
+<span class="fc" id="L83">    }</span>
+    
+    public Boolean getIncludeComparisons() {
+<span class="fc" id="L86">        return includeComparisons;</span>
+    }
+    
+    public void setIncludeComparisons(Boolean includeComparisons) {
+<span class="fc" id="L90">        this.includeComparisons = includeComparisons;</span>
+<span class="fc" id="L91">    }</span>
+    
+    public Boolean getIncludeBreakdowns() {
+<span class="fc" id="L94">        return includeBreakdowns;</span>
+    }
+    
+    public void setIncludeBreakdowns(Boolean includeBreakdowns) {
+<span class="fc" id="L98">        this.includeBreakdowns = includeBreakdowns;</span>
+<span class="fc" id="L99">    }</span>
+    
+    public Integer getRefreshInterval() {
+<span class="fc" id="L102">        return refreshInterval;</span>
+    }
+    
+    public void setRefreshInterval(Integer refreshInterval) {
+<span class="fc" id="L106">        this.refreshInterval = refreshInterval;</span>
+<span class="fc" id="L107">    }</span>
+    
+    public String getResolution() {
+<span class="fc" id="L110">        return resolution;</span>
+    }
+    
+    public void setResolution(String resolution) {
+<span class="fc" id="L114">        this.resolution = resolution;</span>
+<span class="fc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

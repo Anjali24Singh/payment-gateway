@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">SubscriptionPlan.java</span></div><h1>SubscriptionPlan.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import com.talentica.paymentgateway.validation.ValidAmount;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Entity representing a subscription plan template.
+ * Plans define the pricing, billing cycle, and terms for recurring subscriptions.
+ */
+@Entity
+@Table(name = &quot;subscription_plans&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;planCode&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_subscription_plans_code&quot;, columnList = &quot;planCode&quot;),
+           @Index(name = &quot;idx_subscription_plans_active&quot;, columnList = &quot;isActive&quot;)
+       })
+public class SubscriptionPlan extends BaseEntity {
+
+    @NotBlank(message = &quot;Plan code is required&quot;)
+    @Size(max = 100, message = &quot;Plan code must not exceed 100 characters&quot;)
+    @Column(name = &quot;plan_code&quot;, nullable = false, unique = true, length = 100)
+    private String planCode;
+
+    @NotBlank(message = &quot;Plan name is required&quot;)
+    @Size(max = 255, message = &quot;Plan name must not exceed 255 characters&quot;)
+    @Column(name = &quot;name&quot;, nullable = false, length = 255)
+    private String name;
+
+    @Column(name = &quot;description&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String description;
+
+    @NotNull(message = &quot;Amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.01&quot;, message = &quot;Amount must be greater than zero&quot;)
+    @Column(name = &quot;amount&quot;, nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+<span class="fc" id="L47">    @Size(max = 3, message = &quot;Currency must be 3 characters&quot;)</span>
+    @Column(name = &quot;currency&quot;, length = 3)
+    private String currency = &quot;USD&quot;;
+
+<span class="fc" id="L51">    @NotBlank(message = &quot;Interval unit is required&quot;)</span>
+    @Size(max = 20, message = &quot;Interval unit must not exceed 20 characters&quot;)
+    @Pattern(regexp = &quot;DAY|WEEK|MONTH|YEAR&quot;, message = &quot;Interval unit must be DAY, WEEK, MONTH, or YEAR&quot;)
+    @Column(name = &quot;interval_unit&quot;, nullable = false, length = 20)
+    private String intervalUnit = &quot;MONTH&quot;;
+
+<span class="fc" id="L57">    @NotNull(message = &quot;Interval count is required&quot;)</span>
+    @Min(value = 1, message = &quot;Interval count must be at least 1&quot;)
+    @Column(name = &quot;interval_count&quot;, nullable = false)
+<span class="fc" id="L60">    private Integer intervalCount = 1;</span>
+
+<span class="fc" id="L62">    @Min(value = 0, message = &quot;Trial period days must be non-negative&quot;)</span>
+    @Column(name = &quot;trial_period_days&quot;)
+<span class="fc" id="L64">    private Integer trialPeriodDays = 0;</span>
+
+<span class="fc" id="L66">    @Column(name = &quot;is_active&quot;, nullable = false)</span>
+<span class="fc" id="L67">    private Boolean isActive = true;</span>
+
+<span class="fc" id="L69">    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)</span>
+    @Column(name = &quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata = new HashMap&lt;&gt;();
+
+<span class="fc" id="L73">    @Column(name = &quot;setup_fee&quot;, precision = 12, scale = 2)</span>
+    private BigDecimal setupFee = BigDecimal.ZERO;
+
+    // Relationships
+<span class="fc" id="L77">    @OneToMany(mappedBy = &quot;plan&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Subscription&gt; subscriptions = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public SubscriptionPlan() {
+<span class="fc" id="L82">        super();</span>
+<span class="fc" id="L83">    }</span>
+
+    public SubscriptionPlan(String planCode, String name, BigDecimal amount) {
+<span class="fc" id="L86">        this();</span>
+<span class="fc" id="L87">        this.planCode = planCode;</span>
+<span class="fc" id="L88">        this.name = name;</span>
+<span class="fc" id="L89">        this.amount = amount;</span>
+<span class="fc" id="L90">    }</span>
+
+    public SubscriptionPlan(String planCode, String name, BigDecimal amount, String intervalUnit, Integer intervalCount) {
+<span class="nc" id="L93">        this(planCode, name, amount);</span>
+<span class="nc" id="L94">        this.intervalUnit = intervalUnit;</span>
+<span class="nc" id="L95">        this.intervalCount = intervalCount;</span>
+<span class="nc" id="L96">    }</span>
+
+    // Getters and Setters
+    public String getPlanCode() {
+<span class="fc" id="L100">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L104">        this.planCode = planCode;</span>
+<span class="fc" id="L105">    }</span>
+
+    public String getName() {
+<span class="fc" id="L108">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L112">        this.name = name;</span>
+<span class="fc" id="L113">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L116">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L120">        this.description = description;</span>
+<span class="fc" id="L121">    }</span>
+
+    public BigDecimal getAmount() {
+<span class="fc" id="L124">        return amount;</span>
+    }
+
+    public void setAmount(BigDecimal amount) {
+<span class="fc" id="L128">        this.amount = amount;</span>
+<span class="fc" id="L129">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L132">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L136">        this.currency = currency;</span>
+<span class="fc" id="L137">    }</span>
+
+    public String getIntervalUnit() {
+<span class="fc" id="L140">        return intervalUnit;</span>
+    }
+
+    public void setIntervalUnit(String intervalUnit) {
+<span class="fc" id="L144">        this.intervalUnit = intervalUnit;</span>
+<span class="fc" id="L145">    }</span>
+
+    public Integer getIntervalCount() {
+<span class="fc" id="L148">        return intervalCount;</span>
+    }
+
+    public void setIntervalCount(Integer intervalCount) {
+<span class="fc" id="L152">        this.intervalCount = intervalCount;</span>
+<span class="fc" id="L153">    }</span>
+
+    public Integer getTrialPeriodDays() {
+<span class="fc" id="L156">        return trialPeriodDays;</span>
+    }
+
+    public void setTrialPeriodDays(Integer trialPeriodDays) {
+<span class="fc" id="L160">        this.trialPeriodDays = trialPeriodDays;</span>
+<span class="fc" id="L161">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L164">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L168">        this.isActive = isActive;</span>
+<span class="fc" id="L169">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L172">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L176">        this.metadata = metadata;</span>
+<span class="fc" id="L177">    }</span>
+
+    public BigDecimal getSetupFee() {
+<span class="fc" id="L180">        return setupFee;</span>
+    }
+
+    public void setSetupFee(BigDecimal setupFee) {
+<span class="fc" id="L184">        this.setupFee = setupFee;</span>
+<span class="fc" id="L185">    }</span>
+
+    public List&lt;Subscription&gt; getSubscriptions() {
+<span class="fc" id="L188">        return subscriptions;</span>
+    }
+
+    public void setSubscriptions(List&lt;Subscription&gt; subscriptions) {
+<span class="fc" id="L192">        this.subscriptions = subscriptions;</span>
+<span class="fc" id="L193">    }</span>
+
+    // Utility methods
+    public String getFormattedInterval() {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (intervalCount == 1) {</span>
+<span class="fc" id="L198">            return &quot;Every &quot; + intervalUnit.toLowerCase();</span>
+        } else {
+<span class="nc" id="L200">            return &quot;Every &quot; + intervalCount + &quot; &quot; + intervalUnit.toLowerCase() + &quot;s&quot;;</span>
+        }
+    }
+
+    public String getFormattedPrice() {
+<span class="fc" id="L205">        return String.format(&quot;$%.2f&quot;, amount);</span>
+    }
+
+    public String getDisplayName() {
+<span class="fc" id="L209">        return name + &quot; (&quot; + getFormattedPrice() + &quot; &quot; + getFormattedInterval() + &quot;)&quot;;</span>
+    }
+
+    public boolean hasTrialPeriod() {
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">        return trialPeriodDays != null &amp;&amp; trialPeriodDays &gt; 0;</span>
+    }
+
+    public void addMetadata(String key, Object value) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (metadata == null) {</span>
+<span class="nc" id="L218">            metadata = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L220">        metadata.put(key, value);</span>
+<span class="fc" id="L221">    }</span>
+
+    public Object getMetadata(String key) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        return metadata != null ? metadata.get(key) : null;</span>
+    }
+
+    public long getActiveSubscriptionsCount() {
+<span class="fc" id="L228">        return subscriptions.stream()</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                .filter(s -&gt; s.getStatus() == SubscriptionStatus.ACTIVE)</span>
+<span class="fc" id="L230">                .count();</span>
+    }
+
+    public BigDecimal getTotalMonthlyRevenue() {
+<span class="fc" id="L234">        BigDecimal monthlyAmount = calculateMonthlyAmount();</span>
+<span class="fc" id="L235">        return monthlyAmount.multiply(BigDecimal.valueOf(getActiveSubscriptionsCount()));</span>
+    }
+
+    private BigDecimal calculateMonthlyAmount() {
+<span class="pc bpc" id="L239" title="4 of 5 branches missed.">        switch (intervalUnit.toUpperCase()) {</span>
+            case &quot;DAY&quot;:
+<span class="nc" id="L241">                return amount.multiply(BigDecimal.valueOf(30.44 / intervalCount)); // Average days per month</span>
+            case &quot;WEEK&quot;:
+<span class="nc" id="L243">                return amount.multiply(BigDecimal.valueOf(4.33 / intervalCount)); // Average weeks per month</span>
+            case &quot;MONTH&quot;:
+<span class="fc" id="L245">                return amount.divide(BigDecimal.valueOf(intervalCount), 2, java.math.RoundingMode.HALF_UP);</span>
+            case &quot;YEAR&quot;:
+<span class="nc" id="L247">                return amount.divide(BigDecimal.valueOf(intervalCount * 12), 2, java.math.RoundingMode.HALF_UP);</span>
+            default:
+<span class="nc" id="L249">                return amount;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

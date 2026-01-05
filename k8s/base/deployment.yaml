@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-gateway
+  labels:
+    app: payment-gateway
+    version: v1
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: payment-gateway
+  template:
+    metadata:
+      labels:
+        app: payment-gateway
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/api/v1/actuator/prometheus"
+    spec:
+      serviceAccountName: payment-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+      - name: payment-gateway
+        image: ghcr.io/payment-gateway:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: management
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: port
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: database
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: password
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-redis
+              key: host
+        - name: REDIS_PORT
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-redis
+              key: port
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-redis
+              key: password
+              optional: true
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-jwt
+              key: secret
+        - name: AUTHNET_API_LOGIN_ID
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-authnet
+              key: login-id
+        - name: AUTHNET_TRANSACTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-authnet
+              key: transaction-key
+        - name: AUTHNET_ENVIRONMENT
+          value: "production"
+        envFrom:
+        - configMapRef:
+            name: payment-gateway-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/actuator/health/liveness
+            port: http
+          initialDelaySeconds: 90
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/actuator/health/readiness
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/v1/actuator/health/readiness
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - payment-gateway
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300

@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiKeyService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">ApiKeyService.java</span></div><h1>ApiKeyService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.constants.CacheConstants;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.*;
+
+/**
+ * API Key Management Service for external service authentication.
+ * Handles API key validation, caching, and client management.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L20">@Slf4j</span>
+@Service
+public class ApiKeyService {
+    
+    // In-memory store for API keys (in production, this should be database-backed)
+<span class="fc" id="L25">    private final Map&lt;String, ApiKeyInfo&gt; apiKeyStore = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L27">    public ApiKeyService() {</span>
+<span class="fc" id="L28">        initializeDefaultApiKeys();</span>
+<span class="fc" id="L29">    }</span>
+
+    /**
+     * Validate if API key is active and not expired.
+     * Cached in 'apiKeyValidation' cache with 1 hour TTL.
+     * 
+     * @param apiKey API key to validate
+     * @return true if valid
+     */
+    @Cacheable(value = CacheConstants.API_KEY_VALIDATION_CACHE, key = &quot;#apiKey&quot;, unless = &quot;#result == false&quot;)
+    public boolean isValidApiKey(String apiKey) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!StringUtils.hasText(apiKey)) {</span>
+<span class="fc" id="L41">            return false;</span>
+        }
+
+        try {
+            // Validate from store
+<span class="fc" id="L46">            ApiKeyInfo keyInfo = apiKeyStore.get(apiKey);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            boolean isValid = keyInfo != null &amp;&amp; </span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                             keyInfo.isActive() &amp;&amp; </span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">                             (keyInfo.getExpiresAt() == null || keyInfo.getExpiresAt().after(new Date()));</span>
+            
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (isValid) {</span>
+<span class="fc" id="L52">                log.debug(&quot;Valid API key for client: {}&quot;, keyInfo.getClientId());</span>
+            } else {
+<span class="fc" id="L54">                log.warn(&quot;Invalid API key provided&quot;);</span>
+            }
+            
+<span class="fc" id="L57">            return isValid;</span>
+            
+<span class="nc" id="L59">        } catch (Exception e) {</span>
+<span class="nc" id="L60">            log.error(&quot;Error validating API key: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L61">            return false;</span>
+        }
+    }
+
+    /**
+     * Get client ID for API key.
+     * 
+     * @param apiKey API key
+     * @return Client ID
+     */
+    public String getClientId(String apiKey) {
+<span class="fc" id="L72">        ApiKeyInfo keyInfo = apiKeyStore.get(apiKey);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        return keyInfo != null ? keyInfo.getClientId() : null;</span>
+    }
+
+    /**
+     * Get permissions for API key.
+     * Cached in 'clientPermissions' cache with 1 hour TTL.
+     * 
+     * @param apiKey API key
+     * @return List of permissions
+     */
+    @Cacheable(value = CacheConstants.CLIENT_PERMISSIONS_CACHE, key = &quot;#apiKey&quot;)
+    public List&lt;String&gt; getPermissions(String apiKey) {
+        try {
+<span class="fc" id="L86">            ApiKeyInfo keyInfo = apiKeyStore.get(apiKey);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (keyInfo == null) {</span>
+<span class="fc" id="L88">                return Collections.emptyList();</span>
+            }
+            
+<span class="fc" id="L91">            return keyInfo.getPermissions();</span>
+            
+<span class="nc" id="L93">        } catch (Exception e) {</span>
+<span class="nc" id="L94">            log.error(&quot;Error getting permissions for API key: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L95">            return Collections.emptyList();</span>
+        }
+    }
+
+    /**
+     * Create new API key for client.
+     * 
+     * @param clientId Client identifier
+     * @param permissions List of permissions
+     * @param expiresAt Expiration date (null for no expiration)
+     * @return Generated API key
+     */
+    public String createApiKey(String clientId, List&lt;String&gt; permissions, Date expiresAt) {
+<span class="fc" id="L108">        String apiKey = generateApiKey();</span>
+        
+<span class="fc" id="L110">        ApiKeyInfo keyInfo = new ApiKeyInfo(</span>
+                apiKey,
+                clientId,
+                permissions,
+                true,
+                new Date(),
+                expiresAt
+        );
+        
+<span class="fc" id="L119">        apiKeyStore.put(apiKey, keyInfo);</span>
+        
+        // Invalidate cache
+<span class="fc" id="L122">        invalidateCache(apiKey, clientId);</span>
+        
+<span class="fc" id="L124">        log.info(&quot;Created new API key for client: {}&quot;, clientId);</span>
+<span class="fc" id="L125">        return apiKey;</span>
+    }
+
+    /**
+     * Revoke API key.
+     * 
+     * @param apiKey API key to revoke
+     * @return true if successfully revoked
+     */
+    public boolean revokeApiKey(String apiKey) {
+<span class="fc" id="L135">        ApiKeyInfo keyInfo = apiKeyStore.get(apiKey);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (keyInfo != null) {</span>
+<span class="fc" id="L137">            keyInfo.setActive(false);</span>
+<span class="fc" id="L138">            invalidateCache(apiKey, keyInfo.getClientId());</span>
+<span class="fc" id="L139">            log.info(&quot;Revoked API key for client: {}&quot;, keyInfo.getClientId());</span>
+<span class="fc" id="L140">            return true;</span>
+        }
+<span class="fc" id="L142">        return false;</span>
+    }
+
+    /**
+     * Update permissions for API key.
+     * 
+     * @param apiKey API key
+     * @param permissions New permissions
+     * @return true if successfully updated
+     */
+    public boolean updatePermissions(String apiKey, List&lt;String&gt; permissions) {
+<span class="fc" id="L153">        ApiKeyInfo keyInfo = apiKeyStore.get(apiKey);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (keyInfo != null) {</span>
+<span class="fc" id="L155">            keyInfo.setPermissions(permissions);</span>
+<span class="fc" id="L156">            invalidateCache(apiKey, keyInfo.getClientId());</span>
+<span class="fc" id="L157">            log.info(&quot;Updated permissions for client: {}&quot;, keyInfo.getClientId());</span>
+<span class="fc" id="L158">            return true;</span>
+        }
+<span class="fc" id="L160">        return false;</span>
+    }
+
+    /**
+     * Get API key information.
+     * 
+     * @param apiKey API key
+     * @return API key info or null if not found
+     */
+    public ApiKeyInfo getApiKeyInfo(String apiKey) {
+<span class="fc" id="L170">        return apiKeyStore.get(apiKey);</span>
+    }
+
+    /**
+     * List all API keys for client.
+     * 
+     * @param clientId Client identifier
+     * @return List of API keys
+     */
+    public List&lt;ApiKeyInfo&gt; getApiKeysForClient(String clientId) {
+<span class="fc" id="L180">        return apiKeyStore.values().stream()</span>
+<span class="fc" id="L181">                .filter(keyInfo -&gt; clientId.equals(keyInfo.getClientId()))</span>
+<span class="fc" id="L182">                .toList();</span>
+    }
+
+    /**
+     * Initialize default API keys for testing and initial setup.
+     */
+    private void initializeDefaultApiKeys() {
+        // Default API key for Authorize.Net webhook
+<span class="fc" id="L190">        String authorizeNetKey = &quot;authnet_webhook_key_12345&quot;;</span>
+<span class="fc" id="L191">        apiKeyStore.put(authorizeNetKey, new ApiKeyInfo(</span>
+                authorizeNetKey,
+                &quot;authorize_net&quot;,
+<span class="fc" id="L194">                Arrays.asList(&quot;webhook_receive&quot;, &quot;payment_notification&quot;),</span>
+                true,
+                new Date(),
+                null
+        ));
+
+        // Default API key for internal services
+<span class="fc" id="L201">        String internalKey = &quot;internal_service_key_67890&quot;;</span>
+<span class="fc" id="L202">        apiKeyStore.put(internalKey, new ApiKeyInfo(</span>
+                internalKey,
+                &quot;internal_service&quot;,
+<span class="fc" id="L205">                Arrays.asList(&quot;payment_process&quot;, &quot;transaction_query&quot;, &quot;user_management&quot;),</span>
+                true,
+                new Date(),
+                null
+        ));
+
+        // Default API key for external partners
+<span class="fc" id="L212">        String partnerKey = &quot;partner_api_key_abcdef&quot;;</span>
+<span class="fc" id="L213">        apiKeyStore.put(partnerKey, new ApiKeyInfo(</span>
+                partnerKey,
+                &quot;external_partner&quot;,
+<span class="fc" id="L216">                Arrays.asList(&quot;payment_process&quot;, &quot;transaction_query&quot;),</span>
+                true,
+                new Date(),
+                null
+        ));
+
+<span class="fc" id="L222">        log.info(&quot;Initialized {} default API keys&quot;, apiKeyStore.size());</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * Generate random API key.
+     * 
+     * @return Generated API key
+     */
+    private String generateApiKey() {
+<span class="fc" id="L231">        return &quot;pgw_&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;);</span>
+    }
+
+    /**
+     * Invalidate cache for API key and client.
+     * 
+     * @param apiKey API key
+     * @param clientId Client ID
+     */
+    @Caching(evict = {
+        @CacheEvict(value = CacheConstants.API_KEY_VALIDATION_CACHE, key = &quot;#apiKey&quot;),
+        @CacheEvict(value = CacheConstants.CLIENT_PERMISSIONS_CACHE, key = &quot;#apiKey&quot;)
+    })
+    private void invalidateCache(String apiKey, String clientId) {
+<span class="fc" id="L245">        log.debug(&quot;Cache invalidated for API key and client: {}&quot;, clientId);</span>
+<span class="fc" id="L246">    }</span>
+
+    /**
+     * API Key Information class.
+     */
+    public static class ApiKeyInfo {
+        private final String apiKey;
+        private final String clientId;
+        private List&lt;String&gt; permissions;
+        private boolean active;
+        private final Date createdAt;
+        private final Date expiresAt;
+
+        public ApiKeyInfo(String apiKey, String clientId, List&lt;String&gt; permissions, 
+<span class="fc" id="L260">                         boolean active, Date createdAt, Date expiresAt) {</span>
+<span class="fc" id="L261">            this.apiKey = apiKey;</span>
+<span class="fc" id="L262">            this.clientId = clientId;</span>
+<span class="fc" id="L263">            this.permissions = new ArrayList&lt;&gt;(permissions);</span>
+<span class="fc" id="L264">            this.active = active;</span>
+<span class="fc" id="L265">            this.createdAt = createdAt;</span>
+<span class="fc" id="L266">            this.expiresAt = expiresAt;</span>
+<span class="fc" id="L267">        }</span>
+
+        // Getters and setters
+<span class="fc" id="L270">        public String getApiKey() { return apiKey; }</span>
+<span class="fc" id="L271">        public String getClientId() { return clientId; }</span>
+<span class="fc" id="L272">        public List&lt;String&gt; getPermissions() { return new ArrayList&lt;&gt;(permissions); }</span>
+<span class="fc" id="L273">        public void setPermissions(List&lt;String&gt; permissions) { this.permissions = new ArrayList&lt;&gt;(permissions); }</span>
+<span class="fc" id="L274">        public boolean isActive() { return active; }</span>
+<span class="fc" id="L275">        public void setActive(boolean active) { this.active = active; }</span>
+<span class="fc" id="L276">        public Date getCreatedAt() { return createdAt; }</span>
+<span class="fc" id="L277">        public Date getExpiresAt() { return expiresAt; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

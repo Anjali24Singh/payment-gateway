@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Webhook.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">Webhook.java</span></div><h1>Webhook.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Entity representing a webhook delivery attempt.
+ * Webhooks are used to notify external systems about payment events.
+ */
+@Entity
+@Table(name = &quot;webhooks&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;webhookId&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_webhooks_status&quot;, columnList = &quot;status&quot;),
+           @Index(name = &quot;idx_webhooks_event_type&quot;, columnList = &quot;eventType&quot;),
+           @Index(name = &quot;idx_webhooks_scheduled_at&quot;, columnList = &quot;scheduledAt&quot;),
+           @Index(name = &quot;idx_webhooks_next_attempt_at&quot;, columnList = &quot;nextAttemptAt&quot;),
+           @Index(name = &quot;idx_webhooks_correlation_id&quot;, columnList = &quot;correlationId&quot;)
+       })
+public class Webhook extends BaseEntity {
+
+    @NotBlank(message = &quot;Webhook ID is required&quot;)
+    @Size(max = 100, message = &quot;Webhook ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;webhook_id&quot;, nullable = false, unique = true, length = 100)
+    private String webhookId;
+
+    @NotBlank(message = &quot;Event type is required&quot;)
+    @Size(max = 100, message = &quot;Event type must not exceed 100 characters&quot;)
+    @Column(name = &quot;event_type&quot;, nullable = false, length = 100)
+    private String eventType;
+
+    @NotBlank(message = &quot;Event ID is required&quot;)
+    @Size(max = 100, message = &quot;Event ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;event_id&quot;, nullable = false, length = 100)
+    private String eventId;
+
+    @NotBlank(message = &quot;Endpoint URL is required&quot;)
+    @Size(max = 500, message = &quot;Endpoint URL must not exceed 500 characters&quot;)
+    @Column(name = &quot;endpoint_url&quot;, nullable = false, length = 500)
+    private String endpointUrl;
+
+<span class="fc" id="L53">    @Size(max = 10, message = &quot;HTTP method must not exceed 10 characters&quot;)</span>
+    @Column(name = &quot;http_method&quot;, length = 10)
+    private String httpMethod = &quot;POST&quot;;
+
+<span class="fc" id="L57">    @Enumerated(EnumType.STRING)</span>
+    @Column(name = &quot;status&quot;, length = 50)
+    private WebhookStatus status = WebhookStatus.PENDING;
+
+<span class="fc" id="L61">    @Min(value = 0, message = &quot;Attempts must be non-negative&quot;)</span>
+    @Column(name = &quot;attempts&quot;)
+<span class="fc" id="L63">    private Integer attempts = 0;</span>
+
+<span class="fc" id="L65">    @Min(value = 1, message = &quot;Max attempts must be at least 1&quot;)</span>
+    @Column(name = &quot;max_attempts&quot;)
+<span class="fc" id="L67">    private Integer maxAttempts = 5;</span>
+
+    @Column(name = &quot;scheduled_at&quot;)
+    private ZonedDateTime scheduledAt;
+
+    @Column(name = &quot;next_attempt_at&quot;)
+    private ZonedDateTime nextAttemptAt;
+
+    @Column(name = &quot;delivered_at&quot;)
+    private ZonedDateTime deliveredAt;
+
+<span class="fc" id="L78">    @JdbcTypeCode(SqlTypes.JSON)</span>
+    @Column(name = &quot;request_headers&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; requestHeaders = new HashMap&lt;&gt;();
+
+<span class="fc" id="L82">    @NotNull(message = &quot;Request body is required&quot;)</span>
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;request_body&quot;, nullable = false, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; requestBody = new HashMap&lt;&gt;();
+
+    @Column(name = &quot;response_status_code&quot;)
+    private Integer responseStatusCode;
+
+<span class="fc" id="L90">    @JdbcTypeCode(SqlTypes.JSON)</span>
+    @Column(name = &quot;response_headers&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; responseHeaders = new HashMap&lt;&gt;();
+
+    @Column(name = &quot;response_body&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String responseBody;
+
+    @Column(name = &quot;error_message&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String errorMessage;
+
+    @Size(max = 100, message = &quot;Correlation ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;correlation_id&quot;, length = 100)
+    private String correlationId;
+
+    // Constructors
+    public Webhook() {
+<span class="fc" id="L106">        super();</span>
+<span class="fc" id="L107">        this.scheduledAt = ZonedDateTime.now();</span>
+<span class="fc" id="L108">        this.nextAttemptAt = ZonedDateTime.now();</span>
+<span class="fc" id="L109">    }</span>
+
+    public Webhook(String webhookId, String eventType, String eventId, String endpointUrl, Map&lt;String, Object&gt; requestBody) {
+<span class="fc" id="L112">        this();</span>
+<span class="fc" id="L113">        this.webhookId = webhookId;</span>
+<span class="fc" id="L114">        this.eventType = eventType;</span>
+<span class="fc" id="L115">        this.eventId = eventId;</span>
+<span class="fc" id="L116">        this.endpointUrl = endpointUrl;</span>
+<span class="fc" id="L117">        this.requestBody = requestBody;</span>
+<span class="fc" id="L118">    }</span>
+
+    // Getters and Setters
+    public String getWebhookId() {
+<span class="fc" id="L122">        return webhookId;</span>
+    }
+
+    public void setWebhookId(String webhookId) {
+<span class="fc" id="L126">        this.webhookId = webhookId;</span>
+<span class="fc" id="L127">    }</span>
+
+    public String getEventType() {
+<span class="fc" id="L130">        return eventType;</span>
+    }
+
+    public void setEventType(String eventType) {
+<span class="fc" id="L134">        this.eventType = eventType;</span>
+<span class="fc" id="L135">    }</span>
+
+    public String getEventId() {
+<span class="fc" id="L138">        return eventId;</span>
+    }
+
+    public void setEventId(String eventId) {
+<span class="fc" id="L142">        this.eventId = eventId;</span>
+<span class="fc" id="L143">    }</span>
+
+    public String getEndpointUrl() {
+<span class="fc" id="L146">        return endpointUrl;</span>
+    }
+
+    public void setEndpointUrl(String endpointUrl) {
+<span class="fc" id="L150">        this.endpointUrl = endpointUrl;</span>
+<span class="fc" id="L151">    }</span>
+
+    public String getHttpMethod() {
+<span class="fc" id="L154">        return httpMethod;</span>
+    }
+
+    public void setHttpMethod(String httpMethod) {
+<span class="fc" id="L158">        this.httpMethod = httpMethod;</span>
+<span class="fc" id="L159">    }</span>
+
+    public WebhookStatus getStatus() {
+<span class="fc" id="L162">        return status;</span>
+    }
+
+    public void setStatus(WebhookStatus status) {
+<span class="fc" id="L166">        this.status = status;</span>
+<span class="fc" id="L167">    }</span>
+
+    public Integer getAttempts() {
+<span class="fc" id="L170">        return attempts;</span>
+    }
+
+    public void setAttempts(Integer attempts) {
+<span class="fc" id="L174">        this.attempts = attempts;</span>
+<span class="fc" id="L175">    }</span>
+
+    public Integer getMaxAttempts() {
+<span class="fc" id="L178">        return maxAttempts;</span>
+    }
+
+    public void setMaxAttempts(Integer maxAttempts) {
+<span class="fc" id="L182">        this.maxAttempts = maxAttempts;</span>
+<span class="fc" id="L183">    }</span>
+
+    public ZonedDateTime getScheduledAt() {
+<span class="fc" id="L186">        return scheduledAt;</span>
+    }
+
+    public void setScheduledAt(ZonedDateTime scheduledAt) {
+<span class="fc" id="L190">        this.scheduledAt = scheduledAt;</span>
+<span class="fc" id="L191">    }</span>
+
+    public ZonedDateTime getNextAttemptAt() {
+<span class="fc" id="L194">        return nextAttemptAt;</span>
+    }
+
+    public void setNextAttemptAt(ZonedDateTime nextAttemptAt) {
+<span class="fc" id="L198">        this.nextAttemptAt = nextAttemptAt;</span>
+<span class="fc" id="L199">    }</span>
+
+    public ZonedDateTime getDeliveredAt() {
+<span class="fc" id="L202">        return deliveredAt;</span>
+    }
+
+    public void setDeliveredAt(ZonedDateTime deliveredAt) {
+<span class="fc" id="L206">        this.deliveredAt = deliveredAt;</span>
+<span class="fc" id="L207">    }</span>
+
+    public Map&lt;String, Object&gt; getRequestHeaders() {
+<span class="fc" id="L210">        return requestHeaders;</span>
+    }
+
+    public void setRequestHeaders(Map&lt;String, Object&gt; requestHeaders) {
+<span class="fc" id="L214">        this.requestHeaders = requestHeaders;</span>
+<span class="fc" id="L215">    }</span>
+
+    public Map&lt;String, Object&gt; getRequestBody() {
+<span class="fc" id="L218">        return requestBody;</span>
+    }
+
+    public void setRequestBody(Map&lt;String, Object&gt; requestBody) {
+<span class="fc" id="L222">        this.requestBody = requestBody;</span>
+<span class="fc" id="L223">    }</span>
+
+    public Integer getResponseStatusCode() {
+<span class="fc" id="L226">        return responseStatusCode;</span>
+    }
+
+    public void setResponseStatusCode(Integer responseStatusCode) {
+<span class="fc" id="L230">        this.responseStatusCode = responseStatusCode;</span>
+<span class="fc" id="L231">    }</span>
+
+    public Map&lt;String, Object&gt; getResponseHeaders() {
+<span class="fc" id="L234">        return responseHeaders;</span>
+    }
+
+    public void setResponseHeaders(Map&lt;String, Object&gt; responseHeaders) {
+<span class="fc" id="L238">        this.responseHeaders = responseHeaders;</span>
+<span class="fc" id="L239">    }</span>
+
+    public String getResponseBody() {
+<span class="fc" id="L242">        return responseBody;</span>
+    }
+
+    public void setResponseBody(String responseBody) {
+<span class="fc" id="L246">        this.responseBody = responseBody;</span>
+<span class="fc" id="L247">    }</span>
+
+    public String getErrorMessage() {
+<span class="fc" id="L250">        return errorMessage;</span>
+    }
+
+    public void setErrorMessage(String errorMessage) {
+<span class="fc" id="L254">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L255">    }</span>
+
+    public String getCorrelationId() {
+<span class="fc" id="L258">        return correlationId;</span>
+    }
+
+    public void setCorrelationId(String correlationId) {
+<span class="fc" id="L262">        this.correlationId = correlationId;</span>
+<span class="fc" id="L263">    }</span>
+
+    // Utility methods
+    public boolean isDelivered() {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        return status == WebhookStatus.DELIVERED;</span>
+    }
+
+    public boolean isFailed() {
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        return status == WebhookStatus.FAILED;</span>
+    }
+
+    public boolean isPending() {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        return status == WebhookStatus.PENDING;</span>
+    }
+
+    public boolean isRetrying() {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        return status == WebhookStatus.RETRYING;</span>
+    }
+
+    public boolean canRetry() {
+<span class="nc bnc" id="L283" title="All 8 branches missed.">        return attempts &lt; maxAttempts &amp;&amp; </span>
+               (status == WebhookStatus.FAILED || status == WebhookStatus.RETRYING) &amp;&amp;
+               nextAttemptAt != null &amp;&amp; 
+<span class="nc bnc" id="L286" title="All 2 branches missed.">               ZonedDateTime.now().isAfter(nextAttemptAt);</span>
+    }
+
+    public void markAsProcessing() {
+<span class="fc" id="L290">        this.status = WebhookStatus.PROCESSING;</span>
+<span class="fc" id="L291">    }</span>
+
+    public void markAsDelivered(int responseStatusCode, Map&lt;String, Object&gt; responseHeaders, String responseBody) {
+<span class="fc" id="L294">        this.status = WebhookStatus.DELIVERED;</span>
+<span class="fc" id="L295">        this.deliveredAt = ZonedDateTime.now();</span>
+<span class="fc" id="L296">        this.responseStatusCode = responseStatusCode;</span>
+<span class="fc" id="L297">        this.responseHeaders = responseHeaders;</span>
+<span class="fc" id="L298">        this.responseBody = responseBody;</span>
+<span class="fc" id="L299">        this.errorMessage = null;</span>
+<span class="fc" id="L300">        this.nextAttemptAt = null;</span>
+<span class="fc" id="L301">    }</span>
+
+    public void markAsFailed(String errorMessage) {
+<span class="fc" id="L304">        this.attempts++;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (attempts &gt;= maxAttempts) {</span>
+<span class="fc" id="L306">            this.status = WebhookStatus.FAILED;</span>
+<span class="fc" id="L307">            this.nextAttemptAt = null;</span>
+        } else {
+<span class="fc" id="L309">            this.status = WebhookStatus.RETRYING;</span>
+<span class="fc" id="L310">            scheduleNextAttempt();</span>
+        }
+<span class="fc" id="L312">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L313">    }</span>
+
+    public void markAsFailedWithResponse(int responseStatusCode, Map&lt;String, Object&gt; responseHeaders, 
+                                       String responseBody, String errorMessage) {
+<span class="fc" id="L317">        this.responseStatusCode = responseStatusCode;</span>
+<span class="fc" id="L318">        this.responseHeaders = responseHeaders;</span>
+<span class="fc" id="L319">        this.responseBody = responseBody;</span>
+<span class="fc" id="L320">        markAsFailed(errorMessage);</span>
+<span class="fc" id="L321">    }</span>
+
+    private void scheduleNextAttempt() {
+        // Exponential backoff: 1 min, 5 min, 15 min, 60 min, 240 min
+<span class="fc" id="L325">        int[] retryMinutes = {1, 5, 15, 60, 240};</span>
+<span class="fc" id="L326">        int minuteIndex = Math.min(attempts - 1, retryMinutes.length - 1);</span>
+<span class="fc" id="L327">        this.nextAttemptAt = ZonedDateTime.now().plusMinutes(retryMinutes[minuteIndex]);</span>
+<span class="fc" id="L328">    }</span>
+
+    public boolean isSuccessfulResponse() {
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        return responseStatusCode != null &amp;&amp; </span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">               responseStatusCode &gt;= 200 &amp;&amp; </span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">               responseStatusCode &lt; 300;</span>
+    }
+
+    public int getRemainingAttempts() {
+<span class="nc" id="L337">        return Math.max(0, maxAttempts - attempts);</span>
+    }
+
+    public String getNextAttemptDescription() {
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (nextAttemptAt == null) {</span>
+<span class="fc" id="L342">            return &quot;No more attempts scheduled&quot;;</span>
+        }
+        
+<span class="nc" id="L345">        long minutesUntilNext = java.time.temporal.ChronoUnit.MINUTES.between(ZonedDateTime.now(), nextAttemptAt);</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (minutesUntilNext &lt;= 0) {</span>
+<span class="nc" id="L347">            return &quot;Ready to retry&quot;;</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        } else if (minutesUntilNext &lt; 60) {</span>
+<span class="nc" id="L349">            return String.format(&quot;Next attempt in %d minutes&quot;, minutesUntilNext);</span>
+        } else {
+<span class="nc" id="L351">            long hoursUntilNext = minutesUntilNext / 60;</span>
+<span class="nc" id="L352">            return String.format(&quot;Next attempt in %d hours&quot;, hoursUntilNext);</span>
+        }
+    }
+
+    public void addRequestHeader(String key, Object value) {
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">        if (requestHeaders == null) {</span>
+<span class="nc" id="L358">            requestHeaders = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L360">        requestHeaders.put(key, value);</span>
+<span class="fc" id="L361">    }</span>
+
+    public void setStandardHeaders() {
+<span class="fc" id="L364">        addRequestHeader(&quot;Content-Type&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L365">        addRequestHeader(&quot;User-Agent&quot;, &quot;PaymentGateway-Webhook/1.0&quot;);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (correlationId != null) {</span>
+<span class="fc" id="L367">            addRequestHeader(&quot;X-Correlation-ID&quot;, correlationId);</span>
+        }
+<span class="fc" id="L369">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

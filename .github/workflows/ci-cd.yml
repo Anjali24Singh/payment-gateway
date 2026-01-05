@@ -1,0 +1,332 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: '-Xmx3072m'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: payment_gateway_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run unit tests
+      run: mvn clean test -Dspring.profiles.active=test
+      
+    - name: Run integration tests
+      run: mvn verify -Dspring.profiles.active=integration-test
+      env:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/payment_gateway_test
+        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_PASSWORD: postgres
+        SPRING_DATA_REDIS_HOST: localhost
+        SPRING_DATA_REDIS_PORT: 6379
+        
+    - name: Generate test coverage report
+      run: mvn jacoco:report
+      
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./target/site/jacoco/jacoco.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          target/surefire-reports/
+          target/failsafe-reports/
+          target/site/jacoco/
+          
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(grep -o "Total.*[0-9]*%" target/site/jacoco/index.html | tail -1 | grep -o "[0-9]*%" | head -1 | sed 's/%//')
+        echo "Coverage: ${COVERAGE}%"
+        if [ "$COVERAGE" -lt 80 ]; then
+          echo "Coverage ${COVERAGE}% is below minimum threshold of 80%"
+          exit 1
+        fi
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run OWASP Dependency Check
+      run: mvn org.owasp:dependency-check-maven:check
+      continue-on-error: true
+      
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: target/dependency-check/
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better relevancy of analysis
+        
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build and analyze with SonarCloud
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        mvn clean compile test-compile
+        mvn sonar:sonar \
+          -Dsonar.projectKey=payment-gateway \
+          -Dsonar.organization=talentica \
+          -Dsonar.host.url=https://sonarcloud.io
+      continue-on-error: true
+
+  performance-test:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run JMH benchmarks
+      run: mvn test -Dtest='**/*Benchmark.java' -Dspring.profiles.active=test
+      env:
+        RUN_PERFORMANCE_TESTS: true
+        
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: target/jmh-results.json
+
+  build-and-package:
+    name: Build and Package
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, code-quality]
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build application
+      run: mvn clean package -DskipTests
+      
+    - name: Build Docker image
+      run: |
+        docker build -t payment-gateway:${{ github.sha }} .
+        docker build -t payment-gateway:latest .
+        
+    - name: Save Docker image
+      run: docker save payment-gateway:${{ github.sha }} | gzip > payment-gateway-${{ github.sha }}.tar.gz
+      
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: payment-gateway-${{ github.sha }}.tar.gz
+        
+    - name: Upload JAR artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: jar-file
+        path: target/*.jar
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-package
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        
+    - name: Load Docker image
+      run: docker load < payment-gateway-${{ github.sha }}.tar.gz
+      
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add actual deployment commands here
+        # e.g., kubectl apply, docker-compose up, etc.
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-and-package, performance-test]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        
+    - name: Load Docker image
+      run: docker load < payment-gateway-${{ github.sha }}.tar.gz
+      
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Add actual deployment commands here
+        # e.g., kubectl apply, docker-compose up, etc.
+
+  notification:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, code-quality]
+    if: always()
+    
+    steps:
+    - name: Send Slack notification
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#payment-gateway-ci'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

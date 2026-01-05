@@ -1,0 +1,85 @@
+# Test Environment Configuration
+
+server:
+  port: 0 # Use random port for tests to avoid conflicts
+
+spring:
+  # Allow test beans to override main configuration beans
+  main:
+    allow-bean-definition-overriding: true
+    
+  # Use H2 in-memory database for tests
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+  # JPA Configuration for Tests
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+    
+  # Flyway Configuration for Tests
+  flyway:
+    enabled: false # Disable Flyway for tests, use JPA DDL auto
+    
+  # Redis Configuration for Tests (use embedded or mock)
+  data:
+    redis:
+      host: localhost
+      port: 6370 # Different port to avoid conflicts
+      database: 15 # Use different database
+      
+  # Cache Configuration for Tests
+  cache:
+    type: simple # Use simple cache instead of Redis for tests
+
+# Logging Configuration for Tests
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    net.authorize: DEBUG
+
+# Application Specific Configuration for Tests
+app:
+  # Authorize.Net Configuration (Mock for Tests)
+  authorize-net:
+    environment: SANDBOX
+    api-login-id: ${TEST_API_LOGIN_ID:TEST_API_LOGIN_ID}
+    transaction-key: ${TEST_TRANSACTION_KEY:TEST_TRANSACTION_KEY}
+    base-url: http://localhost:8080/mock/authorize-net
+    
+  # JWT Configuration for Tests
+  jwt:
+    secret: ${TEST_JWT_SECRET:TEST_JWT_SECRET_KEY_FOR_TESTING}
+    expiration: 3600000 # 1 hour
+    refresh-expiration: 7200000 # 2 hours
+    
+  # Rate Limiting for Tests (Disabled)
+  rate-limit:
+    enabled: false
+    default-limit: 999999
+    burst-limit: 999999
+    
+  # Test Features
+  test:
+    mock-payments: true
+    detailed-errors: true
+    fast-startup: true
+
+# Management Configuration for Tests
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

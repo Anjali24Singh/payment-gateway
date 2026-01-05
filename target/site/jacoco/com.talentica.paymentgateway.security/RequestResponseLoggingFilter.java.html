@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestResponseLoggingFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.security</a> &gt; <span class="el_source">RequestResponseLoggingFilter.java</span></div><h1>RequestResponseLoggingFilter.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.security;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.ContentCachingResponseWrapper;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.*;
+import java.util.regex.Pattern;
+
+/**
+ * Request/Response Logging Filter with Security Considerations.
+ * 
+ * This filter provides comprehensive request and response logging while ensuring
+ * sensitive data is properly masked or excluded. It supports structured logging
+ * with correlation IDs for distributed tracing.
+ * 
+ * Features:
+ * - Request/response body logging with size limits
+ * - Automatic PII and sensitive data masking
+ * - Configurable exclusion patterns for endpoints
+ * - Performance metrics integration
+ * - Security-aware header filtering
+ * - JSON request/response formatting
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L47">@Slf4j</span>
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 2) // Execute after correlation ID filter
+public class RequestResponseLoggingFilter extends OncePerRequestFilter {
+<span class="fc" id="L51">    private static final Logger auditLogger = LoggerFactory.getLogger(&quot;AUDIT&quot;);</span>
+<span class="fc" id="L52">    private static final Logger paymentLogger = LoggerFactory.getLogger(&quot;PAYMENT&quot;);</span>
+    
+    private static final int MAX_PAYLOAD_LENGTH = 10000;
+    private static final String MASKED_VALUE = &quot;***MASKED***&quot;;
+    
+    private final ObjectMapper objectMapper;
+    
+    // Sensitive field patterns for masking
+<span class="fc" id="L60">    private static final Set&lt;String&gt; SENSITIVE_FIELDS = Set.of(</span>
+        &quot;password&quot;, &quot;cardNumber&quot;, &quot;cvv&quot;, &quot;cvv2&quot;, &quot;cvc&quot;, &quot;cvc2&quot;, &quot;securityCode&quot;, 
+        &quot;transactionKey&quot;, &quot;apiKey&quot;, &quot;token&quot;, &quot;authToken&quot;, &quot;accessToken&quot;, 
+        &quot;refreshToken&quot;, &quot;sessionId&quot;, &quot;accountNumber&quot;, &quot;bankAccount&quot;, &quot;ssn&quot;,
+        &quot;socialSecurityNumber&quot;, &quot;pin&quot;, &quot;signature&quot;, &quot;authorization&quot;
+    );
+    
+<span class="fc" id="L67">    private static final Set&lt;String&gt; SENSITIVE_HEADERS = Set.of(</span>
+        &quot;authorization&quot;, &quot;x-api-key&quot;, &quot;cookie&quot;, &quot;set-cookie&quot;, &quot;x-auth-token&quot;,
+        &quot;x-access-token&quot;, &quot;x-refresh-token&quot;, &quot;x-session-id&quot;
+    );
+    
+    // Patterns for sensitive data in URLs or text
+<span class="fc" id="L73">    private static final Pattern CREDIT_CARD_PATTERN = Pattern.compile(&quot;\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b&quot;);</span>
+<span class="fc" id="L74">    private static final Pattern SSN_PATTERN = Pattern.compile(&quot;\\b\\d{3}-\\d{2}-\\d{4}\\b&quot;);</span>
+    
+<span class="fc" id="L76">    public RequestResponseLoggingFilter(ObjectMapper objectMapper) {</span>
+<span class="fc" id="L77">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L78">    }</span>
+
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+<span class="fc" id="L82">        return true;</span>
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+<span class="fc" id="L87">        return true;</span>
+    }
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
+        
+        // Skip logging for excluded endpoints
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (shouldSkipLogging(request)) {</span>
+<span class="fc" id="L99">            filterChain.doFilter(request, response);</span>
+<span class="fc" id="L100">            return;</span>
+        }
+        
+        // Wrap request and response for content caching
+<span class="fc" id="L104">        ContentCachingRequestWrapper requestWrapper = new ContentCachingRequestWrapper(request);</span>
+<span class="fc" id="L105">        ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);</span>
+        
+<span class="fc" id="L107">        Instant startTime = Instant.now();</span>
+<span class="fc" id="L108">        String correlationId = MDC.get(&quot;correlationId&quot;);</span>
+        
+        try {
+            // Log request
+<span class="fc" id="L112">            logRequest(requestWrapper, correlationId, startTime);</span>
+            
+            // Process the request
+<span class="fc" id="L115">            filterChain.doFilter(requestWrapper, responseWrapper);</span>
+            
+            // Log response
+<span class="fc" id="L118">            Instant endTime = Instant.now();</span>
+<span class="fc" id="L119">            logResponse(requestWrapper, responseWrapper, correlationId, startTime, endTime);</span>
+            
+<span class="nc" id="L121">        } catch (Exception e) {</span>
+<span class="nc" id="L122">            log.error(&quot;Error in request/response logging filter [correlationId={}]: {}&quot;, </span>
+<span class="nc" id="L123">                        correlationId, e.getMessage(), e);</span>
+<span class="nc" id="L124">            throw e;</span>
+        } finally {
+            // Copy response body to actual response
+<span class="fc" id="L127">            responseWrapper.copyBodyToResponse();</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    /**
+     * Log incoming request with security considerations.
+     */
+    private void logRequest(ContentCachingRequestWrapper request, String correlationId, Instant startTime) {
+        try {
+<span class="fc" id="L136">            Map&lt;String, Object&gt; requestLog = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L137">            requestLog.put(&quot;type&quot;, &quot;REQUEST&quot;);</span>
+<span class="fc" id="L138">            requestLog.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L139">            requestLog.put(&quot;timestamp&quot;, startTime.toString());</span>
+<span class="fc" id="L140">            requestLog.put(&quot;method&quot;, request.getMethod());</span>
+<span class="fc" id="L141">            requestLog.put(&quot;uri&quot;, request.getRequestURI());</span>
+<span class="fc" id="L142">            requestLog.put(&quot;queryString&quot;, maskSensitiveData(request.getQueryString()));</span>
+<span class="fc" id="L143">            requestLog.put(&quot;remoteAddr&quot;, getClientIpAddress(request));</span>
+<span class="fc" id="L144">            requestLog.put(&quot;userAgent&quot;, request.getHeader(&quot;User-Agent&quot;));</span>
+<span class="fc" id="L145">            requestLog.put(&quot;contentType&quot;, request.getContentType());</span>
+<span class="fc" id="L146">            requestLog.put(&quot;contentLength&quot;, request.getContentLength());</span>
+            
+            // Add filtered headers
+<span class="fc" id="L149">            requestLog.put(&quot;headers&quot;, getFilteredHeaders(request));</span>
+            
+            // Skip request body logging to avoid consuming the stream
+            // TODO: Implement proper request body logging that doesn't interfere with controllers
+            // if (shouldLogRequestBody(request)) {
+            //     String requestBody = getRequestBody(request);
+            //     if (StringUtils.hasText(requestBody)) {
+            //         requestLog.put(&quot;body&quot;, maskSensitiveDataInJson(requestBody));
+            //     }
+            // }
+            
+            // Choose appropriate logger based on endpoint
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (isPaymentEndpoint(request)) {</span>
+<span class="fc" id="L162">                paymentLogger.info(&quot;Payment request: {}&quot;, objectMapper.writeValueAsString(requestLog));</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            } else if (isAuditableEndpoint(request)) {</span>
+<span class="nc" id="L164">                auditLogger.info(&quot;Auditable request: {}&quot;, objectMapper.writeValueAsString(requestLog));</span>
+            } else {
+<span class="fc" id="L166">                log.info(&quot;Request: {}&quot;, objectMapper.writeValueAsString(requestLog));</span>
+            }
+            
+<span class="nc" id="L169">        } catch (Exception e) {</span>
+<span class="nc" id="L170">            log.warn(&quot;Failed to log request [correlationId={}]: {}&quot;, correlationId, e.getMessage());</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">    }</span>
+
+    /**
+     * Log outgoing response with security considerations.
+     */
+    private void logResponse(
+            ContentCachingRequestWrapper request,
+            ContentCachingResponseWrapper response,
+            String correlationId,
+            Instant startTime,
+            Instant endTime
+    ) {
+        try {
+<span class="fc" id="L185">            long duration = endTime.toEpochMilli() - startTime.toEpochMilli();</span>
+            
+<span class="fc" id="L187">            Map&lt;String, Object&gt; responseLog = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L188">            responseLog.put(&quot;type&quot;, &quot;RESPONSE&quot;);</span>
+<span class="fc" id="L189">            responseLog.put(&quot;correlationId&quot;, correlationId);</span>
+<span class="fc" id="L190">            responseLog.put(&quot;timestamp&quot;, endTime.toString());</span>
+<span class="fc" id="L191">            responseLog.put(&quot;method&quot;, request.getMethod());</span>
+<span class="fc" id="L192">            responseLog.put(&quot;uri&quot;, request.getRequestURI());</span>
+<span class="fc" id="L193">            responseLog.put(&quot;status&quot;, response.getStatus());</span>
+<span class="fc" id="L194">            responseLog.put(&quot;contentType&quot;, response.getContentType());</span>
+<span class="fc" id="L195">            responseLog.put(&quot;contentLength&quot;, response.getContentSize());</span>
+<span class="fc" id="L196">            responseLog.put(&quot;duration&quot;, duration + &quot;ms&quot;);</span>
+            
+            // Add filtered response headers
+<span class="fc" id="L199">            responseLog.put(&quot;headers&quot;, getFilteredResponseHeaders(response));</span>
+            
+            // Add response body if appropriate
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (shouldLogResponseBody(request, response)) {</span>
+<span class="fc" id="L203">                String responseBody = getResponseBody(response);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                if (StringUtils.hasText(responseBody)) {</span>
+<span class="fc" id="L205">                    responseLog.put(&quot;body&quot;, maskSensitiveDataInJson(responseBody));</span>
+                }
+            }
+            
+            // Choose appropriate logger based on endpoint and status
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (isPaymentEndpoint(request)) {</span>
+<span class="fc" id="L211">                paymentLogger.info(&quot;Payment response: {}&quot;, objectMapper.writeValueAsString(responseLog));</span>
+<span class="pc bpc" id="L212" title="1 of 4 branches missed.">            } else if (isAuditableEndpoint(request) || isErrorStatus(response.getStatus())) {</span>
+<span class="fc" id="L213">                auditLogger.info(&quot;Auditable response: {}&quot;, objectMapper.writeValueAsString(responseLog));</span>
+            } else {
+<span class="fc" id="L215">                log.info(&quot;Response: {}&quot;, objectMapper.writeValueAsString(responseLog));</span>
+            }
+            
+<span class="nc" id="L218">        } catch (Exception e) {</span>
+<span class="nc" id="L219">            log.warn(&quot;Failed to log response [correlationId={}]: {}&quot;, correlationId, e.getMessage());</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">    }</span>
+
+    /**
+     * Get filtered request headers excluding sensitive information.
+     */
+    private Map&lt;String, String&gt; getFilteredHeaders(HttpServletRequest request) {
+<span class="fc" id="L227">        Map&lt;String, String&gt; filteredHeaders = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L229">        Enumeration&lt;String&gt; headerNames = request.getHeaderNames();</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        while (headerNames.hasMoreElements()) {</span>
+<span class="fc" id="L231">            String headerName = headerNames.nextElement();</span>
+<span class="fc" id="L232">            String headerValue = request.getHeader(headerName);</span>
+            
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (isSensitiveHeader(headerName)) {</span>
+<span class="nc" id="L235">                filteredHeaders.put(headerName, MASKED_VALUE);</span>
+            } else {
+<span class="fc" id="L237">                filteredHeaders.put(headerName, headerValue);</span>
+            }
+<span class="fc" id="L239">        }</span>
+        
+<span class="fc" id="L241">        return filteredHeaders;</span>
+    }
+
+    /**
+     * Get filtered response headers excluding sensitive information.
+     */
+    private Map&lt;String, String&gt; getFilteredResponseHeaders(HttpServletResponse response) {
+<span class="fc" id="L248">        Map&lt;String, String&gt; filteredHeaders = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L250">        Collection&lt;String&gt; headerNames = response.getHeaderNames();</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (String headerName : headerNames) {</span>
+<span class="fc" id="L252">            String headerValue = response.getHeader(headerName);</span>
+            
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (isSensitiveHeader(headerName)) {</span>
+<span class="nc" id="L255">                filteredHeaders.put(headerName, MASKED_VALUE);</span>
+            } else {
+<span class="fc" id="L257">                filteredHeaders.put(headerName, headerValue);</span>
+            }
+<span class="fc" id="L259">        }</span>
+        
+<span class="fc" id="L261">        return filteredHeaders;</span>
+    }
+
+    /**
+     * Get request body with size limitations.
+     */
+    private String getRequestBody(ContentCachingRequestWrapper request) {
+<span class="nc" id="L268">        byte[] content = request.getContentAsByteArray();</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (content.length == 0) {</span>
+<span class="nc" id="L270">            return null;</span>
+        }
+        
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (content.length &gt; MAX_PAYLOAD_LENGTH) {</span>
+<span class="nc" id="L274">            String truncated = new String(content, 0, MAX_PAYLOAD_LENGTH, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L275">            return truncated + &quot;... [TRUNCATED - Original size: &quot; + content.length + &quot; bytes]&quot;;</span>
+        }
+        
+<span class="nc" id="L278">        return new String(content, StandardCharsets.UTF_8);</span>
+    }
+
+    /**
+     * Get response body with size limitations.
+     */
+    private String getResponseBody(ContentCachingResponseWrapper response) {
+<span class="fc" id="L285">        byte[] content = response.getContentAsByteArray();</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (content.length == 0) {</span>
+<span class="nc" id="L287">            return null;</span>
+        }
+        
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (content.length &gt; MAX_PAYLOAD_LENGTH) {</span>
+<span class="nc" id="L291">            String truncated = new String(content, 0, MAX_PAYLOAD_LENGTH, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L292">            return truncated + &quot;... [TRUNCATED - Original size: &quot; + content.length + &quot; bytes]&quot;;</span>
+        }
+        
+<span class="fc" id="L295">        return new String(content, StandardCharsets.UTF_8);</span>
+    }
+
+    /**
+     * Mask sensitive data in JSON content.
+     */
+    private String maskSensitiveDataInJson(String jsonContent) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (!StringUtils.hasText(jsonContent)) {</span>
+<span class="nc" id="L303">            return jsonContent;</span>
+        }
+        
+        try {
+<span class="fc" id="L307">            JsonNode jsonNode = objectMapper.readTree(jsonContent);</span>
+<span class="fc" id="L308">            maskSensitiveFieldsInNode(jsonNode);</span>
+<span class="fc" id="L309">            String maskedJson = objectMapper.writeValueAsString(jsonNode);</span>
+            
+            // Additional pattern-based masking for any remaining sensitive data
+<span class="fc" id="L312">            return maskSensitiveDataWithPatterns(maskedJson);</span>
+            
+<span class="nc" id="L314">        } catch (Exception e) {</span>
+            // If JSON parsing fails, apply pattern-based masking to the raw string
+<span class="nc" id="L316">            return maskSensitiveDataWithPatterns(jsonContent);</span>
+        }
+    }
+
+    /**
+     * Recursively mask sensitive fields in JSON node.
+     */
+    private void maskSensitiveFieldsInNode(JsonNode node) {
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (node.isObject()) {</span>
+<span class="fc" id="L325">            ObjectNode objectNode = (ObjectNode) node;</span>
+<span class="fc" id="L326">            objectNode.fieldNames().forEachRemaining(fieldName -&gt; {</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                if (isSensitiveField(fieldName)) {</span>
+<span class="fc" id="L328">                    objectNode.put(fieldName, MASKED_VALUE);</span>
+                } else {
+<span class="fc" id="L330">                    maskSensitiveFieldsInNode(objectNode.get(fieldName));</span>
+                }
+<span class="fc" id="L332">            });</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        } else if (node.isArray()) {</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            for (JsonNode arrayItem : node) {</span>
+<span class="fc" id="L335">                maskSensitiveFieldsInNode(arrayItem);</span>
+<span class="fc" id="L336">            }</span>
+        }
+<span class="fc" id="L338">    }</span>
+
+    /**
+     * Mask sensitive data using regex patterns.
+     */
+    private String maskSensitiveDataWithPatterns(String content) {
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (!StringUtils.hasText(content)) {</span>
+<span class="nc" id="L345">            return content;</span>
+        }
+        
+<span class="fc" id="L348">        String masked = content;</span>
+<span class="fc" id="L349">        masked = CREDIT_CARD_PATTERN.matcher(masked).replaceAll(&quot;****-****-****-****&quot;);</span>
+<span class="fc" id="L350">        masked = SSN_PATTERN.matcher(masked).replaceAll(&quot;***-**-****&quot;);</span>
+        
+<span class="fc" id="L352">        return masked;</span>
+    }
+
+    /**
+     * Apply general sensitive data masking to any string.
+     */
+    private String maskSensitiveData(String data) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (!StringUtils.hasText(data)) {</span>
+<span class="fc" id="L360">            return data;</span>
+        }
+        
+<span class="nc" id="L363">        return maskSensitiveDataWithPatterns(data);</span>
+    }
+
+    /**
+     * Get client IP address considering proxy headers.
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+<span class="fc" id="L370">        String xForwardedFor = request.getHeader(&quot;X-Forwarded-For&quot;);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        if (StringUtils.hasText(xForwardedFor)) {</span>
+<span class="nc" id="L372">            return xForwardedFor.split(&quot;,&quot;)[0].trim();</span>
+        }
+        
+<span class="fc" id="L375">        String xRealIp = request.getHeader(&quot;X-Real-IP&quot;);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (StringUtils.hasText(xRealIp)) {</span>
+<span class="nc" id="L377">            return xRealIp.trim();</span>
+        }
+        
+<span class="fc" id="L380">        return request.getRemoteAddr();</span>
+    }
+
+    /**
+     * Check if header is sensitive and should be masked.
+     */
+    private boolean isSensitiveHeader(String headerName) {
+<span class="fc" id="L387">        return SENSITIVE_HEADERS.contains(headerName.toLowerCase());</span>
+    }
+
+    /**
+     * Check if field is sensitive and should be masked.
+     */
+    private boolean isSensitiveField(String fieldName) {
+<span class="fc" id="L394">        return SENSITIVE_FIELDS.contains(fieldName.toLowerCase());</span>
+    }
+
+    /**
+     * Check if logging should be skipped for this request.
+     */
+    private boolean shouldSkipLogging(HttpServletRequest request) {
+<span class="fc" id="L401">        String uri = request.getRequestURI();</span>
+        
+        // Skip health checks and metrics endpoints
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        return uri.startsWith(&quot;/actuator/&quot;) ||</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">               uri.startsWith(&quot;/health/&quot;) ||</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">               uri.startsWith(&quot;/metrics/&quot;) ||</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">               uri.contains(&quot;/swagger-ui/&quot;) ||</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">               uri.contains(&quot;/api-docs/&quot;) ||</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">               uri.endsWith(&quot;.css&quot;) ||</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">               uri.endsWith(&quot;.js&quot;) ||</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">               uri.endsWith(&quot;.png&quot;) ||</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">               uri.endsWith(&quot;.ico&quot;);</span>
+    }
+
+    /**
+     * Check if request body should be logged.
+     */
+    private boolean shouldLogRequestBody(HttpServletRequest request) {
+<span class="nc" id="L419">        String contentType = request.getContentType();</span>
+        
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        return contentType != null &amp;&amp; </span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">               (contentType.contains(&quot;application/json&quot;) || </span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                contentType.contains(&quot;application/xml&quot;) ||</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                contentType.contains(&quot;text/&quot;)) &amp;&amp;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">               request.getContentLength() &gt; 0 &amp;&amp;</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">               request.getContentLength() &lt;= MAX_PAYLOAD_LENGTH * 2; // Allow larger payloads for truncation</span>
+    }
+
+    /**
+     * Check if response body should be logged.
+     */
+    private boolean shouldLogResponseBody(HttpServletRequest request, HttpServletResponse response) {
+<span class="fc" id="L433">        String contentType = response.getContentType();</span>
+        
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        return contentType != null &amp;&amp; </span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">               (contentType.contains(&quot;application/json&quot;) || </span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                contentType.contains(&quot;application/xml&quot;) ||</span>
+<span class="pc bnc" id="L438" title="All 2 branches missed.">                contentType.contains(&quot;text/&quot;)) &amp;&amp;</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">               response.getStatus() &lt; 300; // Only log successful responses by default</span>
+    }
+
+    /**
+     * Check if endpoint is payment-related.
+     */
+    private boolean isPaymentEndpoint(HttpServletRequest request) {
+<span class="fc" id="L446">        String uri = request.getRequestURI();</span>
+<span class="pc bpc" id="L447" title="1 of 4 branches missed.">        return uri.contains(&quot;/payments/&quot;) || uri.contains(&quot;/transactions/&quot;);</span>
+    }
+
+    /**
+     * Check if endpoint should be audited.
+     */
+    private boolean isAuditableEndpoint(HttpServletRequest request) {
+<span class="fc" id="L454">        String uri = request.getRequestURI();</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        return uri.contains(&quot;/auth/&quot;) || </span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">               uri.contains(&quot;/admin/&quot;) || </span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">               uri.contains(&quot;/management/&quot;) ||</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">               isPaymentEndpoint(request);</span>
+    }
+
+    /**
+     * Check if status code indicates an error.
+     */
+    private boolean isErrorStatus(int status) {
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        return status &gt;= 400;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

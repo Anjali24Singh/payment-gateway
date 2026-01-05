@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionInvoice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">SubscriptionInvoice.java</span></div><h1>SubscriptionInvoice.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import com.talentica.paymentgateway.validation.ValidAmount;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Entity representing an invoice for a subscription billing period.
+ * Invoices track the billing details, payment attempts, and transaction references.
+ */
+@Entity
+@Table(name = &quot;subscription_invoices&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;invoiceNumber&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_subscription_invoices_subscription_id&quot;, columnList = &quot;subscription_id&quot;),
+           @Index(name = &quot;idx_subscription_invoices_customer_id&quot;, columnList = &quot;customer_id&quot;),
+           @Index(name = &quot;idx_subscription_invoices_status&quot;, columnList = &quot;status&quot;),
+           @Index(name = &quot;idx_subscription_invoices_due_date&quot;, columnList = &quot;dueDate&quot;)
+       })
+public class SubscriptionInvoice extends BaseEntity {
+
+    @NotBlank(message = &quot;Invoice number is required&quot;)
+    @Size(max = 100, message = &quot;Invoice number must not exceed 100 characters&quot;)
+    @Column(name = &quot;invoice_number&quot;, nullable = false, unique = true, length = 100)
+    private String invoiceNumber;
+
+    @NotNull(message = &quot;Subscription is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;subscription_id&quot;, nullable = false)
+    private Subscription subscription;
+
+    @NotNull(message = &quot;Customer is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;customer_id&quot;, nullable = false)
+    private Customer customer;
+
+    @NotNull(message = &quot;Amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.01&quot;, message = &quot;Amount must be greater than zero&quot;)
+    @Column(name = &quot;amount&quot;, nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+<span class="fc" id="L54">    @Size(max = 3, message = &quot;Currency must be 3 characters&quot;)</span>
+    @Column(name = &quot;currency&quot;, length = 3)
+    private String currency = &quot;USD&quot;;
+
+<span class="fc" id="L58">    @Size(max = 50, message = &quot;Status must not exceed 50 characters&quot;)</span>
+    @Column(name = &quot;status&quot;, length = 50)
+    private String status = &quot;PENDING&quot;;
+
+    @NotNull(message = &quot;Period start is required&quot;)
+    @Column(name = &quot;period_start&quot;, nullable = false)
+    private ZonedDateTime periodStart;
+
+    @NotNull(message = &quot;Period end is required&quot;)
+    @Column(name = &quot;period_end&quot;, nullable = false)
+    private ZonedDateTime periodEnd;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;transaction_id&quot;)
+    private Transaction transaction;
+
+    @Column(name = &quot;paid_at&quot;)
+    private ZonedDateTime paidAt;
+
+    @Column(name = &quot;due_date&quot;)
+    private ZonedDateTime dueDate;
+
+<span class="fc" id="L80">    @Min(value = 0, message = &quot;Payment attempts must be non-negative&quot;)</span>
+    @Column(name = &quot;payment_attempts&quot;)
+<span class="fc" id="L82">    private Integer paymentAttempts = 0;</span>
+
+    @Column(name = &quot;next_payment_attempt&quot;)
+    private ZonedDateTime nextPaymentAttempt;
+
+<span class="fc" id="L87">    @Convert(converter = MapToJsonConverter.class)</span>
+    @Column(name = &quot;metadata&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; metadata = new HashMap&lt;&gt;();
+
+    // Constructors
+    public SubscriptionInvoice() {
+<span class="fc" id="L93">        super();</span>
+<span class="fc" id="L94">    }</span>
+
+    public SubscriptionInvoice(String invoiceNumber, Subscription subscription, Customer customer, 
+                             BigDecimal amount, ZonedDateTime periodStart, ZonedDateTime periodEnd) {
+<span class="fc" id="L98">        this();</span>
+<span class="fc" id="L99">        this.invoiceNumber = invoiceNumber;</span>
+<span class="fc" id="L100">        this.subscription = subscription;</span>
+<span class="fc" id="L101">        this.customer = customer;</span>
+<span class="fc" id="L102">        this.amount = amount;</span>
+<span class="fc" id="L103">        this.periodStart = periodStart;</span>
+<span class="fc" id="L104">        this.periodEnd = periodEnd;</span>
+<span class="fc" id="L105">        this.dueDate = ZonedDateTime.now().plusDays(30); // Default 30 days due date</span>
+<span class="fc" id="L106">    }</span>
+
+    // Getters and Setters
+    public String getInvoiceNumber() {
+<span class="fc" id="L110">        return invoiceNumber;</span>
+    }
+
+    public void setInvoiceNumber(String invoiceNumber) {
+<span class="fc" id="L114">        this.invoiceNumber = invoiceNumber;</span>
+<span class="fc" id="L115">    }</span>
+
+    public Subscription getSubscription() {
+<span class="fc" id="L118">        return subscription;</span>
+    }
+
+    public void setSubscription(Subscription subscription) {
+<span class="fc" id="L122">        this.subscription = subscription;</span>
+<span class="fc" id="L123">    }</span>
+
+    public Customer getCustomer() {
+<span class="fc" id="L126">        return customer;</span>
+    }
+
+    public void setCustomer(Customer customer) {
+<span class="fc" id="L130">        this.customer = customer;</span>
+<span class="fc" id="L131">    }</span>
+
+    public BigDecimal getAmount() {
+<span class="fc" id="L134">        return amount;</span>
+    }
+
+    public void setAmount(BigDecimal amount) {
+<span class="fc" id="L138">        this.amount = amount;</span>
+<span class="fc" id="L139">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L142">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L146">        this.currency = currency;</span>
+<span class="fc" id="L147">    }</span>
+
+    public String getStatus() {
+<span class="fc" id="L150">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="fc" id="L154">        this.status = status;</span>
+<span class="fc" id="L155">    }</span>
+
+    public ZonedDateTime getPeriodStart() {
+<span class="fc" id="L158">        return periodStart;</span>
+    }
+
+    public void setPeriodStart(ZonedDateTime periodStart) {
+<span class="fc" id="L162">        this.periodStart = periodStart;</span>
+<span class="fc" id="L163">    }</span>
+
+    public ZonedDateTime getPeriodEnd() {
+<span class="fc" id="L166">        return periodEnd;</span>
+    }
+
+    public void setPeriodEnd(ZonedDateTime periodEnd) {
+<span class="fc" id="L170">        this.periodEnd = periodEnd;</span>
+<span class="fc" id="L171">    }</span>
+
+    public Transaction getTransaction() {
+<span class="fc" id="L174">        return transaction;</span>
+    }
+
+    public void setTransaction(Transaction transaction) {
+<span class="fc" id="L178">        this.transaction = transaction;</span>
+<span class="fc" id="L179">    }</span>
+
+    public ZonedDateTime getPaidAt() {
+<span class="fc" id="L182">        return paidAt;</span>
+    }
+
+    public void setPaidAt(ZonedDateTime paidAt) {
+<span class="fc" id="L186">        this.paidAt = paidAt;</span>
+<span class="fc" id="L187">    }</span>
+
+    public ZonedDateTime getDueDate() {
+<span class="fc" id="L190">        return dueDate;</span>
+    }
+
+    public void setDueDate(ZonedDateTime dueDate) {
+<span class="fc" id="L194">        this.dueDate = dueDate;</span>
+<span class="fc" id="L195">    }</span>
+
+    public Integer getPaymentAttempts() {
+<span class="fc" id="L198">        return paymentAttempts;</span>
+    }
+
+    public void setPaymentAttempts(Integer paymentAttempts) {
+<span class="fc" id="L202">        this.paymentAttempts = paymentAttempts;</span>
+<span class="fc" id="L203">    }</span>
+
+    public ZonedDateTime getNextPaymentAttempt() {
+<span class="fc" id="L206">        return nextPaymentAttempt;</span>
+    }
+
+    public void setNextPaymentAttempt(ZonedDateTime nextPaymentAttempt) {
+<span class="fc" id="L210">        this.nextPaymentAttempt = nextPaymentAttempt;</span>
+<span class="fc" id="L211">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L214">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L218">        this.metadata = metadata;</span>
+<span class="fc" id="L219">    }</span>
+
+    // Utility methods
+    public boolean isPaid() {
+<span class="fc" id="L223">        return &quot;PAID&quot;.equals(status);</span>
+    }
+
+    public boolean isPending() {
+<span class="fc" id="L227">        return &quot;PENDING&quot;.equals(status);</span>
+    }
+
+    public boolean isFailed() {
+<span class="nc" id="L231">        return &quot;FAILED&quot;.equals(status);</span>
+    }
+
+    public boolean isOverdue() {
+<span class="pc bpc" id="L235" title="3 of 6 branches missed.">        return dueDate != null &amp;&amp; ZonedDateTime.now().isAfter(dueDate) &amp;&amp; !isPaid();</span>
+    }
+
+    public boolean isDue() {
+<span class="pc bpc" id="L239" title="3 of 6 branches missed.">        return dueDate != null &amp;&amp; !ZonedDateTime.now().isBefore(dueDate.minusDays(1)) &amp;&amp; !isPaid();</span>
+    }
+
+    public void markAsPaid(Transaction transaction) {
+<span class="fc" id="L243">        this.status = &quot;PAID&quot;;</span>
+<span class="fc" id="L244">        this.paidAt = ZonedDateTime.now();</span>
+<span class="fc" id="L245">        this.transaction = transaction;</span>
+<span class="fc" id="L246">        this.nextPaymentAttempt = null;</span>
+<span class="fc" id="L247">    }</span>
+
+    public void markAsFailed() {
+<span class="fc" id="L250">        this.status = &quot;FAILED&quot;;</span>
+<span class="fc" id="L251">        this.paymentAttempts++;</span>
+<span class="fc" id="L252">        scheduleNextPaymentAttempt();</span>
+<span class="fc" id="L253">    }</span>
+
+    public void markAsProcessing() {
+<span class="fc" id="L256">        this.status = &quot;PROCESSING&quot;;</span>
+<span class="fc" id="L257">        this.paymentAttempts++;</span>
+<span class="fc" id="L258">    }</span>
+
+    public void markAsCancelled() {
+<span class="fc" id="L261">        this.status = &quot;CANCELLED&quot;;</span>
+<span class="fc" id="L262">        this.nextPaymentAttempt = null;</span>
+<span class="fc" id="L263">    }</span>
+
+    public void scheduleNextPaymentAttempt() {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (paymentAttempts &lt; 5) { // Max 5 attempts</span>
+            // Exponential backoff: 1 day, 3 days, 7 days, 14 days, 30 days
+<span class="fc" id="L268">            int[] retryDays = {1, 3, 7, 14, 30};</span>
+<span class="fc" id="L269">            int dayIndex = Math.min(paymentAttempts - 1, retryDays.length - 1);</span>
+<span class="fc" id="L270">            this.nextPaymentAttempt = ZonedDateTime.now().plusDays(retryDays[dayIndex]);</span>
+<span class="fc" id="L271">        } else {</span>
+<span class="nc" id="L272">            this.nextPaymentAttempt = null; // No more retries</span>
+        }
+<span class="fc" id="L274">    }</span>
+
+    public boolean canRetryPayment() {
+<span class="nc bnc" id="L277" title="All 4 branches missed.">        return paymentAttempts &lt; 5 &amp;&amp; </span>
+               nextPaymentAttempt != null &amp;&amp; 
+<span class="nc bnc" id="L279" title="All 2 branches missed.">               ZonedDateTime.now().isAfter(nextPaymentAttempt);</span>
+    }
+
+    public int getDaysUntilDue() {
+<span class="nc bnc" id="L283" title="All 4 branches missed.">        if (dueDate == null || isPaid()) {</span>
+<span class="nc" id="L284">            return -1;</span>
+        }
+<span class="nc" id="L286">        return (int) java.time.temporal.ChronoUnit.DAYS.between(ZonedDateTime.now(), dueDate);</span>
+    }
+
+    public int getDaysOverdue() {
+<span class="pc bpc" id="L290" title="2 of 4 branches missed.">        if (dueDate == null || !isOverdue()) {</span>
+<span class="nc" id="L291">            return 0;</span>
+        }
+<span class="fc" id="L293">        return (int) java.time.temporal.ChronoUnit.DAYS.between(dueDate, ZonedDateTime.now());</span>
+    }
+
+    public String getBillingPeriodDescription() {
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">        if (periodStart != null &amp;&amp; periodEnd != null) {</span>
+<span class="fc" id="L298">            return String.format(&quot;Billing period: %s to %s&quot;, </span>
+<span class="fc" id="L299">                    periodStart.toLocalDate(), </span>
+<span class="fc" id="L300">                    periodEnd.toLocalDate());</span>
+        }
+<span class="nc" id="L302">        return &quot;Unknown billing period&quot;;</span>
+    }
+
+    public String getFormattedAmount() {
+<span class="fc" id="L306">        return String.format(&quot;$%.2f %s&quot;, amount, currency);</span>
+    }
+
+    public void addMetadata(String key, Object value) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (metadata == null) {</span>
+<span class="nc" id="L311">            metadata = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L313">        metadata.put(key, value);</span>
+<span class="fc" id="L314">    }</span>
+
+    public Object getMetadata(String key) {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        return metadata != null ? metadata.get(key) : null;</span>
+    }
+
+    public void reset() {
+<span class="fc" id="L321">        this.status = &quot;PENDING&quot;;</span>
+<span class="fc" id="L322">        this.paymentAttempts = 0;</span>
+<span class="fc" id="L323">        this.nextPaymentAttempt = null;</span>
+<span class="fc" id="L324">        this.paidAt = null;</span>
+<span class="fc" id="L325">        this.transaction = null;</span>
+<span class="fc" id="L326">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

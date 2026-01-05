@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditLog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">AuditLog.java</span></div><h1>AuditLog.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.net.InetAddress;
+import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Entity representing an audit log entry for tracking all system changes.
+ * Audit logs provide a complete history of who changed what and when.
+ */
+@Entity
+@Table(name = &quot;audit_logs&quot;,
+       indexes = {
+           @Index(name = &quot;idx_audit_logs_entity&quot;, columnList = &quot;entityType, entityId&quot;),
+           @Index(name = &quot;idx_audit_logs_user_id&quot;, columnList = &quot;user_id&quot;),
+           @Index(name = &quot;idx_audit_logs_correlation_id&quot;, columnList = &quot;correlationId&quot;),
+           @Index(name = &quot;idx_audit_logs_created_at&quot;, columnList = &quot;createdAt&quot;)
+       })
+public class AuditLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = &quot;id&quot;, updatable = false, nullable = false)
+    private UUID id;
+
+    @NotBlank(message = &quot;Entity type is required&quot;)
+    @Size(max = 100, message = &quot;Entity type must not exceed 100 characters&quot;)
+    @Column(name = &quot;entity_type&quot;, nullable = false, length = 100)
+    private String entityType;
+
+    @NotNull(message = &quot;Entity ID is required&quot;)
+    @Column(name = &quot;entity_id&quot;, nullable = false)
+    private UUID entityId;
+
+    @NotBlank(message = &quot;Action is required&quot;)
+    @Size(max = 50, message = &quot;Action must not exceed 50 characters&quot;)
+    @Column(name = &quot;action&quot;, nullable = false, length = 50)
+    private String action;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;user_id&quot;)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;api_key_id&quot;)
+    private ApiKey apiKey;
+
+    @Column(name = &quot;ip_address&quot;, columnDefinition = &quot;INET&quot;)
+    private InetAddress ipAddress;
+
+    @Column(name = &quot;user_agent&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String userAgent;
+
+    @Size(max = 100, message = &quot;Correlation ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;correlation_id&quot;, length = 100)
+    private String correlationId;
+
+<span class="fc" id="L65">    @Convert(converter = MapToJsonConverter.class)</span>
+    @Column(name = &quot;old_values&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; oldValues = new HashMap&lt;&gt;();
+
+<span class="fc" id="L69">    @Convert(converter = MapToJsonConverter.class)</span>
+    @Column(name = &quot;new_values&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; newValues = new HashMap&lt;&gt;();
+
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private ZonedDateTime createdAt;
+
+    // Constructors
+<span class="fc" id="L77">    public AuditLog() {</span>
+<span class="fc" id="L78">        this.createdAt = ZonedDateTime.now();</span>
+<span class="fc" id="L79">    }</span>
+
+    public AuditLog(String entityType, UUID entityId, String action) {
+<span class="fc" id="L82">        this();</span>
+<span class="fc" id="L83">        this.entityType = entityType;</span>
+<span class="fc" id="L84">        this.entityId = entityId;</span>
+<span class="fc" id="L85">        this.action = action;</span>
+<span class="fc" id="L86">    }</span>
+
+    public AuditLog(String entityType, UUID entityId, String action, User user) {
+<span class="fc" id="L89">        this(entityType, entityId, action);</span>
+<span class="fc" id="L90">        this.user = user;</span>
+<span class="fc" id="L91">    }</span>
+
+    public AuditLog(String entityType, UUID entityId, String action, ApiKey apiKey) {
+<span class="nc" id="L94">        this(entityType, entityId, action);</span>
+<span class="nc" id="L95">        this.apiKey = apiKey;</span>
+<span class="nc" id="L96">    }</span>
+
+    // Getters and Setters
+    public UUID getId() {
+<span class="fc" id="L100">        return id;</span>
+    }
+
+    public void setId(UUID id) {
+<span class="fc" id="L104">        this.id = id;</span>
+<span class="fc" id="L105">    }</span>
+
+    public String getEntityType() {
+<span class="fc" id="L108">        return entityType;</span>
+    }
+
+    public void setEntityType(String entityType) {
+<span class="fc" id="L112">        this.entityType = entityType;</span>
+<span class="fc" id="L113">    }</span>
+
+    public UUID getEntityId() {
+<span class="fc" id="L116">        return entityId;</span>
+    }
+
+    public void setEntityId(UUID entityId) {
+<span class="fc" id="L120">        this.entityId = entityId;</span>
+<span class="fc" id="L121">    }</span>
+
+    public String getAction() {
+<span class="fc" id="L124">        return action;</span>
+    }
+
+    public void setAction(String action) {
+<span class="fc" id="L128">        this.action = action;</span>
+<span class="fc" id="L129">    }</span>
+
+    public User getUser() {
+<span class="fc" id="L132">        return user;</span>
+    }
+
+    public void setUser(User user) {
+<span class="fc" id="L136">        this.user = user;</span>
+<span class="fc" id="L137">    }</span>
+
+    public ApiKey getApiKey() {
+<span class="fc" id="L140">        return apiKey;</span>
+    }
+
+    public void setApiKey(ApiKey apiKey) {
+<span class="fc" id="L144">        this.apiKey = apiKey;</span>
+<span class="fc" id="L145">    }</span>
+
+    public InetAddress getIpAddress() {
+<span class="fc" id="L148">        return ipAddress;</span>
+    }
+
+    public void setIpAddress(InetAddress ipAddress) {
+<span class="fc" id="L152">        this.ipAddress = ipAddress;</span>
+<span class="fc" id="L153">    }</span>
+
+    public String getUserAgent() {
+<span class="fc" id="L156">        return userAgent;</span>
+    }
+
+    public void setUserAgent(String userAgent) {
+<span class="fc" id="L160">        this.userAgent = userAgent;</span>
+<span class="fc" id="L161">    }</span>
+
+    public String getCorrelationId() {
+<span class="fc" id="L164">        return correlationId;</span>
+    }
+
+    public void setCorrelationId(String correlationId) {
+<span class="fc" id="L168">        this.correlationId = correlationId;</span>
+<span class="fc" id="L169">    }</span>
+
+    public Map&lt;String, Object&gt; getOldValues() {
+<span class="fc" id="L172">        return oldValues;</span>
+    }
+
+    public void setOldValues(Map&lt;String, Object&gt; oldValues) {
+<span class="fc" id="L176">        this.oldValues = oldValues;</span>
+<span class="fc" id="L177">    }</span>
+
+    public Map&lt;String, Object&gt; getNewValues() {
+<span class="fc" id="L180">        return newValues;</span>
+    }
+
+    public void setNewValues(Map&lt;String, Object&gt; newValues) {
+<span class="fc" id="L184">        this.newValues = newValues;</span>
+<span class="fc" id="L185">    }</span>
+
+    public ZonedDateTime getCreatedAt() {
+<span class="fc" id="L188">        return createdAt;</span>
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+<span class="fc" id="L192">        this.createdAt = createdAt;</span>
+<span class="fc" id="L193">    }</span>
+
+    // Utility methods
+    public String getActorDescription() {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (user != null) {</span>
+<span class="fc" id="L198">            return &quot;User: &quot; + user.getUsername();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        } else if (apiKey != null) {</span>
+<span class="nc" id="L200">            return &quot;API Key: &quot; + apiKey.getKeyName();</span>
+        } else {
+<span class="nc" id="L202">            return &quot;System&quot;;</span>
+        }
+    }
+
+    public boolean hasChanges() {
+<span class="pc bpc" id="L207" title="4 of 6 branches missed.">        return (oldValues != null &amp;&amp; !oldValues.isEmpty()) || </span>
+<span class="pc bnc" id="L208" title="All 2 branches missed.">               (newValues != null &amp;&amp; !newValues.isEmpty());</span>
+    }
+
+    public void addOldValue(String field, Object value) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (oldValues == null) {</span>
+<span class="nc" id="L213">            oldValues = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L215">        oldValues.put(field, value);</span>
+<span class="fc" id="L216">    }</span>
+
+    public void addNewValue(String field, Object value) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (newValues == null) {</span>
+<span class="nc" id="L220">            newValues = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L222">        newValues.put(field, value);</span>
+<span class="fc" id="L223">    }</span>
+
+    public void addChange(String field, Object oldValue, Object newValue) {
+<span class="fc" id="L226">        addOldValue(field, oldValue);</span>
+<span class="fc" id="L227">        addNewValue(field, newValue);</span>
+<span class="fc" id="L228">    }</span>
+
+    public String getChangeDescription() {
+<span class="fc" id="L231">        StringBuilder description = new StringBuilder();</span>
+<span class="fc" id="L232">        description.append(getActorDescription())</span>
+<span class="fc" id="L233">                  .append(&quot; performed &quot;)</span>
+<span class="fc" id="L234">                  .append(action)</span>
+<span class="fc" id="L235">                  .append(&quot; on &quot;)</span>
+<span class="fc" id="L236">                  .append(entityType)</span>
+<span class="fc" id="L237">                  .append(&quot; (ID: &quot;)</span>
+<span class="fc" id="L238">                  .append(entityId)</span>
+<span class="fc" id="L239">                  .append(&quot;)&quot;);</span>
+        
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (hasChanges()) {</span>
+<span class="fc" id="L242">            description.append(&quot; with changes: &quot;);</span>
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">            if (newValues != null &amp;&amp; !newValues.isEmpty()) {</span>
+<span class="fc" id="L244">                description.append(newValues.size()).append(&quot; field(s) modified&quot;);</span>
+            }
+        }
+        
+<span class="fc" id="L248">        return description.toString();</span>
+    }
+
+    public boolean isCreation() {
+<span class="pc bpc" id="L252" title="3 of 4 branches missed.">        return &quot;CREATE&quot;.equalsIgnoreCase(action) || &quot;CREATED&quot;.equalsIgnoreCase(action);</span>
+    }
+
+    public boolean isUpdate() {
+<span class="pc bpc" id="L256" title="3 of 4 branches missed.">        return &quot;UPDATE&quot;.equalsIgnoreCase(action) || &quot;UPDATED&quot;.equalsIgnoreCase(action);</span>
+    }
+
+    public boolean isDeletion() {
+<span class="pc bpc" id="L260" title="3 of 4 branches missed.">        return &quot;DELETE&quot;.equalsIgnoreCase(action) || &quot;DELETED&quot;.equalsIgnoreCase(action);</span>
+    }
+
+    // Common audit log creation methods
+    public static AuditLog createForUser(String entityType, UUID entityId, String action, User user) {
+<span class="nc" id="L265">        return new AuditLog(entityType, entityId, action, user);</span>
+    }
+
+    public static AuditLog createForApiKey(String entityType, UUID entityId, String action, ApiKey apiKey) {
+<span class="nc" id="L269">        return new AuditLog(entityType, entityId, action, apiKey);</span>
+    }
+
+    public static AuditLog createSystemLog(String entityType, UUID entityId, String action) {
+<span class="nc" id="L273">        return new AuditLog(entityType, entityId, action);</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (this == obj) return true;</span>
+<span class="nc bnc" id="L279" title="All 4 branches missed.">        if (obj == null || getClass() != obj.getClass()) return false;</span>
+<span class="nc" id="L280">        AuditLog auditLog = (AuditLog) obj;</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">        return id != null &amp;&amp; id.equals(auditLog.id);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L286">        return getClass().hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L291">        return String.format(&quot;AuditLog{id=%s, entityType=%s, entityId=%s, action=%s, createdAt=%s}&quot;, </span>
+                id, entityType, entityId, action, createdAt);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

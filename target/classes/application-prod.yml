@@ -1,0 +1,158 @@
+# Production Environment Configuration
+
+spring:
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5433}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+      
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: 2
+      timeout: 2000ms
+      ssl: ${REDIS_SSL:false}
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 8
+          max-wait: -1ms
+          
+  # JPA Configuration for Production
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+        generate_statistics: false
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  ssl:
+    enabled: ${SSL_ENABLED:true}
+    key-store: ${SSL_KEYSTORE_PATH}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-store-type: ${SSL_KEYSTORE_TYPE:PKCS12}
+    protocol: TLS
+    enabled-protocols: TLSv1.3,TLSv1.2
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+
+# Logging Configuration for Production
+logging:
+  level:
+    com.talentica.paymentgateway: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: ERROR
+    net.authorize: WARN
+    root: WARN
+  file:
+    name: /var/log/payment-gateway/payment-gateway-prod.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 90
+      total-size-cap: 10GB
+
+# Management Configuration for Production
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+  security:
+    enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 30s
+
+# Application Specific Configuration for Production
+app:
+  # Authorize.Net Configuration (Production)
+  authorize-net:
+    environment: PRODUCTION
+    api-login-id: ${AUTHNET_API_LOGIN_ID}
+    transaction-key: ${AUTHNET_TRANSACTION_KEY}
+    base-url: https://api.authorize.net/xml/v1/request.api
+    
+  # CORS Configuration for Production
+  cors:
+    allowed-origins: 
+      - ${FRONTEND_URL}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
+    allowed-headers: Authorization,Content-Type,X-Correlation-ID,X-API-Key
+    allow-credentials: true
+    max-age: 3600
+    
+  # Security Configuration for Production
+  security:
+    jwt:
+      debug: false
+      secret: ${JWT_SECRET}
+    api-key:
+      debug: false
+    headers:
+      frame-options: DENY
+      content-type-options: nosniff
+      xss-protection: "1; mode=block"
+      referrer-policy: strict-origin-when-cross-origin
+      
+  # Rate Limiting for Production
+  rate-limit:
+    enabled: true
+    default-limit: 2000 # requests per hour
+    burst-limit: 200 # burst capacity
+    
+  # Production Features
+  production:
+    detailed-errors: false
+    performance-monitoring: true
+    security-headers: true
+    
+  # Webhook Configuration
+  webhook:
+    base-url: ${WEBHOOK_BASE_URL}
+    
+  # Monitoring and Alerting
+  monitoring:
+    enabled: true
+    alert-email: ${ALERT_EMAIL}
+    pager-duty-key: ${PAGER_DUTY_KEY:}
+    
+  # Backup Configuration
+  backup:
+    enabled: true
+    schedule: "0 2 * * *" # Daily at 2 AM
+    retention-days: 30
+    s3-bucket: ${BACKUP_S3_BUCKET:}
+    
+  # Circuit Breaker Configuration
+  circuit-breaker:
+    failure-rate-threshold: 50
+    wait-duration-in-open-state: 30s
+    sliding-window-size: 10
+    minimum-number-of-calls: 5

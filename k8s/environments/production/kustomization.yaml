@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: payment-gateway
+
+resources:
+- ../../base/configmap.yaml
+- ../../base/deployment.yaml
+- ../../base/service.yaml
+- ../../base/ingress.yaml
+- ../../base/hpa.yaml
+- production-config.yaml
+
+patchesStrategicMerge:
+- production-patches.yaml
+
+images:
+- name: ghcr.io/payment-gateway
+  newTag: latest
+
+replicas:
+- name: payment-gateway
+  count: 5
+
+configMapGenerator:
+- name: payment-gateway-config
+  behavior: merge
+  literals:
+  - SPRING_PROFILES_ACTIVE=production
+  - LOGGING_LEVEL_ROOT=WARN
+  - LOGGING_LEVEL_COM_TALENTICA=INFO
+  - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+  - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=never
+  - RATE_LIMIT_REQUESTS_PER_MINUTE=200
+  - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=50
+  - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=0.01
+
+secretGenerator:
+- name: payment-gateway-tls
+  type: kubernetes.io/tls
+  files:
+  - tls.crt=certs/production/tls.crt
+  - tls.key=certs/production/tls.key
+
+commonLabels:
+  environment: production
+  version: v1
+
+commonAnnotations:
+  deployment.kubernetes.io/revision: "1"
+  app.kubernetes.io/managed-by: kustomize

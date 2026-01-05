@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandardErrorResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.common</a> &gt; <span class="el_source">StandardErrorResponse.java</span></div><h1>StandardErrorResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.common;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Standardized error response format for all API endpoints.
+ * Provides consistent error information with correlation tracking and detailed validation errors.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = &quot;Standard error response format&quot;)
+public class StandardErrorResponse {
+
+    @Schema(description = &quot;HTTP status code&quot;, example = &quot;400&quot;)
+    private int status;
+
+    @Schema(description = &quot;Unique error code&quot;, example = &quot;VALIDATION_ERROR&quot;)
+    private String errorCode;
+
+    @Schema(description = &quot;Human-readable error message&quot;, example = &quot;Request validation failed&quot;)
+    private String message;
+
+    @Schema(description = &quot;Detailed error description&quot;)
+    private String description;
+
+    @Schema(description = &quot;Error category&quot;, example = &quot;VALIDATION_ERROR&quot;, 
+            allowableValues = {&quot;VALIDATION_ERROR&quot;, &quot;AUTHENTICATION_ERROR&quot;, &quot;AUTHORIZATION_ERROR&quot;, 
+                              &quot;PAYMENT_ERROR&quot;, &quot;BUSINESS_ERROR&quot;, &quot;SYSTEM_ERROR&quot;, &quot;NETWORK_ERROR&quot;})
+    private String category;
+
+    @Schema(description = &quot;Correlation ID for tracking&quot;, example = &quot;corr-12345678&quot;)
+    private String correlationId;
+
+    @Schema(description = &quot;Error timestamp&quot;, example = &quot;2025-09-10T10:30:00&quot;)
+    @JsonFormat(pattern = &quot;yyyy-MM-dd'T'HH:mm:ss&quot;)
+    private LocalDateTime timestamp;
+
+    @Schema(description = &quot;Request path where error occurred&quot;, example = &quot;/api/v1/payments/purchase&quot;)
+    private String path;
+
+    @Schema(description = &quot;HTTP method&quot;, example = &quot;POST&quot;)
+    private String method;
+
+    @Schema(description = &quot;Detailed validation errors&quot;)
+    private List&lt;ValidationError&gt; validationErrors;
+
+    @Schema(description = &quot;Additional error context&quot;)
+    private Object additionalInfo;
+
+<span class="fc" id="L57">    public StandardErrorResponse() {</span>
+<span class="fc" id="L58">        this.timestamp = LocalDateTime.now();</span>
+<span class="fc" id="L59">    }</span>
+
+    public StandardErrorResponse(int status, String errorCode, String message) {
+<span class="fc" id="L62">        this();</span>
+<span class="fc" id="L63">        this.status = status;</span>
+<span class="fc" id="L64">        this.errorCode = errorCode;</span>
+<span class="fc" id="L65">        this.message = message;</span>
+<span class="fc" id="L66">    }</span>
+
+    public StandardErrorResponse(int status, String errorCode, String message, String correlationId) {
+<span class="fc" id="L69">        this(status, errorCode, message);</span>
+<span class="fc" id="L70">        this.correlationId = correlationId;</span>
+<span class="fc" id="L71">    }</span>
+
+    // Static factory methods
+    public static StandardErrorResponse validation(String message, String correlationId) {
+<span class="fc" id="L75">        StandardErrorResponse error = new StandardErrorResponse(400, &quot;VALIDATION_ERROR&quot;, message, correlationId);</span>
+<span class="fc" id="L76">        error.setCategory(&quot;VALIDATION_ERROR&quot;);</span>
+<span class="fc" id="L77">        error.setDescription(&quot;Request validation failed due to invalid input parameters&quot;);</span>
+<span class="fc" id="L78">        return error;</span>
+    }
+
+    public static StandardErrorResponse authentication(String message, String correlationId) {
+<span class="fc" id="L82">        StandardErrorResponse error = new StandardErrorResponse(401, &quot;AUTHENTICATION_ERROR&quot;, message, correlationId);</span>
+<span class="fc" id="L83">        error.setCategory(&quot;AUTHENTICATION_ERROR&quot;);</span>
+<span class="fc" id="L84">        error.setDescription(&quot;Authentication failed - invalid or missing credentials&quot;);</span>
+<span class="fc" id="L85">        return error;</span>
+    }
+
+    public static StandardErrorResponse authorization(String message, String correlationId) {
+<span class="fc" id="L89">        StandardErrorResponse error = new StandardErrorResponse(403, &quot;AUTHORIZATION_ERROR&quot;, message, correlationId);</span>
+<span class="fc" id="L90">        error.setCategory(&quot;AUTHORIZATION_ERROR&quot;);</span>
+<span class="fc" id="L91">        error.setDescription(&quot;Authorization failed - insufficient permissions&quot;);</span>
+<span class="fc" id="L92">        return error;</span>
+    }
+
+    public static StandardErrorResponse notFound(String message, String correlationId) {
+<span class="fc" id="L96">        StandardErrorResponse error = new StandardErrorResponse(404, &quot;NOT_FOUND&quot;, message, correlationId);</span>
+<span class="fc" id="L97">        error.setCategory(&quot;BUSINESS_ERROR&quot;);</span>
+<span class="fc" id="L98">        error.setDescription(&quot;Requested resource was not found&quot;);</span>
+<span class="fc" id="L99">        return error;</span>
+    }
+
+    public static StandardErrorResponse paymentError(String message, String correlationId) {
+<span class="fc" id="L103">        StandardErrorResponse error = new StandardErrorResponse(422, &quot;PAYMENT_ERROR&quot;, message, correlationId);</span>
+<span class="fc" id="L104">        error.setCategory(&quot;PAYMENT_ERROR&quot;);</span>
+<span class="fc" id="L105">        error.setDescription(&quot;Payment processing failed&quot;);</span>
+<span class="fc" id="L106">        return error;</span>
+    }
+
+    public static StandardErrorResponse businessError(String errorCode, String message, String correlationId) {
+<span class="fc" id="L110">        StandardErrorResponse error = new StandardErrorResponse(422, errorCode, message, correlationId);</span>
+<span class="fc" id="L111">        error.setCategory(&quot;BUSINESS_ERROR&quot;);</span>
+<span class="fc" id="L112">        error.setDescription(&quot;Business rule validation failed&quot;);</span>
+<span class="fc" id="L113">        return error;</span>
+    }
+
+    public static StandardErrorResponse systemError(String message, String correlationId) {
+<span class="fc" id="L117">        StandardErrorResponse error = new StandardErrorResponse(500, &quot;SYSTEM_ERROR&quot;, message, correlationId);</span>
+<span class="fc" id="L118">        error.setCategory(&quot;SYSTEM_ERROR&quot;);</span>
+<span class="fc" id="L119">        error.setDescription(&quot;An unexpected system error occurred&quot;);</span>
+<span class="fc" id="L120">        return error;</span>
+    }
+
+    public static StandardErrorResponse rateLimitExceeded(String message, String correlationId) {
+<span class="fc" id="L124">        StandardErrorResponse error = new StandardErrorResponse(429, &quot;RATE_LIMIT_EXCEEDED&quot;, message, correlationId);</span>
+<span class="fc" id="L125">        error.setCategory(&quot;SYSTEM_ERROR&quot;);</span>
+<span class="fc" id="L126">        error.setDescription(&quot;Rate limit exceeded - too many requests&quot;);</span>
+<span class="fc" id="L127">        return error;</span>
+    }
+
+    // Getters and setters
+<span class="fc" id="L131">    public int getStatus() { return status; }</span>
+<span class="fc" id="L132">    public void setStatus(int status) { this.status = status; }</span>
+<span class="fc" id="L133">    public String getErrorCode() { return errorCode; }</span>
+<span class="fc" id="L134">    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }</span>
+<span class="fc" id="L135">    public String getMessage() { return message; }</span>
+<span class="fc" id="L136">    public void setMessage(String message) { this.message = message; }</span>
+<span class="fc" id="L137">    public String getDescription() { return description; }</span>
+<span class="fc" id="L138">    public void setDescription(String description) { this.description = description; }</span>
+<span class="fc" id="L139">    public String getCategory() { return category; }</span>
+<span class="fc" id="L140">    public void setCategory(String category) { this.category = category; }</span>
+<span class="fc" id="L141">    public String getCorrelationId() { return correlationId; }</span>
+<span class="fc" id="L142">    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }</span>
+<span class="fc" id="L143">    public LocalDateTime getTimestamp() { return timestamp; }</span>
+<span class="fc" id="L144">    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }</span>
+<span class="fc" id="L145">    public String getPath() { return path; }</span>
+<span class="fc" id="L146">    public void setPath(String path) { this.path = path; }</span>
+<span class="fc" id="L147">    public String getMethod() { return method; }</span>
+<span class="fc" id="L148">    public void setMethod(String method) { this.method = method; }</span>
+<span class="fc" id="L149">    public List&lt;ValidationError&gt; getValidationErrors() { return validationErrors; }</span>
+<span class="fc" id="L150">    public void setValidationErrors(List&lt;ValidationError&gt; validationErrors) { this.validationErrors = validationErrors; }</span>
+<span class="fc" id="L151">    public Object getAdditionalInfo() { return additionalInfo; }</span>
+<span class="fc" id="L152">    public void setAdditionalInfo(Object additionalInfo) { this.additionalInfo = additionalInfo; }</span>
+
+    /**
+     * Validation error detail.
+     */
+    @Schema(description = &quot;Validation error detail&quot;)
+    public static class ValidationError {
+        @Schema(description = &quot;Field name that failed validation&quot;, example = &quot;amount&quot;)
+        private String field;
+
+        @Schema(description = &quot;Validation error code&quot;, example = &quot;INVALID_VALUE&quot;)
+        private String code;
+
+        @Schema(description = &quot;Validation error message&quot;, example = &quot;Amount must be greater than 0&quot;)
+        private String message;
+
+        @Schema(description = &quot;Invalid value provided&quot;)
+        private Object rejectedValue;
+
+<span class="fc" id="L171">        public ValidationError() {}</span>
+
+<span class="fc" id="L173">        public ValidationError(String field, String code, String message) {</span>
+<span class="fc" id="L174">            this.field = field;</span>
+<span class="fc" id="L175">            this.code = code;</span>
+<span class="fc" id="L176">            this.message = message;</span>
+<span class="fc" id="L177">        }</span>
+
+        public ValidationError(String field, String code, String message, Object rejectedValue) {
+<span class="fc" id="L180">            this(field, code, message);</span>
+<span class="fc" id="L181">            this.rejectedValue = rejectedValue;</span>
+<span class="fc" id="L182">        }</span>
+
+        // Getters and setters
+<span class="fc" id="L185">        public String getField() { return field; }</span>
+<span class="fc" id="L186">        public void setField(String field) { this.field = field; }</span>
+<span class="fc" id="L187">        public String getCode() { return code; }</span>
+<span class="fc" id="L188">        public void setCode(String code) { this.code = code; }</span>
+<span class="fc" id="L189">        public String getMessage() { return message; }</span>
+<span class="fc" id="L190">        public void setMessage(String message) { this.message = message; }</span>
+<span class="fc" id="L191">        public Object getRejectedValue() { return rejectedValue; }</span>
+<span class="fc" id="L192">        public void setRejectedValue(Object rejectedValue) { this.rejectedValue = rejectedValue; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

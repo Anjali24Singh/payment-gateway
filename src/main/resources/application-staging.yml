@@ -1,0 +1,123 @@
+# Staging Environment Configuration
+
+spring:
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:payment-gateway}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+      
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: 1
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: -1ms
+          
+  # JPA Configuration for Staging
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  ssl:
+    enabled: ${SSL_ENABLED:false}
+    key-store: ${SSL_KEYSTORE_PATH:}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
+    key-store-type: ${SSL_KEYSTORE_TYPE:PKCS12}
+
+# Logging Configuration for Staging
+logging:
+  level:
+    com.talentica.paymentgateway: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    net.authorize: INFO
+  file:
+    name: /var/log/payment-gateway/payment-gateway-staging.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 60
+      total-size-cap: 2GB
+
+# Management Configuration for Staging
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  security:
+    enabled: true
+
+# Application Specific Configuration for Staging
+app:
+  # Authorize.Net Configuration (Sandbox for Staging)
+  authorize-net:
+    environment: SANDBOX
+    api-login-id: ${AUTHNET_API_LOGIN_ID}
+    transaction-key: ${AUTHNET_TRANSACTION_KEY}
+    base-url: https://apitest.authorize.net/xml/v1/request.api
+    
+  # CORS Configuration for Staging
+  cors:
+    allowed-origins: 
+      - ${FRONTEND_URL:https://staging-frontend.talentica.com}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
+    allowed-headers: Authorization,Content-Type,X-Correlation-ID,X-API-Key
+    allow-credentials: true
+    max-age: 3600
+    
+  # Security Configuration for Staging
+  security:
+    jwt:
+      debug: false
+      secret: ${JWT_SECRET}
+    api-key:
+      debug: false
+      
+  # Rate Limiting for Staging
+  rate-limit:
+    enabled: true
+    default-limit: 5000 # requests per hour
+    burst-limit: 500 # burst capacity
+    
+  # Staging Features
+  staging:
+    detailed-errors: false
+    performance-monitoring: true
+    
+  # Webhook Configuration
+  webhook:
+    base-url: ${WEBHOOK_BASE_URL:https://staging-api.talentica.com/api/v1}
+    
+  # Monitoring and Alerting
+  monitoring:
+    enabled: true
+    alert-email: ${ALERT_EMAIL:staging-alerts@talentica.com}

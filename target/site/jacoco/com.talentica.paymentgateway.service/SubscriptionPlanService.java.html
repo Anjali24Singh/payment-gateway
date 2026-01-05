@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionPlanService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">SubscriptionPlanService.java</span></div><h1>SubscriptionPlanService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.subscription.CreatePlanRequest;
+import com.talentica.paymentgateway.dto.subscription.PlanResponse;
+import com.talentica.paymentgateway.entity.SubscriptionPlan;
+import com.talentica.paymentgateway.entity.SubscriptionStatus;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.repository.SubscriptionPlanRepository;
+import com.talentica.paymentgateway.repository.SubscriptionRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Service class for managing subscription plans.
+ * Handles plan creation, updates, activation/deactivation, and analytics.
+ * 
+ * Features:
+ * - Plan lifecycle management
+ * - Plan validation and business rules
+ * - Usage statistics and analytics
+ * - Plan comparison and recommendations
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L33">@Slf4j</span>
+@Service
+@Transactional
+public class SubscriptionPlanService {
+
+    private final SubscriptionPlanRepository planRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final MetricsService metricsService;
+
+    public SubscriptionPlanService(SubscriptionPlanRepository planRepository,
+                                 SubscriptionRepository subscriptionRepository,
+<span class="fc" id="L44">                                 MetricsService metricsService) {</span>
+<span class="fc" id="L45">        this.planRepository = planRepository;</span>
+<span class="fc" id="L46">        this.subscriptionRepository = subscriptionRepository;</span>
+<span class="fc" id="L47">        this.metricsService = metricsService;</span>
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Creates a new subscription plan.
+     * 
+     * @param request Plan creation request
+     * @return Created plan response
+     * @throws PaymentProcessingException if plan creation fails
+     */
+    public PlanResponse createPlan(CreatePlanRequest request) {
+<span class="fc" id="L58">        log.info(&quot;Creating subscription plan: {}&quot;, request.getPlanCode());</span>
+
+        // Validate plan code uniqueness
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (planRepository.existsByPlanCode(request.getPlanCode())) {</span>
+<span class="fc" id="L62">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L63">                &quot;Plan code already exists: &quot; + request.getPlanCode(), &quot;PLAN_CODE_EXISTS&quot;);</span>
+        }
+
+        // Validate business rules
+<span class="fc" id="L67">        validatePlanRequest(request);</span>
+
+        // Create plan entity
+<span class="fc" id="L70">        SubscriptionPlan plan = new SubscriptionPlan();</span>
+<span class="fc" id="L71">        plan.setPlanCode(request.getPlanCode());</span>
+<span class="fc" id="L72">        plan.setName(request.getName());</span>
+<span class="fc" id="L73">        plan.setDescription(request.getDescription());</span>
+<span class="fc" id="L74">        plan.setAmount(request.getAmount());</span>
+<span class="fc" id="L75">        plan.setCurrency(request.getCurrency());</span>
+<span class="fc" id="L76">        plan.setIntervalUnit(request.getIntervalUnit());</span>
+<span class="fc" id="L77">        plan.setIntervalCount(request.getIntervalCount());</span>
+<span class="fc" id="L78">        plan.setTrialPeriodDays(request.getTrialPeriodDays());</span>
+<span class="fc" id="L79">        plan.setIsActive(request.getIsActive());</span>
+
+        // Set metadata
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (request.getMetadata() != null) {</span>
+<span class="fc" id="L83">            plan.setMetadata(request.getMetadata());</span>
+        }
+
+        // Add additional fields
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (request.getFeatures() != null) {</span>
+<span class="fc" id="L88">            plan.addMetadata(&quot;features&quot;, request.getFeatures());</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (request.getSetupFee() != null) {</span>
+<span class="fc" id="L91">            plan.addMetadata(&quot;setupFee&quot;, request.getSetupFee());</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (request.getMaxSubscribers() != null) {</span>
+<span class="fc" id="L94">            plan.addMetadata(&quot;maxSubscribers&quot;, request.getMaxSubscribers());</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (request.getCategory() != null) {</span>
+<span class="fc" id="L97">            plan.addMetadata(&quot;category&quot;, request.getCategory());</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (request.getSortOrder() != null) {</span>
+<span class="fc" id="L100">            plan.addMetadata(&quot;sortOrder&quot;, request.getSortOrder());</span>
+        }
+
+        // Save plan
+<span class="fc" id="L104">        plan = planRepository.save(plan);</span>
+
+<span class="fc" id="L106">        log.info(&quot;Subscription plan created successfully: {}&quot;, plan.getPlanCode());</span>
+
+        // Record metrics
+<span class="fc" id="L109">        metricsService.recordPlanCreated(plan.getPlanCode(), plan.getAmount());</span>
+
+<span class="fc" id="L111">        return mapToPlanResponse(plan);</span>
+    }
+
+    /**
+     * Updates an existing subscription plan.
+     * 
+     * @param planCode Plan code to update
+     * @param request Update request
+     * @return Updated plan response
+     */
+    public PlanResponse updatePlan(String planCode, CreatePlanRequest request) {
+<span class="fc" id="L122">        log.info(&quot;Updating subscription plan: {}&quot;, planCode);</span>
+
+<span class="fc" id="L124">        SubscriptionPlan plan = planRepository.findByPlanCode(planCode)</span>
+<span class="fc" id="L125">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Plan not found: &quot; + planCode, &quot;PLAN_NOT_FOUND&quot;));
+
+        // Validate that we can update this plan
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (hasActiveSubscriptions(plan)) {</span>
+<span class="fc" id="L130">            log.warn(&quot;Updating plan with active subscriptions: {}&quot;, planCode);</span>
+            // Only allow certain updates for plans with active subscriptions
+<span class="nc" id="L132">            validateUpdateForActivePlan(request, plan);</span>
+        }
+
+        // Update fields
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (request.getName() != null) {</span>
+<span class="fc" id="L137">            plan.setName(request.getName());</span>
+        }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (request.getDescription() != null) {</span>
+<span class="fc" id="L140">            plan.setDescription(request.getDescription());</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (request.getIsActive() != null) {</span>
+<span class="fc" id="L143">            plan.setIsActive(request.getIsActive());</span>
+        }
+
+        // Amount changes require special handling
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (request.getAmount() != null &amp;&amp; !request.getAmount().equals(plan.getAmount())) {</span>
+<span class="fc" id="L148">            handlePriceChange(plan, request.getAmount());</span>
+        }
+
+        // Update metadata
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (request.getMetadata() != null) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (plan.getMetadata() == null) {</span>
+<span class="nc" id="L154">                plan.setMetadata(request.getMetadata());</span>
+            } else {
+<span class="nc" id="L156">                plan.getMetadata().putAll(request.getMetadata());</span>
+            }
+        }
+
+<span class="fc" id="L160">        plan = planRepository.save(plan);</span>
+
+<span class="fc" id="L162">        log.info(&quot;Subscription plan updated successfully: {}&quot;, planCode);</span>
+
+<span class="fc" id="L164">        return mapToPlanResponse(plan);</span>
+    }
+
+    /**
+     * Retrieves a subscription plan by code.
+     * 
+     * @param planCode Plan code
+     * @return Plan response
+     */
+    @Transactional(readOnly = true)
+    public PlanResponse getPlan(String planCode) {
+<span class="fc" id="L175">        SubscriptionPlan plan = planRepository.findByPlanCode(planCode)</span>
+<span class="fc" id="L176">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Plan not found: &quot; + planCode, &quot;PLAN_NOT_FOUND&quot;));
+
+<span class="fc" id="L179">        return mapToPlanResponse(plan);</span>
+    }
+
+    /**
+     * Retrieves all subscription plans.
+     * 
+     * @param pageable Pagination information
+     * @return Page of plan responses
+     */
+    @Transactional(readOnly = true)
+    public Page&lt;PlanResponse&gt; getAllPlans(Pageable pageable) {
+<span class="fc" id="L190">        Page&lt;SubscriptionPlan&gt; plans = planRepository.findAll(pageable);</span>
+<span class="fc" id="L191">        return plans.map(this::mapToPlanResponse);</span>
+    }
+
+    /**
+     * Retrieves active subscription plans.
+     * 
+     * @return List of active plan responses
+     */
+    @Transactional(readOnly = true)
+    public List&lt;PlanResponse&gt; getActivePlans() {
+<span class="fc" id="L201">        List&lt;SubscriptionPlan&gt; plans = planRepository.findByIsActiveTrue();</span>
+<span class="fc" id="L202">        return plans.stream()</span>
+<span class="fc" id="L203">                   .map(this::mapToPlanResponse)</span>
+<span class="fc" id="L204">                   .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Retrieves plans by interval.
+     * 
+     * @param intervalUnit Interval unit (DAY, WEEK, MONTH, YEAR)
+     * @return List of plan responses
+     */
+    @Transactional(readOnly = true)
+    public List&lt;PlanResponse&gt; getPlansByInterval(String intervalUnit) {
+<span class="fc" id="L215">        List&lt;SubscriptionPlan&gt; plans = planRepository.findByIntervalUnit(intervalUnit);</span>
+<span class="fc" id="L216">        return plans.stream()</span>
+<span class="fc" id="L217">                   .map(this::mapToPlanResponse)</span>
+<span class="fc" id="L218">                   .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Retrieves plans with trial periods.
+     * 
+     * @return List of plan responses with trial periods
+     */
+    @Transactional(readOnly = true)
+    public List&lt;PlanResponse&gt; getPlansWithTrial() {
+<span class="fc" id="L228">        List&lt;SubscriptionPlan&gt; plans = planRepository.findByTrialPeriodDaysGreaterThan(0);</span>
+<span class="fc" id="L229">        return plans.stream()</span>
+<span class="fc" id="L230">                   .map(this::mapToPlanResponse)</span>
+<span class="fc" id="L231">                   .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Activates a subscription plan.
+     * 
+     * @param planCode Plan code to activate
+     * @return Updated plan response
+     */
+    public PlanResponse activatePlan(String planCode) {
+<span class="fc" id="L241">        log.info(&quot;Activating subscription plan: {}&quot;, planCode);</span>
+
+<span class="fc" id="L243">        SubscriptionPlan plan = planRepository.findByPlanCode(planCode)</span>
+<span class="fc" id="L244">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Plan not found: &quot; + planCode, &quot;PLAN_NOT_FOUND&quot;));
+
+<span class="fc" id="L247">        plan.setIsActive(true);</span>
+<span class="fc" id="L248">        plan = planRepository.save(plan);</span>
+
+<span class="fc" id="L250">        log.info(&quot;Subscription plan activated: {}&quot;, planCode);</span>
+
+<span class="fc" id="L252">        return mapToPlanResponse(plan);</span>
+    }
+
+    /**
+     * Deactivates a subscription plan.
+     * 
+     * @param planCode Plan code to deactivate
+     * @return Updated plan response
+     */
+    public PlanResponse deactivatePlan(String planCode) {
+<span class="fc" id="L262">        log.info(&quot;Deactivating subscription plan: {}&quot;, planCode);</span>
+
+<span class="fc" id="L264">        SubscriptionPlan plan = planRepository.findByPlanCode(planCode)</span>
+<span class="pc" id="L265">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Plan not found: &quot; + planCode, &quot;PLAN_NOT_FOUND&quot;));
+
+        // Check if plan has active subscriptions
+<span class="fc" id="L269">        long activeSubscriptions = subscriptionRepository.countByPlanAndStatus(plan, SubscriptionStatus.ACTIVE.name());</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (activeSubscriptions &gt; 0) {</span>
+<span class="fc" id="L271">            log.warn(&quot;Deactivating plan with {} active subscriptions: {}&quot;, activeSubscriptions, planCode);</span>
+            // Allow deactivation but log warning
+        }
+
+<span class="fc" id="L275">        plan.setIsActive(false);</span>
+<span class="fc" id="L276">        plan = planRepository.save(plan);</span>
+
+<span class="fc" id="L278">        log.info(&quot;Subscription plan deactivated: {}&quot;, planCode);</span>
+
+<span class="fc" id="L280">        return mapToPlanResponse(plan);</span>
+    }
+
+    /**
+     * Deletes a subscription plan.
+     * 
+     * @param planCode Plan code to delete
+     * @throws PaymentProcessingException if plan cannot be deleted
+     */
+    public void deletePlan(String planCode) {
+<span class="fc" id="L290">        log.info(&quot;Deleting subscription plan: {}&quot;, planCode);</span>
+
+<span class="fc" id="L292">        SubscriptionPlan plan = planRepository.findByPlanCode(planCode)</span>
+<span class="fc" id="L293">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Plan not found: &quot; + planCode, &quot;PLAN_NOT_FOUND&quot;));
+
+        // Check if plan has any subscriptions
+<span class="fc" id="L297">        long totalSubscriptions = subscriptionRepository.countByPlan(plan);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        if (totalSubscriptions &gt; 0) {</span>
+<span class="fc" id="L299">            throw new PaymentProcessingException(</span>
+                &quot;Cannot delete plan with existing subscriptions: &quot; + planCode, &quot;PLAN_HAS_SUBSCRIPTIONS&quot;);
+        }
+
+<span class="fc" id="L303">        planRepository.delete(plan);</span>
+
+<span class="fc" id="L305">        log.info(&quot;Subscription plan deleted: {}&quot;, planCode);</span>
+<span class="fc" id="L306">    }</span>
+
+    // Private helper methods
+
+    private void validatePlanRequest(CreatePlanRequest request) {
+        // Validate interval combination
+<span class="pc bpc" id="L312" title="1 of 4 branches missed.">        if (&quot;DAY&quot;.equals(request.getIntervalUnit()) &amp;&amp; request.getIntervalCount() &gt; 365) {</span>
+<span class="fc" id="L313">            throw new PaymentProcessingException(</span>
+                &quot;Daily interval cannot exceed 365 days&quot;, &quot;INVALID_INTERVAL&quot;);
+        }
+<span class="pc bpc" id="L316" title="1 of 4 branches missed.">        if (&quot;WEEK&quot;.equals(request.getIntervalUnit()) &amp;&amp; request.getIntervalCount() &gt; 52) {</span>
+<span class="fc" id="L317">            throw new PaymentProcessingException(</span>
+                &quot;Weekly interval cannot exceed 52 weeks&quot;, &quot;INVALID_INTERVAL&quot;);
+        }
+<span class="fc bfc" id="L320" title="All 4 branches covered.">        if (&quot;MONTH&quot;.equals(request.getIntervalUnit()) &amp;&amp; request.getIntervalCount() &gt; 12) {</span>
+<span class="fc" id="L321">            throw new PaymentProcessingException(</span>
+                &quot;Monthly interval cannot exceed 12 months&quot;, &quot;INVALID_INTERVAL&quot;);
+        }
+<span class="pc bpc" id="L324" title="1 of 4 branches missed.">        if (&quot;YEAR&quot;.equals(request.getIntervalUnit()) &amp;&amp; request.getIntervalCount() &gt; 5) {</span>
+<span class="fc" id="L325">            throw new PaymentProcessingException(</span>
+                &quot;Yearly interval cannot exceed 5 years&quot;, &quot;INVALID_INTERVAL&quot;);
+        }
+
+        // Validate minimum amounts
+<span class="fc" id="L330">        BigDecimal minAmount = new BigDecimal(&quot;0.50&quot;);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (request.getAmount().compareTo(minAmount) &lt; 0) {</span>
+<span class="fc" id="L332">            throw new PaymentProcessingException(</span>
+                &quot;Plan amount cannot be less than $0.50&quot;, &quot;AMOUNT_TOO_LOW&quot;);
+        }
+
+        // Validate maximum amounts
+<span class="fc" id="L337">        BigDecimal maxAmount = new BigDecimal(&quot;100000.00&quot;);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        if (request.getAmount().compareTo(maxAmount) &gt; 0) {</span>
+<span class="fc" id="L339">            throw new PaymentProcessingException(</span>
+                &quot;Plan amount cannot exceed $100,000&quot;, &quot;AMOUNT_TOO_HIGH&quot;);
+        }
+<span class="fc" id="L342">    }</span>
+
+    private void validateUpdateForActivePlan(CreatePlanRequest request, SubscriptionPlan existingPlan) {
+        // Don't allow critical changes for plans with active subscriptions
+<span class="pc bpc" id="L346" title="3 of 4 branches missed.">        if (request.getAmount() != null &amp;&amp; !request.getAmount().equals(existingPlan.getAmount())) {</span>
+<span class="nc" id="L347">            log.warn(&quot;Price change attempted for plan with active subscriptions: {}&quot;, existingPlan.getPlanCode());</span>
+            // Allow price changes but log warning - they should be handled carefully
+        }
+
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">        if (request.getIntervalUnit() != null &amp;&amp; !request.getIntervalUnit().equals(existingPlan.getIntervalUnit())) {</span>
+<span class="fc" id="L352">            throw new PaymentProcessingException(</span>
+                &quot;Cannot change interval unit for plan with active subscriptions&quot;, &quot;CANNOT_CHANGE_INTERVAL&quot;);
+        }
+
+<span class="nc bnc" id="L356" title="All 4 branches missed.">        if (request.getIntervalCount() != null &amp;&amp; !request.getIntervalCount().equals(existingPlan.getIntervalCount())) {</span>
+<span class="nc" id="L357">            throw new PaymentProcessingException(</span>
+                &quot;Cannot change interval count for plan with active subscriptions&quot;, &quot;CANNOT_CHANGE_INTERVAL&quot;);
+        }
+<span class="nc" id="L360">    }</span>
+
+    private void handlePriceChange(SubscriptionPlan plan, BigDecimal newAmount) {
+<span class="fc" id="L363">        BigDecimal oldAmount = plan.getAmount();</span>
+<span class="fc" id="L364">        plan.setAmount(newAmount);</span>
+        
+        // Add price change to metadata for audit trail
+<span class="fc" id="L367">        plan.addMetadata(&quot;priceChangeHistory&quot;, String.format(</span>
+            &quot;Changed from $%.2f to $%.2f on %s&quot;, 
+<span class="fc" id="L369">            oldAmount, newAmount, java.time.ZonedDateTime.now()</span>
+        ));
+
+<span class="fc" id="L372">        log.info(&quot;Price changed for plan {}: ${} -&gt; ${}&quot;, </span>
+<span class="fc" id="L373">                   plan.getPlanCode(), oldAmount, newAmount);</span>
+<span class="fc" id="L374">    }</span>
+
+    private boolean hasActiveSubscriptions(SubscriptionPlan plan) {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        return subscriptionRepository.countByPlanAndStatus(plan, SubscriptionStatus.ACTIVE.name()) &gt; 0;</span>
+    }
+
+    private PlanResponse mapToPlanResponse(SubscriptionPlan plan) {
+<span class="fc" id="L381">        PlanResponse response = new PlanResponse();</span>
+        
+        // Basic plan info
+<span class="fc" id="L384">        response.setPlanCode(plan.getPlanCode());</span>
+<span class="fc" id="L385">        response.setName(plan.getName());</span>
+<span class="fc" id="L386">        response.setDescription(plan.getDescription());</span>
+<span class="fc" id="L387">        response.setAmount(plan.getAmount());</span>
+<span class="fc" id="L388">        response.setCurrency(plan.getCurrency());</span>
+<span class="fc" id="L389">        response.setIntervalUnit(plan.getIntervalUnit());</span>
+<span class="fc" id="L390">        response.setIntervalCount(plan.getIntervalCount());</span>
+<span class="fc" id="L391">        response.setTrialPeriodDays(plan.getTrialPeriodDays());</span>
+<span class="fc" id="L392">        response.setIsActive(plan.getIsActive());</span>
+<span class="fc" id="L393">        response.setCreatedAt(plan.getCreatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+<span class="fc" id="L394">        response.setUpdatedAt(plan.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+<span class="fc" id="L395">        response.setMetadata(plan.getMetadata());</span>
+
+        // Extract metadata fields with safe casting
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (plan.getMetadata() != null) {</span>
+<span class="fc" id="L399">            response.setFeatures((List&lt;String&gt;) plan.getMetadata().get(&quot;features&quot;));</span>
+            
+            // Safe cast for BigDecimal fields
+<span class="fc" id="L402">            Object setupFeeObj = plan.getMetadata().get(&quot;setupFee&quot;);</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (setupFeeObj instanceof BigDecimal) {</span>
+<span class="nc" id="L404">                response.setSetupFee((BigDecimal) setupFeeObj);</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            } else if (setupFeeObj instanceof Number) {</span>
+<span class="nc" id="L406">                response.setSetupFee(new BigDecimal(setupFeeObj.toString()));</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            } else if (setupFeeObj != null) {</span>
+<span class="nc" id="L408">                response.setSetupFee(new BigDecimal(setupFeeObj.toString()));</span>
+            }
+            
+            // Safe cast for Integer fields
+<span class="fc" id="L412">            Object maxSubsObj = plan.getMetadata().get(&quot;maxSubscribers&quot;);</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (maxSubsObj instanceof Integer) {</span>
+<span class="nc" id="L414">                response.setMaxSubscribers((Integer) maxSubsObj);</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">            } else if (maxSubsObj instanceof Number) {</span>
+<span class="nc" id="L416">                response.setMaxSubscribers(((Number) maxSubsObj).intValue());</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            } else if (maxSubsObj != null) {</span>
+                try {
+<span class="nc" id="L419">                    response.setMaxSubscribers(Integer.parseInt(maxSubsObj.toString()));</span>
+<span class="nc" id="L420">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L421">                    response.setMaxSubscribers(0);</span>
+<span class="nc" id="L422">                }</span>
+            }
+            
+<span class="fc" id="L425">            response.setCategory((String) plan.getMetadata().get(&quot;category&quot;));</span>
+            
+            // Safe cast for sort order
+<span class="fc" id="L428">            Object sortOrderObj = plan.getMetadata().get(&quot;sortOrder&quot;);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (sortOrderObj instanceof Integer) {</span>
+<span class="nc" id="L430">                response.setSortOrder((Integer) sortOrderObj);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            } else if (sortOrderObj instanceof Number) {</span>
+<span class="nc" id="L432">                response.setSortOrder(((Number) sortOrderObj).intValue());</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            } else if (sortOrderObj != null) {</span>
+                try {
+<span class="nc" id="L435">                    response.setSortOrder(Integer.parseInt(sortOrderObj.toString()));</span>
+<span class="nc" id="L436">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L437">                    response.setSortOrder(0);</span>
+<span class="nc" id="L438">                }</span>
+            }
+        }
+
+        // Calculated fields
+<span class="fc" id="L443">        response.setFormattedInterval(plan.getFormattedInterval());</span>
+<span class="fc" id="L444">        response.setFormattedPrice(plan.getFormattedPrice());</span>
+<span class="fc" id="L445">        response.setDisplayName(plan.getDisplayName());</span>
+<span class="fc" id="L446">        response.setHasTrialPeriod(plan.hasTrialPeriod());</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        response.setHasSetupFee(response.getSetupFee() != null &amp;&amp; </span>
+<span class="pc bnc" id="L448" title="All 2 branches missed.">                              response.getSetupFee().compareTo(BigDecimal.ZERO) &gt; 0);</span>
+
+        // Usage statistics
+<span class="fc" id="L451">        long activeSubscriptions = subscriptionRepository.countByPlanAndStatus(plan, SubscriptionStatus.ACTIVE.name());</span>
+<span class="fc" id="L452">        long totalSubscriptions = subscriptionRepository.countByPlan(plan);</span>
+        
+<span class="fc" id="L454">        response.setActiveSubscriptions(activeSubscriptions);</span>
+<span class="fc" id="L455">        response.setTotalSubscriptions(totalSubscriptions);</span>
+<span class="fc" id="L456">        response.setMonthlyRecurringRevenue(plan.getTotalMonthlyRevenue());</span>
+        
+        // Check subscriber limit
+<span class="pc bpc" id="L459" title="3 of 4 branches missed.">        if (response.getMaxSubscribers() != null &amp;&amp; response.getMaxSubscribers() &gt; 0) {</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            response.setAtSubscriberLimit(activeSubscriptions &gt;= response.getMaxSubscribers());</span>
+        } else {
+<span class="fc" id="L462">            response.setAtSubscriberLimit(false);</span>
+        }
+
+<span class="fc" id="L465">        return response;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

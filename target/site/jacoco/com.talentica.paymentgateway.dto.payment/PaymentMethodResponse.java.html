@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentMethodResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">PaymentMethodResponse.java</span></div><h1>PaymentMethodResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+/**
+ * Payment method response DTO containing masked payment information.
+ * Used in payment responses to provide payment method details without exposing sensitive data.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Payment method information in response (masked for security)&quot;)
+public class PaymentMethodResponse {
+
+    @Schema(description = &quot;Payment method type&quot;, example = &quot;CREDIT_CARD&quot;)
+    @JsonProperty(&quot;type&quot;)
+    private String type;
+
+    @Schema(description = &quot;Masked card number&quot;, example = &quot;****-****-****-1111&quot;)
+    @JsonProperty(&quot;maskedCardNumber&quot;)
+    private String maskedCardNumber;
+
+    @Schema(description = &quot;Card brand&quot;, example = &quot;VISA&quot;)
+    @JsonProperty(&quot;cardBrand&quot;)
+    private String cardBrand;
+
+    @Schema(description = &quot;Card expiry month&quot;, example = &quot;12&quot;)
+    @JsonProperty(&quot;expiryMonth&quot;)
+    private String expiryMonth;
+
+    @Schema(description = &quot;Card expiry year&quot;, example = &quot;2025&quot;)
+    @JsonProperty(&quot;expiryYear&quot;)
+    private String expiryYear;
+
+    @Schema(description = &quot;Cardholder name&quot;, example = &quot;John Doe&quot;)
+    @JsonProperty(&quot;cardholderName&quot;)
+    private String cardholderName;
+
+    @Schema(description = &quot;Payment token for future use&quot;, example = &quot;pm_1234567890abcdef&quot;)
+    @JsonProperty(&quot;token&quot;)
+    private String token;
+
+    @Schema(description = &quot;Masked bank account number&quot;, example = &quot;****7890&quot;)
+    @JsonProperty(&quot;maskedAccountNumber&quot;)
+    private String maskedAccountNumber;
+
+    @Schema(description = &quot;Bank routing number&quot;, example = &quot;123456789&quot;)
+    @JsonProperty(&quot;routingNumber&quot;)
+    private String routingNumber;
+
+    @Schema(description = &quot;Bank account type&quot;, example = &quot;CHECKING&quot;)
+    @JsonProperty(&quot;accountType&quot;)
+    private String accountType;
+
+    @Schema(description = &quot;Bank name&quot;, example = &quot;Wells Fargo&quot;)
+    @JsonProperty(&quot;bankName&quot;)
+    private String bankName;
+
+    @Schema(description = &quot;Account holder name&quot;, example = &quot;John Doe&quot;)
+    @JsonProperty(&quot;accountHolderName&quot;)
+    private String accountHolderName;
+
+    // Default constructor
+<span class="fc" id="L65">    public PaymentMethodResponse() {</span>
+<span class="fc" id="L66">    }</span>
+
+    // Constructor for credit card
+    public PaymentMethodResponse(String type, String maskedCardNumber, String cardBrand, 
+<span class="fc" id="L70">                                String expiryMonth, String expiryYear, String cardholderName) {</span>
+<span class="fc" id="L71">        this.type = type;</span>
+<span class="fc" id="L72">        this.maskedCardNumber = maskedCardNumber;</span>
+<span class="fc" id="L73">        this.cardBrand = cardBrand;</span>
+<span class="fc" id="L74">        this.expiryMonth = expiryMonth;</span>
+<span class="fc" id="L75">        this.expiryYear = expiryYear;</span>
+<span class="fc" id="L76">        this.cardholderName = cardholderName;</span>
+<span class="fc" id="L77">    }</span>
+
+    // Constructor for bank account - using different parameter order to avoid constructor conflict
+    public PaymentMethodResponse(String type, String maskedAccountNumber, String routingNumber, 
+<span class="nc" id="L81">                                String accountType, String bankName, String accountHolderName, boolean isBankAccount) {</span>
+<span class="nc" id="L82">        this.type = type;</span>
+<span class="nc" id="L83">        this.maskedAccountNumber = maskedAccountNumber;</span>
+<span class="nc" id="L84">        this.routingNumber = routingNumber;</span>
+<span class="nc" id="L85">        this.accountType = accountType;</span>
+<span class="nc" id="L86">        this.bankName = bankName;</span>
+<span class="nc" id="L87">        this.accountHolderName = accountHolderName;</span>
+<span class="nc" id="L88">    }</span>
+
+    // Static factory methods
+    public static PaymentMethodResponse fromCreditCard(String cardNumber, String cardBrand, 
+                                                      String expiryMonth, String expiryYear, 
+                                                      String cardholderName) {
+<span class="fc" id="L94">        return new PaymentMethodResponse(</span>
+            &quot;CREDIT_CARD&quot;,
+<span class="fc" id="L96">            maskCardNumber(cardNumber),</span>
+            cardBrand,
+            expiryMonth,
+            expiryYear,
+            cardholderName
+        );
+    }
+
+    public static PaymentMethodResponse fromToken(String token) {
+<span class="nc" id="L105">        PaymentMethodResponse response = new PaymentMethodResponse();</span>
+<span class="nc" id="L106">        response.setType(&quot;TOKEN&quot;);</span>
+<span class="nc" id="L107">        response.setToken(token);</span>
+<span class="nc" id="L108">        return response;</span>
+    }
+
+    public static PaymentMethodResponse fromBankAccount(String accountNumber, String routingNumber, 
+                                                       String accountType, String bankName, 
+                                                       String accountHolderName) {
+<span class="nc" id="L114">        return new PaymentMethodResponse(</span>
+            &quot;BANK_ACCOUNT&quot;,
+<span class="nc" id="L116">            maskAccountNumber(accountNumber),</span>
+            routingNumber,
+            accountType,
+            bankName,
+            accountHolderName,
+            true
+        );
+    }
+
+    // Utility methods for masking sensitive data
+    private static String maskCardNumber(String cardNumber) {
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (cardNumber == null || cardNumber.length() &lt; 4) {</span>
+<span class="nc" id="L128">            return &quot;****-****-****-****&quot;;</span>
+        }
+<span class="fc" id="L130">        return &quot;****-****-****-&quot; + cardNumber.substring(cardNumber.length() - 4);</span>
+    }
+
+    private static String maskAccountNumber(String accountNumber) {
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (accountNumber == null || accountNumber.length() &lt; 4) {</span>
+<span class="nc" id="L135">            return &quot;****&quot;;</span>
+        }
+<span class="nc" id="L137">        return &quot;****&quot; + accountNumber.substring(accountNumber.length() - 4);</span>
+    }
+
+    // Getters and Setters
+    public String getType() {
+<span class="fc" id="L142">        return type;</span>
+    }
+
+    public void setType(String type) {
+<span class="fc" id="L146">        this.type = type;</span>
+<span class="fc" id="L147">    }</span>
+
+    public String getMaskedCardNumber() {
+<span class="fc" id="L150">        return maskedCardNumber;</span>
+    }
+
+    public void setMaskedCardNumber(String maskedCardNumber) {
+<span class="fc" id="L154">        this.maskedCardNumber = maskedCardNumber;</span>
+<span class="fc" id="L155">    }</span>
+
+    public String getCardBrand() {
+<span class="fc" id="L158">        return cardBrand;</span>
+    }
+
+    public void setCardBrand(String cardBrand) {
+<span class="fc" id="L162">        this.cardBrand = cardBrand;</span>
+<span class="fc" id="L163">    }</span>
+
+    public String getExpiryMonth() {
+<span class="fc" id="L166">        return expiryMonth;</span>
+    }
+
+    public void setExpiryMonth(String expiryMonth) {
+<span class="fc" id="L170">        this.expiryMonth = expiryMonth;</span>
+<span class="fc" id="L171">    }</span>
+
+    public String getExpiryYear() {
+<span class="fc" id="L174">        return expiryYear;</span>
+    }
+
+    public void setExpiryYear(String expiryYear) {
+<span class="fc" id="L178">        this.expiryYear = expiryYear;</span>
+<span class="fc" id="L179">    }</span>
+
+    public String getCardholderName() {
+<span class="fc" id="L182">        return cardholderName;</span>
+    }
+
+    public void setCardholderName(String cardholderName) {
+<span class="fc" id="L186">        this.cardholderName = cardholderName;</span>
+<span class="fc" id="L187">    }</span>
+
+    public String getToken() {
+<span class="fc" id="L190">        return token;</span>
+    }
+
+    public void setToken(String token) {
+<span class="fc" id="L194">        this.token = token;</span>
+<span class="fc" id="L195">    }</span>
+
+    public String getMaskedAccountNumber() {
+<span class="fc" id="L198">        return maskedAccountNumber;</span>
+    }
+
+    public void setMaskedAccountNumber(String maskedAccountNumber) {
+<span class="fc" id="L202">        this.maskedAccountNumber = maskedAccountNumber;</span>
+<span class="fc" id="L203">    }</span>
+
+    public String getRoutingNumber() {
+<span class="fc" id="L206">        return routingNumber;</span>
+    }
+
+    public void setRoutingNumber(String routingNumber) {
+<span class="fc" id="L210">        this.routingNumber = routingNumber;</span>
+<span class="fc" id="L211">    }</span>
+
+    public String getAccountType() {
+<span class="fc" id="L214">        return accountType;</span>
+    }
+
+    public void setAccountType(String accountType) {
+<span class="fc" id="L218">        this.accountType = accountType;</span>
+<span class="fc" id="L219">    }</span>
+
+    public String getBankName() {
+<span class="fc" id="L222">        return bankName;</span>
+    }
+
+    public void setBankName(String bankName) {
+<span class="fc" id="L226">        this.bankName = bankName;</span>
+<span class="fc" id="L227">    }</span>
+
+    public String getAccountHolderName() {
+<span class="fc" id="L230">        return accountHolderName;</span>
+    }
+
+    public void setAccountHolderName(String accountHolderName) {
+<span class="fc" id="L234">        this.accountHolderName = accountHolderName;</span>
+<span class="fc" id="L235">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L239">        return &quot;PaymentMethodResponse{&quot; +</span>
+                &quot;type='&quot; + type + '\'' +
+                &quot;, maskedCardNumber='&quot; + maskedCardNumber + '\'' +
+                &quot;, cardBrand='&quot; + cardBrand + '\'' +
+                &quot;, expiryMonth='&quot; + expiryMonth + '\'' +
+                &quot;, expiryYear='&quot; + expiryYear + '\'' +
+                &quot;, cardholderName='&quot; + cardholderName + '\'' +
+                &quot;, token='&quot; + token + '\'' +
+                &quot;, maskedAccountNumber='&quot; + maskedAccountNumber + '\'' +
+                &quot;, routingNumber='&quot; + routingNumber + '\'' +
+                &quot;, accountType='&quot; + accountType + '\'' +
+                &quot;, bankName='&quot; + bankName + '\'' +
+                &quot;, accountHolderName='&quot; + accountHolderName + '\'' +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

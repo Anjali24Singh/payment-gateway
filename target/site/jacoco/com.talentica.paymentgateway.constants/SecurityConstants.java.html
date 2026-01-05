@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityConstants.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.constants</a> &gt; <span class="el_source">SecurityConstants.java</span></div><h1>SecurityConstants.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.constants;
+
+/**
+ * Security-related constants.
+ * Centralizes security configuration, password policies, and encryption settings.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public final class SecurityConstants {
+
+<span class="nc" id="L12">    private SecurityConstants() {</span>
+<span class="nc" id="L13">        throw new UnsupportedOperationException(&quot;This is a constants class and cannot be instantiated&quot;);</span>
+    }
+
+    // Password Policy
+    public static final int PASSWORD_MIN_LENGTH = 8;
+    public static final int PASSWORD_MAX_LENGTH = 128;
+    public static final int PASSWORD_HISTORY_COUNT = 5;
+    public static final int PASSWORD_EXPIRY_DAYS = 90;
+
+    // Account Lockout
+    public static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    public static final int ACCOUNT_LOCKOUT_DURATION_MINUTES = 30;
+
+    // Session Management
+    public static final int SESSION_TIMEOUT_MINUTES = 30;
+    public static final int MAX_CONCURRENT_SESSIONS = 3;
+
+    // Token Expiration
+    public static final int ACCESS_TOKEN_EXPIRY_MINUTES = 15;
+    public static final int REFRESH_TOKEN_EXPIRY_DAYS = 30;
+    public static final int EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
+    public static final int PASSWORD_RESET_TOKEN_EXPIRY_HOURS = 2;
+
+    // Encryption Algorithms
+    public static final String ENCRYPTION_ALGORITHM = &quot;AES/GCM/NoPadding&quot;;
+    public static final String HASH_ALGORITHM = &quot;SHA-256&quot;;
+    public static final String HMAC_ALGORITHM = &quot;HmacSHA256&quot;;
+    public static final int ENCRYPTION_KEY_LENGTH = 256;
+
+    // CORS
+<span class="nc" id="L43">    public static final String[] ALLOWED_ORIGINS = {&quot;http://localhost:3000&quot;, &quot;https://app.example.com&quot;};</span>
+<span class="nc" id="L44">    public static final String[] ALLOWED_METHODS = {&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;DELETE&quot;, &quot;PATCH&quot;, &quot;OPTIONS&quot;};</span>
+<span class="nc" id="L45">    public static final String[] ALLOWED_HEADERS = {&quot;*&quot;};</span>
+    public static final int CORS_MAX_AGE_SECONDS = 3600;
+
+    // Security Headers
+    public static final String HEADER_X_FRAME_OPTIONS = &quot;X-Frame-Options&quot;;
+    public static final String HEADER_X_CONTENT_TYPE_OPTIONS = &quot;X-Content-Type-Options&quot;;
+    public static final String HEADER_X_XSS_PROTECTION = &quot;X-XSS-Protection&quot;;
+    public static final String HEADER_STRICT_TRANSPORT_SECURITY = &quot;Strict-Transport-Security&quot;;
+    public static final String HEADER_CONTENT_SECURITY_POLICY = &quot;Content-Security-Policy&quot;;
+
+    // Role Names
+    public static final String ROLE_ADMIN = &quot;ROLE_ADMIN&quot;;
+    public static final String ROLE_USER = &quot;ROLE_USER&quot;;
+    public static final String ROLE_API_CLIENT = &quot;ROLE_API_CLIENT&quot;;
+    public static final String ROLE_MERCHANT = &quot;ROLE_MERCHANT&quot;;
+
+    // Permission Names
+    public static final String PERMISSION_READ = &quot;READ&quot;;
+    public static final String PERMISSION_WRITE = &quot;WRITE&quot;;
+    public static final String PERMISSION_DELETE = &quot;DELETE&quot;;
+    public static final String PERMISSION_ADMIN = &quot;ADMIN&quot;;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

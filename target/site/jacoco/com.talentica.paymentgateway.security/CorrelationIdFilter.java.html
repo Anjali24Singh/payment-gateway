@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CorrelationIdFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.security</a> &gt; <span class="el_source">CorrelationIdFilter.java</span></div><h1>CorrelationIdFilter.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.security;
+
+import com.talentica.paymentgateway.config.ApplicationConfig;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+/**
+ * Correlation ID Filter for distributed tracing.
+ * 
+ * This filter ensures every request has a unique correlation ID that can be tracked
+ * across the entire request lifecycle and distributed systems. The correlation ID
+ * is extracted from request headers or generated if not present, then added to
+ * MDC for logging and response headers for tracing.
+ * 
+ * Features:
+ * - Automatic correlation ID generation for new requests
+ * - Header extraction for external correlation IDs
+ * - MDC integration for structured logging
+ * - Response header injection for client tracking
+ * - Proper cleanup to prevent memory leaks
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L38">@Slf4j</span>
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 1) // Execute early in filter chain
+public class CorrelationIdFilter extends OncePerRequestFilter {
+    
+    // Default configuration if properties are not available
+    private static final String DEFAULT_HEADER_NAME = &quot;X-Correlation-ID&quot;;
+    private static final String DEFAULT_MDC_KEY = &quot;correlationId&quot;;
+    
+    private final ApplicationConfig.AppProperties appProperties;
+    
+<span class="fc" id="L49">    public CorrelationIdFilter(ApplicationConfig.AppProperties appProperties) {</span>
+<span class="fc" id="L50">        this.appProperties = appProperties;</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
+        
+<span class="fc" id="L60">        String correlationId = null;</span>
+        
+        try {
+            // Get configuration values
+<span class="fc" id="L64">            String headerName = getHeaderName();</span>
+<span class="fc" id="L65">            String mdcKey = getMdcKey();</span>
+            
+            // Extract correlation ID from request header
+<span class="fc" id="L68">            correlationId = extractCorrelationId(request, headerName);</span>
+            
+            // Generate new correlation ID if not present
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (!StringUtils.hasText(correlationId)) {</span>
+<span class="fc" id="L72">                correlationId = generateCorrelationId();</span>
+<span class="fc" id="L73">                log.debug(&quot;Generated new correlation ID: {}&quot;, correlationId);</span>
+            } else {
+<span class="fc" id="L75">                log.debug(&quot;Using existing correlation ID: {}&quot;, correlationId);</span>
+            }
+            
+            // Add correlation ID to MDC for logging
+<span class="fc" id="L79">            MDC.put(mdcKey, correlationId);</span>
+            
+            // Add correlation ID to response header for tracing
+<span class="fc" id="L82">            response.setHeader(headerName, correlationId);</span>
+            
+            // Log request start with correlation ID
+<span class="fc" id="L85">            log.info(&quot;Request started: {} {} [correlationId={}]&quot;, </span>
+<span class="fc" id="L86">                       request.getMethod(), request.getRequestURI(), correlationId);</span>
+            
+            // Continue with filter chain
+<span class="fc" id="L89">            filterChain.doFilter(request, response);</span>
+            
+            // Log request completion
+<span class="fc" id="L92">            log.info(&quot;Request completed: {} {} [correlationId={}] [status={}]&quot;, </span>
+<span class="fc" id="L93">                       request.getMethod(), request.getRequestURI(), </span>
+<span class="fc" id="L94">                       correlationId, response.getStatus());</span>
+            
+<span class="fc" id="L96">        } catch (Exception e) {</span>
+<span class="fc" id="L97">            log.error(&quot;Error in correlation ID filter [correlationId={}]: {}&quot;, </span>
+<span class="fc" id="L98">                        correlationId, e.getMessage(), e);</span>
+<span class="fc" id="L99">            throw e;</span>
+        } finally {
+            // Always clear MDC to prevent memory leaks
+<span class="fc" id="L102">            MDC.clear();</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    /**
+     * Extract correlation ID from request headers.
+     * Supports multiple header formats for interoperability.
+     * 
+     * @param request HTTP request
+     * @param primaryHeaderName Primary header name to check
+     * @return Correlation ID if found, null otherwise
+     */
+    private String extractCorrelationId(HttpServletRequest request, String primaryHeaderName) {
+        // Check primary header first
+<span class="fc" id="L116">        String correlationId = request.getHeader(primaryHeaderName);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (StringUtils.hasText(correlationId)) {</span>
+<span class="fc" id="L118">            return sanitizeCorrelationId(correlationId);</span>
+        }
+        
+        // Check alternative header names for interoperability
+<span class="fc" id="L122">        String[] alternativeHeaders = {</span>
+            &quot;X-Request-ID&quot;,
+            &quot;X-Trace-ID&quot;, 
+            &quot;Request-ID&quot;,
+            &quot;Trace-ID&quot;,
+            &quot;X-Request-Id&quot;,
+            &quot;X-Trace-Id&quot;
+        };
+        
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (String headerName : alternativeHeaders) {</span>
+<span class="fc" id="L132">            correlationId = request.getHeader(headerName);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (StringUtils.hasText(correlationId)) {</span>
+<span class="fc" id="L134">                log.debug(&quot;Found correlation ID in alternative header {}: {}&quot;, </span>
+                           headerName, correlationId);
+<span class="fc" id="L136">                return sanitizeCorrelationId(correlationId);</span>
+            }
+        }
+        
+<span class="fc" id="L140">        return null;</span>
+    }
+
+    /**
+     * Sanitize correlation ID to ensure it's safe for logging and headers.
+     * 
+     * @param correlationId Raw correlation ID
+     * @return Sanitized correlation ID
+     */
+    private String sanitizeCorrelationId(String correlationId) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!StringUtils.hasText(correlationId)) {</span>
+<span class="nc" id="L151">            return null;</span>
+        }
+        
+        // Remove any whitespace and limit length
+<span class="fc" id="L155">        String sanitized = correlationId.trim();</span>
+        
+        // Limit length to prevent header size issues
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (sanitized.length() &gt; 128) {</span>
+<span class="fc" id="L159">            sanitized = sanitized.substring(0, 128);</span>
+<span class="fc" id="L160">            log.debug(&quot;Truncated correlation ID to 128 characters&quot;);</span>
+        }
+        
+        // Validate format - should contain only alphanumeric, hyphens, and underscores
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (!sanitized.matches(&quot;^[a-zA-Z0-9\\-_]+$&quot;)) {</span>
+<span class="fc" id="L165">            log.warn(&quot;Invalid correlation ID format, generating new one. Original: {}&quot;, correlationId);</span>
+<span class="fc" id="L166">            return null;</span>
+        }
+        
+<span class="fc" id="L169">        return sanitized;</span>
+    }
+
+    /**
+     * Generate a new UUID-based correlation ID.
+     * 
+     * @return New correlation ID
+     */
+    private String generateCorrelationId() {
+<span class="fc" id="L178">        return UUID.randomUUID().toString();</span>
+    }
+
+    /**
+     * Get correlation ID header name from configuration.
+     * 
+     * @return Header name for correlation ID
+     */
+    private String getHeaderName() {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (appProperties != null &amp;&amp; </span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            appProperties.getCorrelation() != null &amp;&amp; </span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            StringUtils.hasText(appProperties.getCorrelation().getHeaderName())) {</span>
+<span class="fc" id="L190">            return appProperties.getCorrelation().getHeaderName();</span>
+        }
+<span class="fc" id="L192">        return DEFAULT_HEADER_NAME;</span>
+    }
+
+    /**
+     * Get MDC key name from configuration.
+     * 
+     * @return MDC key for correlation ID
+     */
+    private String getMdcKey() {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (appProperties != null &amp;&amp; </span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            appProperties.getCorrelation() != null &amp;&amp; </span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            StringUtils.hasText(appProperties.getCorrelation().getMdcKey())) {</span>
+<span class="fc" id="L204">            return appProperties.getCorrelation().getMdcKey();</span>
+        }
+<span class="fc" id="L206">        return DEFAULT_MDC_KEY;</span>
+    }
+
+    /**
+     * Get current correlation ID from MDC.
+     * This is a utility method that can be used by other components.
+     * 
+     * @return Current correlation ID or null if not set
+     */
+    public static String getCurrentCorrelationId() {
+<span class="fc" id="L216">        return MDC.get(DEFAULT_MDC_KEY);</span>
+    }
+
+    /**
+     * Set correlation ID in MDC programmatically.
+     * This can be used in async operations or when processing external events.
+     * 
+     * @param correlationId Correlation ID to set
+     */
+    public static void setCorrelationId(String correlationId) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (StringUtils.hasText(correlationId)) {</span>
+<span class="fc" id="L227">            MDC.put(DEFAULT_MDC_KEY, correlationId);</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    /**
+     * Clear correlation ID from MDC.
+     * Should be called when finishing async operations.
+     */
+    public static void clearCorrelationId() {
+<span class="fc" id="L236">        MDC.remove(DEFAULT_MDC_KEY);</span>
+<span class="fc" id="L237">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

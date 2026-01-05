@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.mapper</a> &gt; <span class="el_source">SubscriptionMapper.java</span></div><h1>SubscriptionMapper.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.mapper;
+
+import com.talentica.paymentgateway.dto.subscription.CreateSubscriptionRequest;
+import com.talentica.paymentgateway.dto.subscription.PlanResponse;
+import com.talentica.paymentgateway.dto.subscription.SubscriptionResponse;
+import com.talentica.paymentgateway.entity.Subscription;
+import com.talentica.paymentgateway.entity.SubscriptionPlan;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+import org.mapstruct.factory.Mappers;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
+/**
+ * MapStruct mapper for Subscription and SubscriptionPlan entity to DTO conversions.
+ * Handles mapping between subscription domain entities and data transfer objects.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Mapper(componentModel = &quot;spring&quot;)
+public interface SubscriptionMapper {
+
+<span class="fc" id="L28">    SubscriptionMapper INSTANCE = Mappers.getMapper(SubscriptionMapper.class);</span>
+
+    /**
+     * Map Subscription entity to SubscriptionResponse DTO.
+     */
+    @Mapping(source = &quot;subscriptionId&quot;, target = &quot;subscriptionId&quot;)
+    @Mapping(source = &quot;customer.customerReference&quot;, target = &quot;customerId&quot;)
+    @Mapping(source = &quot;plan.planCode&quot;, target = &quot;planCode&quot;)
+    @Mapping(source = &quot;plan.name&quot;, target = &quot;planName&quot;)
+    @Mapping(source = &quot;plan.amount&quot;, target = &quot;planAmount&quot;)
+    @Mapping(source = &quot;plan.currency&quot;, target = &quot;currency&quot;)
+    @Mapping(source = &quot;status&quot;, target = &quot;status&quot;)
+    @Mapping(target = &quot;customerName&quot;, ignore = true)
+    @Mapping(target = &quot;customerEmail&quot;, ignore = true)
+    SubscriptionResponse toSubscriptionResponse(Subscription subscription);
+
+    /**
+     * Map SubscriptionPlan entity to PlanResponse DTO.
+     */
+    @Mapping(source = &quot;planCode&quot;, target = &quot;planCode&quot;)
+    @Mapping(source = &quot;name&quot;, target = &quot;name&quot;)
+    @Mapping(source = &quot;description&quot;, target = &quot;description&quot;)
+    @Mapping(source = &quot;amount&quot;, target = &quot;amount&quot;)
+    @Mapping(source = &quot;currency&quot;, target = &quot;currency&quot;)
+    @Mapping(source = &quot;intervalUnit&quot;, target = &quot;intervalUnit&quot;)
+    @Mapping(source = &quot;intervalCount&quot;, target = &quot;intervalCount&quot;)
+    @Mapping(source = &quot;trialPeriodDays&quot;, target = &quot;trialPeriodDays&quot;)
+    @Mapping(target = &quot;setupFee&quot;, ignore = true)
+    PlanResponse toPlanResponse(SubscriptionPlan plan);
+
+    /**
+     * Map CreateSubscriptionRequest DTO to Subscription entity.
+     */
+    @Mapping(target = &quot;id&quot;, ignore = true)
+    @Mapping(target = &quot;subscriptionId&quot;, ignore = true)
+    @Mapping(target = &quot;customer&quot;, ignore = true)
+    @Mapping(target = &quot;plan&quot;, ignore = true)
+    @Mapping(target = &quot;paymentMethod&quot;, ignore = true)
+    @Mapping(target = &quot;status&quot;, ignore = true)
+    @Mapping(target = &quot;currentPeriodStart&quot;, ignore = true)
+    @Mapping(target = &quot;currentPeriodEnd&quot;, ignore = true)
+    @Mapping(target = &quot;trialStart&quot;, ignore = true)
+    @Mapping(target = &quot;trialEnd&quot;, ignore = true)
+    @Mapping(target = &quot;nextBillingDate&quot;, ignore = true)
+    @Mapping(target = &quot;billingCycleAnchor&quot;, ignore = true)
+    @Mapping(target = &quot;cancelledAt&quot;, ignore = true)
+    @Mapping(target = &quot;cancellationReason&quot;, ignore = true)
+    @Mapping(target = &quot;metadata&quot;, ignore = true)
+    @Mapping(target = &quot;invoices&quot;, ignore = true)
+    @Mapping(target = &quot;createdAt&quot;, ignore = true)
+    @Mapping(target = &quot;updatedAt&quot;, ignore = true)
+    Subscription toSubscription(CreateSubscriptionRequest request);
+
+    /**
+     * Format LocalDateTime to ISO 8601 string.
+     * Converts LocalDateTime to ZonedDateTime using system default timezone.
+     */
+    @Named(&quot;formatDateTime&quot;)
+    default String formatDateTime(LocalDateTime dateTime) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (dateTime == null) {</span>
+<span class="nc" id="L88">            return null;</span>
+        }
+<span class="nc" id="L90">        ZonedDateTime zonedDateTime = dateTime.atZone(ZoneId.systemDefault());</span>
+<span class="nc" id="L91">        return zonedDateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);</span>
+    }
+
+    /**
+     * Convert LocalDateTime to ZonedDateTime using system default timezone.
+     * This method is used automatically by MapStruct for LocalDateTime to ZonedDateTime mappings.
+     */
+    default ZonedDateTime map(LocalDateTime localDateTime) {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (localDateTime == null) {</span>
+<span class="nc" id="L100">            return null;</span>
+        }
+<span class="nc" id="L102">        return localDateTime.atZone(ZoneId.systemDefault());</span>
+    }
+
+    /**
+     * Convert ZonedDateTime to LocalDateTime.
+     * This method is used automatically by MapStruct for ZonedDateTime to LocalDateTime mappings.
+     */
+    default LocalDateTime map(ZonedDateTime zonedDateTime) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (zonedDateTime == null) {</span>
+<span class="nc" id="L111">            return null;</span>
+        }
+<span class="nc" id="L113">        return zonedDateTime.toLocalDateTime();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

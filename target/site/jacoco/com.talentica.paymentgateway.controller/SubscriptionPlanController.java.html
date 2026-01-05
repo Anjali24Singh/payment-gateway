@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionPlanController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">SubscriptionPlanController.java</span></div><h1>SubscriptionPlanController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.subscription.CreatePlanRequest;
+import com.talentica.paymentgateway.dto.subscription.PlanResponse;
+import com.talentica.paymentgateway.service.SubscriptionPlanService;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * REST controller for subscription plan management operations.
+ * Provides endpoints for creating, updating, and managing subscription plans.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L35">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/subscription-plans&quot;)
+@Tag(name = &quot;Subscription Plans&quot;, description = &quot;Subscription plan management operations&quot;)
+@SecurityRequirement(name = &quot;JWT&quot;)
+@SecurityRequirement(name = &quot;ApiKey&quot;)
+public class SubscriptionPlanController {
+
+    private final SubscriptionPlanService planService;
+
+<span class="fc" id="L45">    public SubscriptionPlanController(SubscriptionPlanService planService) {</span>
+<span class="fc" id="L46">        this.planService = planService;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Operation(summary = &quot;Create a new subscription plan&quot;, 
+               description = &quot;Creates a new subscription plan with pricing and billing configuration&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Plan created successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PlanResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid plan configuration&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Plan code already exists&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;PlanResponse&gt; createPlan(@Valid @RequestBody CreatePlanRequest request) {
+<span class="fc" id="L61">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L63">        log.info(&quot;Creating subscription plan - Code: {}, Name: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L64">                   request.getPlanCode(), request.getName(), correlationId);</span>
+
+<span class="fc" id="L66">        PlanResponse response = planService.createPlan(request);</span>
+        
+<span class="fc" id="L68">        log.info(&quot;Subscription plan created successfully - Code: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L69">                   response.getPlanCode(), correlationId);</span>
+
+<span class="fc" id="L71">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L72">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L73">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Update a subscription plan&quot;, 
+               description = &quot;Updates an existing subscription plan configuration&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plan updated successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PlanResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid plan configuration&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Plan not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Cannot update plan with active subscriptions&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PutMapping(&quot;/{planCode}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;PlanResponse&gt; updatePlan(
+            @Parameter(description = &quot;Plan code&quot;) @PathVariable String planCode,
+            @Valid @RequestBody CreatePlanRequest request) {
+        
+<span class="fc" id="L92">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L94">        log.info(&quot;Updating subscription plan - Code: {}, CorrelationId: {}&quot;, planCode, correlationId);</span>
+
+<span class="fc" id="L96">        PlanResponse response = planService.updatePlan(planCode, request);</span>
+        
+<span class="fc" id="L98">        log.info(&quot;Subscription plan updated successfully - Code: {}, CorrelationId: {}&quot;, </span>
+                   planCode, correlationId);
+
+<span class="fc" id="L101">        return ResponseEntity.ok()</span>
+<span class="fc" id="L102">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L103">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get subscription plan details&quot;, 
+               description = &quot;Retrieves detailed information about a specific subscription plan&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plan details retrieved successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PlanResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Plan not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/{planCode}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;PlanResponse&gt; getPlan(
+            @Parameter(description = &quot;Plan code&quot;) @PathVariable String planCode) {
+        
+<span class="fc" id="L119">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L121">        log.debug(&quot;Retrieving subscription plan - Code: {}, CorrelationId: {}&quot;, planCode, correlationId);</span>
+
+<span class="fc" id="L123">        PlanResponse response = planService.getPlan(planCode);</span>
+
+<span class="fc" id="L125">        return ResponseEntity.ok()</span>
+<span class="fc" id="L126">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L127">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get all subscription plans&quot;, 
+               description = &quot;Retrieves all subscription plans with pagination&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plans retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Page&lt;PlanResponse&gt;&gt; getAllPlans(
+            @PageableDefault(size = 20, sort = &quot;name&quot;, direction = Sort.Direction.ASC) Pageable pageable) {
+        
+<span class="fc" id="L141">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L143">        log.debug(&quot;Retrieving all subscription plans - CorrelationId: {}&quot;, correlationId);</span>
+
+<span class="fc" id="L145">        Page&lt;PlanResponse&gt; response = planService.getAllPlans(pageable);</span>
+
+<span class="fc" id="L147">        return ResponseEntity.ok()</span>
+<span class="fc" id="L148">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L149">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get active subscription plans&quot;, 
+               description = &quot;Retrieves all active subscription plans&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Active plans retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/active&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;List&lt;PlanResponse&gt;&gt; getActivePlans() {
+<span class="fc" id="L161">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L163">        log.debug(&quot;Retrieving active subscription plans - CorrelationId: {}&quot;, correlationId);</span>
+
+<span class="fc" id="L165">        List&lt;PlanResponse&gt; response = planService.getActivePlans();</span>
+
+<span class="fc" id="L167">        return ResponseEntity.ok()</span>
+<span class="fc" id="L168">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L169">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get plans by billing interval&quot;, 
+               description = &quot;Retrieves subscription plans filtered by billing interval&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plans retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid interval unit&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/by-interval/{intervalUnit}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;List&lt;PlanResponse&gt;&gt; getPlansByInterval(
+            @Parameter(description = &quot;Interval unit (DAY, WEEK, MONTH, YEAR)&quot;) 
+            @PathVariable String intervalUnit) {
+        
+<span class="fc" id="L185">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L187">        log.debug(&quot;Retrieving plans by interval - Unit: {}, CorrelationId: {}&quot;, </span>
+                    intervalUnit, correlationId);
+
+<span class="fc" id="L190">        List&lt;PlanResponse&gt; response = planService.getPlansByInterval(intervalUnit.toUpperCase());</span>
+
+<span class="fc" id="L192">        return ResponseEntity.ok()</span>
+<span class="fc" id="L193">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L194">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get plans with trial periods&quot;, 
+               description = &quot;Retrieves subscription plans that offer trial periods&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Trial plans retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/with-trial&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;List&lt;PlanResponse&gt;&gt; getPlansWithTrial() {
+<span class="fc" id="L206">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L208">        log.debug(&quot;Retrieving plans with trial periods - CorrelationId: {}&quot;, correlationId);</span>
+
+<span class="fc" id="L210">        List&lt;PlanResponse&gt; response = planService.getPlansWithTrial();</span>
+
+<span class="fc" id="L212">        return ResponseEntity.ok()</span>
+<span class="fc" id="L213">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L214">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Activate a subscription plan&quot;, 
+               description = &quot;Activates a subscription plan, making it available for new subscriptions&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plan activated successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PlanResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Plan not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{planCode}/activate&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;PlanResponse&gt; activatePlan(
+            @Parameter(description = &quot;Plan code&quot;) @PathVariable String planCode) {
+        
+<span class="fc" id="L230">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L232">        log.info(&quot;Activating subscription plan - Code: {}, CorrelationId: {}&quot;, planCode, correlationId);</span>
+
+<span class="fc" id="L234">        PlanResponse response = planService.activatePlan(planCode);</span>
+        
+<span class="fc" id="L236">        log.info(&quot;Subscription plan activated successfully - Code: {}, CorrelationId: {}&quot;, </span>
+                   planCode, correlationId);
+
+<span class="fc" id="L239">        return ResponseEntity.ok()</span>
+<span class="fc" id="L240">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L241">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Deactivate a subscription plan&quot;, 
+               description = &quot;Deactivates a subscription plan, preventing new subscriptions&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Plan deactivated successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = PlanResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Plan not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{planCode}/deactivate&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;PlanResponse&gt; deactivatePlan(
+            @Parameter(description = &quot;Plan code&quot;) @PathVariable String planCode) {
+        
+<span class="fc" id="L257">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L259">        log.info(&quot;Deactivating subscription plan - Code: {}, CorrelationId: {}&quot;, planCode, correlationId);</span>
+
+<span class="fc" id="L261">        PlanResponse response = planService.deactivatePlan(planCode);</span>
+        
+<span class="fc" id="L263">        log.info(&quot;Subscription plan deactivated successfully - Code: {}, CorrelationId: {}&quot;, </span>
+                   planCode, correlationId);
+
+<span class="fc" id="L266">        return ResponseEntity.ok()</span>
+<span class="fc" id="L267">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L268">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Delete a subscription plan&quot;, 
+               description = &quot;Permanently deletes a subscription plan (only if no subscriptions exist)&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;204&quot;, description = &quot;Plan deleted successfully&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Plan not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Cannot delete plan with existing subscriptions&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @DeleteMapping(&quot;/{planCode}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;Void&gt; deletePlan(
+            @Parameter(description = &quot;Plan code&quot;) @PathVariable String planCode) {
+        
+<span class="fc" id="L284">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L286">        log.info(&quot;Deleting subscription plan - Code: {}, CorrelationId: {}&quot;, planCode, correlationId);</span>
+
+<span class="fc" id="L288">        planService.deletePlan(planCode);</span>
+        
+<span class="fc" id="L290">        log.info(&quot;Subscription plan deleted successfully - Code: {}, CorrelationId: {}&quot;, </span>
+                   planCode, correlationId);
+
+<span class="fc" id="L293">        return ResponseEntity.noContent()</span>
+<span class="fc" id="L294">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L295">                           .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

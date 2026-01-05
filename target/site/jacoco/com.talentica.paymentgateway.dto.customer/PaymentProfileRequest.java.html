@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentProfileRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.customer</a> &gt; <span class="el_source">PaymentProfileRequest.java</span></div><h1>PaymentProfileRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.customer;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+/**
+ * Request DTO for creating or updating payment profiles
+ */
+public class PaymentProfileRequest {
+
+    @NotBlank(message = &quot;Card number is required&quot;)
+    @Pattern(regexp = &quot;\\d{13,19}&quot;, message = &quot;Card number must be 13-19 digits&quot;)
+    private String cardNumber;
+
+    @NotBlank(message = &quot;Expiry month is required&quot;)
+    @Pattern(regexp = &quot;^(0[1-9]|1[0-2])$&quot;, message = &quot;Expiry month must be 01-12&quot;)
+    private String expiryMonth;
+
+    @NotBlank(message = &quot;Expiry year is required&quot;)
+    @Pattern(regexp = &quot;^\\d{4}$&quot;, message = &quot;Expiry year must be 4 digits&quot;)
+    private String expiryYear;
+
+    @Pattern(regexp = &quot;\\d{3,4}&quot;, message = &quot;CVV must be 3-4 digits&quot;)
+    private String cvv;
+
+    // Billing Address Fields
+    @Size(max = 50, message = &quot;First name must not exceed 50 characters&quot;)
+    private String firstName;
+
+    @Size(max = 50, message = &quot;Last name must not exceed 50 characters&quot;)
+    private String lastName;
+
+    @Size(max = 50, message = &quot;Company must not exceed 50 characters&quot;)
+    private String company;
+
+    @Size(max = 60, message = &quot;Address must not exceed 60 characters&quot;)
+    private String address;
+
+    @Size(max = 40, message = &quot;City must not exceed 40 characters&quot;)
+    private String city;
+
+    @Size(max = 40, message = &quot;State must not exceed 40 characters&quot;)
+    private String state;
+
+    @Size(max = 20, message = &quot;ZIP code must not exceed 20 characters&quot;)
+    private String zip;
+
+    @Size(max = 60, message = &quot;Country must not exceed 60 characters&quot;)
+    private String country;
+
+    @Size(max = 25, message = &quot;Phone number must not exceed 25 characters&quot;)
+    private String phoneNumber;
+
+    @Size(max = 25, message = &quot;Fax number must not exceed 25 characters&quot;)
+    private String faxNumber;
+
+<span class="fc" id="L58">    private boolean defaultPaymentProfile = false;</span>
+
+    // Default constructor
+<span class="fc" id="L61">    public PaymentProfileRequest() {}</span>
+
+    // Getters and Setters
+    public String getCardNumber() {
+<span class="fc" id="L65">        return cardNumber;</span>
+    }
+
+    public void setCardNumber(String cardNumber) {
+<span class="fc" id="L69">        this.cardNumber = cardNumber;</span>
+<span class="fc" id="L70">    }</span>
+
+    public String getExpiryMonth() {
+<span class="fc" id="L73">        return expiryMonth;</span>
+    }
+
+    public void setExpiryMonth(String expiryMonth) {
+<span class="fc" id="L77">        this.expiryMonth = expiryMonth;</span>
+<span class="fc" id="L78">    }</span>
+
+    public String getExpiryYear() {
+<span class="fc" id="L81">        return expiryYear;</span>
+    }
+
+    public void setExpiryYear(String expiryYear) {
+<span class="fc" id="L85">        this.expiryYear = expiryYear;</span>
+<span class="fc" id="L86">    }</span>
+
+    public String getCvv() {
+<span class="fc" id="L89">        return cvv;</span>
+    }
+
+    public void setCvv(String cvv) {
+<span class="fc" id="L93">        this.cvv = cvv;</span>
+<span class="fc" id="L94">    }</span>
+
+    public String getFirstName() {
+<span class="fc" id="L97">        return firstName;</span>
+    }
+
+    public void setFirstName(String firstName) {
+<span class="fc" id="L101">        this.firstName = firstName;</span>
+<span class="fc" id="L102">    }</span>
+
+    public String getLastName() {
+<span class="fc" id="L105">        return lastName;</span>
+    }
+
+    public void setLastName(String lastName) {
+<span class="fc" id="L109">        this.lastName = lastName;</span>
+<span class="fc" id="L110">    }</span>
+
+    public String getCompany() {
+<span class="fc" id="L113">        return company;</span>
+    }
+
+    public void setCompany(String company) {
+<span class="fc" id="L117">        this.company = company;</span>
+<span class="fc" id="L118">    }</span>
+
+    public String getAddress() {
+<span class="fc" id="L121">        return address;</span>
+    }
+
+    public void setAddress(String address) {
+<span class="fc" id="L125">        this.address = address;</span>
+<span class="fc" id="L126">    }</span>
+
+    public String getCity() {
+<span class="fc" id="L129">        return city;</span>
+    }
+
+    public void setCity(String city) {
+<span class="fc" id="L133">        this.city = city;</span>
+<span class="fc" id="L134">    }</span>
+
+    public String getState() {
+<span class="fc" id="L137">        return state;</span>
+    }
+
+    public void setState(String state) {
+<span class="fc" id="L141">        this.state = state;</span>
+<span class="fc" id="L142">    }</span>
+
+    public String getZip() {
+<span class="fc" id="L145">        return zip;</span>
+    }
+
+    public void setZip(String zip) {
+<span class="fc" id="L149">        this.zip = zip;</span>
+<span class="fc" id="L150">    }</span>
+
+    public String getCountry() {
+<span class="fc" id="L153">        return country;</span>
+    }
+
+    public void setCountry(String country) {
+<span class="fc" id="L157">        this.country = country;</span>
+<span class="fc" id="L158">    }</span>
+
+    public String getPhoneNumber() {
+<span class="fc" id="L161">        return phoneNumber;</span>
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+<span class="fc" id="L165">        this.phoneNumber = phoneNumber;</span>
+<span class="fc" id="L166">    }</span>
+
+    public String getFaxNumber() {
+<span class="fc" id="L169">        return faxNumber;</span>
+    }
+
+    public void setFaxNumber(String faxNumber) {
+<span class="fc" id="L173">        this.faxNumber = faxNumber;</span>
+<span class="fc" id="L174">    }</span>
+
+    public boolean isDefaultPaymentProfile() {
+<span class="fc" id="L177">        return defaultPaymentProfile;</span>
+    }
+
+    public void setDefaultPaymentProfile(boolean defaultPaymentProfile) {
+<span class="fc" id="L181">        this.defaultPaymentProfile = defaultPaymentProfile;</span>
+<span class="fc" id="L182">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L186">        return &quot;PaymentProfileRequest{&quot; +</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">                &quot;cardNumber='****&quot; + (cardNumber != null &amp;&amp; cardNumber.length() &gt;= 4 ? </span>
+<span class="pc" id="L188">                    cardNumber.substring(cardNumber.length() - 4) : &quot;****&quot;) + '\'' +</span>
+                &quot;, expiryMonth='&quot; + expiryMonth + '\'' +
+                &quot;, expiryYear='&quot; + expiryYear + '\'' +
+                &quot;, firstName='&quot; + firstName + '\'' +
+                &quot;, lastName='&quot; + lastName + '\'' +
+                &quot;, city='&quot; + city + '\'' +
+                &quot;, state='&quot; + state + '\'' +
+                &quot;, defaultPaymentProfile=&quot; + defaultPaymentProfile +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

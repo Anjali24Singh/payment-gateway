@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">UserService.java</span></div><h1>UserService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.RegistrationRequest;
+import com.talentica.paymentgateway.dto.user.UpdateUserRequest;
+import com.talentica.paymentgateway.dto.user.UserResponse;
+import com.talentica.paymentgateway.entity.User;
+import com.talentica.paymentgateway.exception.ResourceNotFoundException;
+import com.talentica.paymentgateway.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Service class for user management operations.
+ * Handles user registration, authentication, and profile management.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L34">@Slf4j</span>
+@Service
+@Transactional
+public class UserService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+<span class="fc" id="L42">    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {</span>
+<span class="fc" id="L43">        this.userRepository = userRepository;</span>
+<span class="fc" id="L44">        this.passwordEncoder = passwordEncoder;</span>
+<span class="fc" id="L45">        initializeDefaultUsers();</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Load user by username for Spring Security authentication.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        try {
+<span class="fc" id="L55">            log.debug(&quot;Loading user by username: {}&quot;, username);</span>
+            
+<span class="fc" id="L57">            User user = userRepository.findByEmailIgnoreCase(username)</span>
+<span class="fc" id="L58">                    .orElseThrow(() -&gt; {</span>
+<span class="fc" id="L59">                        log.warn(&quot;User not found during loadUserByUsername: {}&quot;, username);</span>
+<span class="fc" id="L60">                        return new UsernameNotFoundException(&quot;User not found: &quot; + username);</span>
+                    });
+
+<span class="fc" id="L63">            log.debug(&quot;Found user: {}, Active: {}, Verified: {}&quot;, user.getEmail(), user.getIsActive(), user.getIsVerified());</span>
+
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (!user.getIsActive()) {</span>
+<span class="fc" id="L66">                log.warn(&quot;User account is inactive: {}&quot;, username);</span>
+<span class="fc" id="L67">                throw new UsernameNotFoundException(&quot;User account is inactive: &quot; + username);</span>
+            }
+
+<span class="fc" id="L70">            var authorities = getUserAuthorities(user);</span>
+<span class="fc" id="L71">            log.debug(&quot;User authorities for {}: {}&quot;, username, authorities);</span>
+
+            // For now, all users get ROLE_USER. In production, you'd have a roles table
+<span class="fc" id="L74">            UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()</span>
+<span class="fc" id="L75">                    .username(user.getEmail())</span>
+<span class="fc" id="L76">                    .password(user.getPasswordHash())</span>
+<span class="fc" id="L77">                    .authorities(authorities)</span>
+<span class="fc" id="L78">                    .accountExpired(false)</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                    .accountLocked(!user.getIsActive())</span>
+<span class="fc" id="L80">                    .credentialsExpired(false)</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                    .disabled(!user.getIsActive())</span>
+<span class="fc" id="L82">                    .build();</span>
+            
+<span class="fc" id="L84">            log.debug(&quot;Successfully loaded UserDetails for: {}&quot;, username);</span>
+<span class="fc" id="L85">            return userDetails;</span>
+<span class="fc" id="L86">        } catch (Exception e) {</span>
+<span class="fc" id="L87">            log.error(&quot;Error loading user by username {}: {}&quot;, username, e.getMessage(), e);</span>
+<span class="fc" id="L88">            throw e;</span>
+        }
+    }
+
+    /**
+     * Register a new user.
+     */
+    public User registerUser(RegistrationRequest request) {
+<span class="fc" id="L96">        log.info(&quot;Registering new user with email: {}&quot;, request.getEmail());</span>
+
+        // Check if user already exists
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {</span>
+<span class="fc" id="L100">            throw new IllegalArgumentException(&quot;User with email already exists: &quot; + request.getEmail());</span>
+        }
+
+        // Create new user
+<span class="fc" id="L104">        User user = new User();</span>
+<span class="fc" id="L105">        user.setUsername(request.getEmail()); // Use email as username</span>
+<span class="fc" id="L106">        user.setEmail(request.getEmail().toLowerCase());</span>
+<span class="fc" id="L107">        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));</span>
+<span class="fc" id="L108">        user.setFirstName(request.getFirstName());</span>
+<span class="fc" id="L109">        user.setLastName(request.getLastName());</span>
+<span class="fc" id="L110">        user.setIsActive(true);</span>
+<span class="fc" id="L111">        user.setIsVerified(false); // Email verification would be implemented separately</span>
+
+<span class="fc" id="L113">        User savedUser = userRepository.save(user);</span>
+<span class="fc" id="L114">        log.info(&quot;Successfully registered user: {} with ID: {}&quot;, savedUser.getEmail(), savedUser.getId());</span>
+        
+<span class="fc" id="L116">        return savedUser;</span>
+    }
+
+    /**
+     * Find user by email.
+     */
+    @Transactional(readOnly = true)
+    public Optional&lt;User&gt; findByEmail(String email) {
+<span class="fc" id="L124">        return userRepository.findByEmailIgnoreCase(email);</span>
+    }
+
+    /**
+     * Find user by ID.
+     */
+    @Transactional(readOnly = true)
+    public Optional&lt;User&gt; findById(UUID id) {
+<span class="fc" id="L132">        return userRepository.findById(id);</span>
+    }
+
+    /**
+     * Update user's last login timestamp.
+     */
+    @Transactional
+    public void updateLastLogin(UUID userId) {
+<span class="fc" id="L140">        userRepository.updateLastLoginAt(userId, ZonedDateTime.now());</span>
+<span class="fc" id="L141">        log.debug(&quot;Updated last login for user ID: {}&quot;, userId);</span>
+<span class="fc" id="L142">    }</span>
+
+    /**
+     * Validate user credentials.
+     */
+    @Transactional(readOnly = true)
+    public boolean validateCredentials(String email, String password) {
+        try {
+<span class="fc" id="L150">            log.debug(&quot;Validating credentials for email: {}&quot;, email);</span>
+<span class="fc" id="L151">            Optional&lt;User&gt; userOpt = userRepository.findByEmailIgnoreCase(email);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (userOpt.isEmpty()) {</span>
+<span class="fc" id="L153">                log.warn(&quot;User not found for email: {}&quot;, email);</span>
+<span class="fc" id="L154">                return false;</span>
+            }
+
+<span class="fc" id="L157">            User user = userOpt.get();</span>
+<span class="fc" id="L158">            log.debug(&quot;Found user: {}, Active: {}&quot;, user.getEmail(), user.getIsActive());</span>
+            
+<span class="fc" id="L160">            boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());</span>
+<span class="fc" id="L161">            log.debug(&quot;Password matches for user {}: {}&quot;, email, passwordMatches);</span>
+            
+<span class="fc bfc" id="L163" title="All 4 branches covered.">            boolean isValid = user.getIsActive() &amp;&amp; passwordMatches;</span>
+<span class="fc" id="L164">            log.info(&quot;Credential validation result for {}: {}&quot;, email, isValid);</span>
+            
+<span class="fc" id="L166">            return isValid;</span>
+<span class="fc" id="L167">        } catch (Exception e) {</span>
+<span class="fc" id="L168">            log.error(&quot;Error validating credentials for email {}: {}&quot;, email, e.getMessage(), e);</span>
+<span class="fc" id="L169">            return false;</span>
+        }
+    }
+
+    /**
+     * Get current user profile.
+     */
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentUserProfile() {
+<span class="fc" id="L178">        Authentication auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="fc" id="L179">        String email = auth.getName();</span>
+        
+<span class="fc" id="L181">        User user = userRepository.findByEmailIgnoreCase(email)</span>
+<span class="fc" id="L182">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found: &quot; + email));</span>
+        
+<span class="fc" id="L184">        return convertToUserResponse(user);</span>
+    }
+
+    /**
+     * Update current user profile.
+     */
+    @Transactional
+    public UserResponse updateCurrentUserProfile(UpdateUserRequest request) {
+<span class="fc" id="L192">        Authentication auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="fc" id="L193">        String email = auth.getName();</span>
+        
+<span class="fc" id="L195">        User user = userRepository.findByEmailIgnoreCase(email)</span>
+<span class="pc" id="L196">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found: &quot; + email));</span>
+        
+<span class="fc" id="L198">        updateUserFields(user, request, false); // Don't allow role changes for self-update</span>
+<span class="fc" id="L199">        User updatedUser = userRepository.save(user);</span>
+        
+<span class="fc" id="L201">        log.info(&quot;User profile updated: {}&quot;, email);</span>
+<span class="fc" id="L202">        return convertToUserResponse(updatedUser);</span>
+    }
+
+    /**
+     * Get user by ID (Admin only).
+     */
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(UUID userId) {
+<span class="fc" id="L210">        User user = userRepository.findById(userId)</span>
+<span class="fc" id="L211">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found with ID: &quot; + userId));</span>
+        
+<span class="fc" id="L213">        return convertToUserResponse(user);</span>
+    }
+
+    /**
+     * Update user by ID (Admin only).
+     */
+    @Transactional
+    public UserResponse updateUserById(UUID userId, UpdateUserRequest request) {
+<span class="fc" id="L221">        User user = userRepository.findById(userId)</span>
+<span class="fc" id="L222">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found with ID: &quot; + userId));</span>
+        
+<span class="fc" id="L224">        updateUserFields(user, request, true); // Allow role changes for admin updates</span>
+<span class="fc" id="L225">        User updatedUser = userRepository.save(user);</span>
+        
+<span class="fc" id="L227">        log.info(&quot;User updated by admin - ID: {}, Email: {}&quot;, userId, user.getEmail());</span>
+<span class="fc" id="L228">        return convertToUserResponse(updatedUser);</span>
+    }
+
+    /**
+     * Update user role (Admin only).
+     */
+    @Transactional
+    public UserResponse updateUserRole(UUID userId, String role) {
+<span class="fc" id="L236">        User user = userRepository.findById(userId)</span>
+<span class="fc" id="L237">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found with ID: &quot; + userId));</span>
+        
+<span class="fc" id="L239">        String normalizedRole = normalizeRole(role);</span>
+        // Note: In a real application, you'd update a roles table
+        // For now, we'll store it in a custom field or handle it differently
+        
+<span class="fc" id="L243">        User updatedUser = userRepository.save(user);</span>
+<span class="fc" id="L244">        log.info(&quot;User role updated - ID: {}, New Role: {}&quot;, userId, normalizedRole);</span>
+        
+<span class="fc" id="L246">        return convertToUserResponse(updatedUser);</span>
+    }
+
+    /**
+     * Update user status (Admin only).
+     */
+    @Transactional
+    public UserResponse updateUserStatus(UUID userId, Boolean isActive) {
+<span class="fc" id="L254">        User user = userRepository.findById(userId)</span>
+<span class="fc" id="L255">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found with ID: &quot; + userId));</span>
+        
+<span class="fc" id="L257">        user.setIsActive(isActive);</span>
+<span class="fc" id="L258">        User updatedUser = userRepository.save(user);</span>
+        
+<span class="fc" id="L260">        log.info(&quot;User status updated - ID: {}, Active: {}&quot;, userId, isActive);</span>
+<span class="fc" id="L261">        return convertToUserResponse(updatedUser);</span>
+    }
+
+    /**
+     * Get all users with pagination (Admin only).
+     */
+    @Transactional(readOnly = true)
+    public Page&lt;UserResponse&gt; getAllUsers(Pageable pageable) {
+<span class="fc" id="L269">        Page&lt;User&gt; users = userRepository.findAll(pageable);</span>
+<span class="fc" id="L270">        return users.map(this::convertToUserResponse);</span>
+    }
+
+    /**
+     * Search users by email or name (Admin only).
+     */
+    @Transactional(readOnly = true)
+    public Page&lt;UserResponse&gt; searchUsers(String query, Pageable pageable) {
+        // Simplified search - would need custom repository method for full search
+<span class="fc" id="L279">        Page&lt;User&gt; users = userRepository.findAll(pageable);</span>
+        // TODO: Implement proper search functionality
+<span class="fc" id="L281">        return users.map(this::convertToUserResponse);</span>
+    }
+
+    /**
+     * Delete user (Admin only).
+     */
+    @Transactional
+    public void deleteUser(UUID userId) {
+<span class="fc" id="L289">        User user = userRepository.findById(userId)</span>
+<span class="fc" id="L290">            .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;User not found with ID: &quot; + userId));</span>
+        
+<span class="fc" id="L292">        userRepository.delete(user);</span>
+<span class="fc" id="L293">        log.info(&quot;User deleted - ID: {}, Email: {}&quot;, userId, user.getEmail());</span>
+<span class="fc" id="L294">    }</span>
+
+    /**
+     * Convert User entity to UserResponse DTO.
+     */
+    private UserResponse convertToUserResponse(User user) {
+<span class="fc" id="L300">        UserResponse response = new UserResponse();</span>
+<span class="fc" id="L301">        response.setId(user.getId());</span>
+<span class="fc" id="L302">        response.setEmail(user.getEmail());</span>
+<span class="fc" id="L303">        response.setFirstName(user.getFirstName());</span>
+<span class="fc" id="L304">        response.setLastName(user.getLastName());</span>
+<span class="fc" id="L305">        response.setPhone(null); // Phone field not available in current User entity</span>
+<span class="fc" id="L306">        response.setRole(getUserRole(user)); // Get role based on email for now</span>
+<span class="fc" id="L307">        response.setIsActive(user.getIsActive());</span>
+<span class="fc" id="L308">        response.setCreatedAt(user.getCreatedAt());</span>
+<span class="fc" id="L309">        response.setUpdatedAt(user.getUpdatedAt());</span>
+<span class="fc" id="L310">        return response;</span>
+    }
+
+    /**
+     * Update user fields from request.
+     */
+    private void updateUserFields(User user, UpdateUserRequest request, boolean allowRoleChange) {
+<span class="fc bfc" id="L317" title="All 4 branches covered.">        if (request.getEmail() != null &amp;&amp; !request.getEmail().equals(user.getEmail())) {</span>
+            // Check if new email already exists
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {</span>
+<span class="fc" id="L320">                throw new IllegalArgumentException(&quot;Email already exists: &quot; + request.getEmail());</span>
+            }
+<span class="fc" id="L322">            user.setEmail(request.getEmail().toLowerCase());</span>
+<span class="fc" id="L323">            user.setUsername(request.getEmail().toLowerCase());</span>
+        }
+        
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (request.getFirstName() != null) {</span>
+<span class="fc" id="L327">            user.setFirstName(request.getFirstName());</span>
+        }
+        
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (request.getLastName() != null) {</span>
+<span class="fc" id="L331">            user.setLastName(request.getLastName());</span>
+        }
+        
+        // Phone field not available in current User entity
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (request.getPhone() != null) {</span>
+<span class="fc" id="L336">            log.warn(&quot;Phone update requested but not supported in current User entity&quot;);</span>
+        }
+        
+<span class="pc bpc" id="L339" title="3 of 4 branches missed.">        if (request.getIsActive() != null &amp;&amp; allowRoleChange) {</span>
+<span class="nc" id="L340">            user.setIsActive(request.getIsActive());</span>
+        }
+        
+        // Note: Role updates would require a proper roles table in production
+<span class="pc bpc" id="L344" title="3 of 4 branches missed.">        if (request.getRole() != null &amp;&amp; allowRoleChange) {</span>
+            // For now, we can't store roles directly in the User entity
+            // This would require database schema changes
+<span class="nc" id="L347">            log.info(&quot;Role update requested but not implemented in current schema: {}&quot;, request.getRole());</span>
+        }
+<span class="fc" id="L349">    }</span>
+
+    /**
+     * Get user role based on email (temporary implementation).
+     */
+    private String getUserRole(User user) {
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (user.getEmail().startsWith(&quot;admin@&quot;)) {</span>
+<span class="fc" id="L356">            return &quot;ROLE_ADMIN&quot;;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        } else if (user.getEmail().startsWith(&quot;manager@&quot;)) {</span>
+<span class="fc" id="L358">            return &quot;ROLE_MERCHANT&quot;;</span>
+        } else {
+<span class="fc" id="L360">            return &quot;ROLE_USER&quot;;</span>
+        }
+    }
+
+    /**
+     * Normalize role string.
+     */
+    private String normalizeRole(String role) {
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (role == null) {</span>
+<span class="nc" id="L369">            return &quot;ROLE_USER&quot;;</span>
+        }
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        return role.startsWith(&quot;ROLE_&quot;) ? role : &quot;ROLE_&quot; + role;</span>
+    }
+
+    /**
+     * Get user authorities based on user properties.
+     * In a real application, this would be based on roles from a roles table.
+     */
+    private java.util.Collection&lt;SimpleGrantedAuthority&gt; getUserAuthorities(User user) {
+        // For demo purposes, assign roles based on email
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (user.getEmail().startsWith(&quot;admin@&quot;)) {</span>
+<span class="fc" id="L381">            return java.util.Arrays.asList(</span>
+                new SimpleGrantedAuthority(&quot;ROLE_ADMIN&quot;),
+                new SimpleGrantedAuthority(&quot;ROLE_USER&quot;)
+            );
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        } else if (user.getEmail().startsWith(&quot;manager@&quot;)) {</span>
+<span class="fc" id="L386">            return java.util.Arrays.asList(</span>
+                new SimpleGrantedAuthority(&quot;ROLE_MERCHANT&quot;),
+                new SimpleGrantedAuthority(&quot;ROLE_USER&quot;)
+            );
+        } else {
+<span class="fc" id="L391">            return Collections.singletonList(new SimpleGrantedAuthority(&quot;ROLE_USER&quot;));</span>
+        }
+    }
+
+    /**
+     * Initialize default users if they don't exist.
+     */
+    private void initializeDefaultUsers() {
+        try {
+<span class="fc" id="L400">            log.info(&quot;Starting default users initialization...&quot;);</span>
+<span class="fc" id="L401">            createDefaultUserIfNotExists(&quot;admin@paymentgateway.com&quot;, &quot;Admin123!&quot;, &quot;Admin&quot;, &quot;User&quot;);</span>
+<span class="fc" id="L402">            createDefaultUserIfNotExists(&quot;manager@paymentgateway.com&quot;, &quot;Manager123!&quot;, &quot;Manager&quot;, &quot;User&quot;);</span>
+<span class="fc" id="L403">            createDefaultUserIfNotExists(&quot;user@paymentgateway.com&quot;, &quot;User123!&quot;, &quot;Regular&quot;, &quot;User&quot;);</span>
+            
+<span class="fc" id="L405">            log.info(&quot;Default users initialization completed successfully&quot;);</span>
+<span class="nc" id="L406">        } catch (Exception e) {</span>
+<span class="nc" id="L407">            log.error(&quot;Error during default users initialization: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L408">            throw new RuntimeException(&quot;Failed to initialize default users&quot;, e);</span>
+<span class="fc" id="L409">        }</span>
+<span class="fc" id="L410">    }</span>
+
+    /**
+     * Create a default user if it doesn't exist.
+     */
+    private void createDefaultUserIfNotExists(String email, String password, String firstName, String lastName) {
+        try {
+<span class="fc" id="L417">            log.debug(&quot;Checking if user exists: {}&quot;, email);</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">            if (!userRepository.existsByEmailIgnoreCase(email)) {</span>
+<span class="nc" id="L419">                log.info(&quot;Creating default user: {}&quot;, email);</span>
+<span class="nc" id="L420">                User user = new User();</span>
+<span class="nc" id="L421">                user.setUsername(email);</span>
+<span class="nc" id="L422">                user.setEmail(email.toLowerCase());</span>
+<span class="nc" id="L423">                user.setPasswordHash(passwordEncoder.encode(password));</span>
+<span class="nc" id="L424">                user.setFirstName(firstName);</span>
+<span class="nc" id="L425">                user.setLastName(lastName);</span>
+<span class="nc" id="L426">                user.setIsActive(true);</span>
+<span class="nc" id="L427">                user.setIsVerified(true);</span>
+                
+<span class="nc" id="L429">                User savedUser = userRepository.save(user);</span>
+<span class="nc" id="L430">                log.info(&quot;Successfully created default user: {} with ID: {}&quot;, email, savedUser.getId());</span>
+<span class="nc" id="L431">            } else {</span>
+<span class="fc" id="L432">                log.debug(&quot;Default user already exists: {}&quot;, email);</span>
+            }
+<span class="nc" id="L434">        } catch (Exception e) {</span>
+<span class="nc" id="L435">            log.error(&quot;Error creating default user {}: {}&quot;, email, e.getMessage(), e);</span>
+<span class="nc" id="L436">            throw new RuntimeException(&quot;Failed to create default user: &quot; + email, e);</span>
+<span class="fc" id="L437">        }</span>
+<span class="fc" id="L438">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.exception</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.exception;
+
+import com.talentica.paymentgateway.dto.payment.PaymentErrorResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Global exception handler for payment processing and other application errors.
+ * Provides consistent error responses with proper logging and correlation tracking.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L29">@Slf4j</span>
+@RestControllerAdvice
+<span class="fc" id="L31">public class GlobalExceptionHandler {</span>
+
+    /**
+     * Handles PaymentProcessingException with detailed error information.
+     */
+    @ExceptionHandler(PaymentProcessingException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handlePaymentProcessingException(
+            PaymentProcessingException ex, WebRequest request) {
+        
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        String correlationId = ex.getCorrelationId() != null ? </span>
+<span class="pc" id="L41">            ex.getCorrelationId() : getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L43">        log.error(&quot;Payment processing error - CorrelationId: {}, ErrorCode: {}, Message: {}&quot;, </span>
+<span class="fc" id="L44">                    correlationId, ex.getErrorCode(), ex.getMessage(), ex);</span>
+
+        PaymentErrorResponse errorResponse;
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (ex.getErrorResponse() != null) {</span>
+<span class="fc" id="L48">            errorResponse = ex.getErrorResponse();</span>
+        } else {
+<span class="fc" id="L50">            errorResponse = new PaymentErrorResponse(</span>
+<span class="fc" id="L51">                ex.getErrorCode(),</span>
+<span class="fc" id="L52">                ex.getMessage(),</span>
+                &quot;Payment processing failed due to an error&quot;,
+                &quot;PAYMENT_ERROR&quot;,
+                correlationId
+            );
+        }
+
+<span class="fc" id="L59">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles validation errors from request body validation.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleValidationException(
+            MethodArgumentNotValidException ex, WebRequest request) {
+        
+<span class="fc" id="L69">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L71">        log.warn(&quot;Validation error - CorrelationId: {}, Errors: {}&quot;, </span>
+<span class="fc" id="L72">                   correlationId, ex.getBindingResult().getFieldErrors().size());</span>
+
+<span class="fc" id="L74">        List&lt;PaymentErrorResponse.ErrorDetail&gt; details = ex.getBindingResult()</span>
+<span class="fc" id="L75">            .getFieldErrors()</span>
+<span class="fc" id="L76">            .stream()</span>
+<span class="fc" id="L77">            .map(this::mapFieldError)</span>
+<span class="fc" id="L78">            .collect(Collectors.toList());</span>
+
+<span class="fc" id="L80">        PaymentErrorResponse errorResponse = PaymentErrorResponse.validationError(</span>
+            &quot;Request validation failed&quot;, correlationId);
+<span class="fc" id="L82">        errorResponse.setDetails(details);</span>
+
+<span class="fc" id="L84">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+    }
+
+    /**
+     * Handle malformed JSON or missing request body.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, WebRequest request) {
+<span class="nc" id="L93">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="nc" id="L94">        log.warn(&quot;Malformed JSON body - CorrelationId: {}, Message: {}&quot;, correlationId, ex.getMessage());</span>
+<span class="nc" id="L95">        PaymentErrorResponse errorResponse = PaymentErrorResponse.validationError(</span>
+            &quot;Malformed or missing request body&quot;, correlationId);
+<span class="nc" id="L97">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles constraint validation errors.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleConstraintViolationException(
+            ConstraintViolationException ex, WebRequest request) {
+        
+<span class="fc" id="L107">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L109">        log.warn(&quot;Constraint validation error - CorrelationId: {}, Violations: {}&quot;, </span>
+<span class="fc" id="L110">                   correlationId, ex.getConstraintViolations().size());</span>
+
+<span class="fc" id="L112">        List&lt;PaymentErrorResponse.ErrorDetail&gt; details = ex.getConstraintViolations()</span>
+<span class="fc" id="L113">            .stream()</span>
+<span class="fc" id="L114">            .map(this::mapConstraintViolation)</span>
+<span class="fc" id="L115">            .collect(Collectors.toList());</span>
+
+<span class="fc" id="L117">        PaymentErrorResponse errorResponse = PaymentErrorResponse.validationError(</span>
+            &quot;Request validation failed&quot;, correlationId);
+<span class="fc" id="L119">        errorResponse.setDetails(details);</span>
+
+<span class="fc" id="L121">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles IllegalArgumentException.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleIllegalArgumentException(
+            IllegalArgumentException ex, WebRequest request) {
+        
+<span class="fc" id="L131">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L133">        log.warn(&quot;Invalid argument error - CorrelationId: {}, Message: {}&quot;, </span>
+<span class="fc" id="L134">                   correlationId, ex.getMessage());</span>
+
+<span class="fc" id="L136">        PaymentErrorResponse errorResponse = PaymentErrorResponse.validationError(</span>
+<span class="fc" id="L137">            ex.getMessage(), correlationId);</span>
+
+<span class="fc" id="L139">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles IllegalStateException.
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleIllegalStateException(
+            IllegalStateException ex, WebRequest request) {
+        
+<span class="fc" id="L149">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L151">        log.warn(&quot;Invalid state error - CorrelationId: {}, Message: {}&quot;, </span>
+<span class="fc" id="L152">                   correlationId, ex.getMessage());</span>
+
+<span class="fc" id="L154">        PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+            &quot;INVALID_STATE&quot;,
+<span class="fc" id="L156">            ex.getMessage(),</span>
+            &quot;The operation cannot be performed in the current state&quot;,
+            &quot;BUSINESS_ERROR&quot;,
+            correlationId
+        );
+
+<span class="fc" id="L162">        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles RuntimeException and other unexpected errors.
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleRuntimeException(
+            RuntimeException ex, WebRequest request) {
+        
+<span class="fc" id="L172">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L174">        log.error(&quot;Runtime error - CorrelationId: {}, Message: {}&quot;, </span>
+<span class="fc" id="L175">                    correlationId, ex.getMessage(), ex);</span>
+
+<span class="fc" id="L177">        PaymentErrorResponse errorResponse = PaymentErrorResponse.processingError(</span>
+            &quot;An unexpected error occurred&quot;, correlationId);
+
+<span class="fc" id="L180">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles NoResourceFoundException (404 errors).
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleNoResourceFoundException(
+            org.springframework.web.servlet.resource.NoResourceFoundException ex, WebRequest request) {
+        
+<span class="nc" id="L190">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="nc" id="L192">        log.warn(&quot;Resource not found - CorrelationId: {}, Path: {}&quot;, </span>
+<span class="nc" id="L193">                   correlationId, ex.getResourcePath());</span>
+
+<span class="nc" id="L195">        PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+            &quot;RESOURCE_NOT_FOUND&quot;,
+            &quot;The requested resource was not found&quot;,
+            &quot;The endpoint you are trying to access does not exist&quot;,
+            &quot;VALIDATION_ERROR&quot;,
+            correlationId
+        );
+<span class="nc" id="L202">        errorResponse.setRetryable(false);</span>
+<span class="nc" id="L203">        errorResponse.setSuggestedAction(&quot;Please check the API documentation for valid endpoints&quot;);</span>
+
+<span class="nc" id="L205">        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles AccessDeniedException (403 Forbidden - Authorization failures).
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleAccessDeniedException(
+            AccessDeniedException ex, WebRequest request) {
+        
+<span class="fc" id="L215">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L217">        log.warn(&quot;Access denied - CorrelationId: {}, Message: {}&quot;, </span>
+<span class="fc" id="L218">                   correlationId, ex.getMessage());</span>
+
+<span class="fc" id="L220">        PaymentErrorResponse errorResponse = new PaymentErrorResponse(</span>
+            &quot;ACCESS_DENIED&quot;,
+            &quot;Access denied&quot;,
+            &quot;You do not have permission to access this resource&quot;,
+            &quot;AUTHORIZATION_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L227">        errorResponse.setRetryable(false);</span>
+<span class="fc" id="L228">        errorResponse.setSuggestedAction(&quot;Please check your user role and permissions&quot;);</span>
+
+<span class="fc" id="L230">        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);</span>
+    }
+
+    /**
+     * Handles all other exceptions.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;PaymentErrorResponse&gt; handleGenericException(
+            Exception ex, WebRequest request) {
+        
+<span class="fc" id="L240">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L242">        log.error(&quot;Unexpected error - CorrelationId: {}, Exception Type: {}, Message: {}&quot;, </span>
+<span class="fc" id="L243">                    correlationId, ex.getClass().getSimpleName(), ex.getMessage(), ex);</span>
+
+<span class="fc" id="L245">        PaymentErrorResponse errorResponse = PaymentErrorResponse.processingError(</span>
+            &quot;An unexpected error occurred&quot;, correlationId);
+
+<span class="fc" id="L248">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+    }
+
+    // Helper methods
+
+    private PaymentErrorResponse.ErrorDetail mapFieldError(FieldError fieldError) {
+<span class="fc" id="L254">        return new PaymentErrorResponse.ErrorDetail(</span>
+<span class="fc" id="L255">            fieldError.getField(),</span>
+            &quot;VALIDATION_ERROR&quot;,
+<span class="fc" id="L257">            fieldError.getDefaultMessage()</span>
+        );
+    }
+
+    private PaymentErrorResponse.ErrorDetail mapConstraintViolation(ConstraintViolation&lt;?&gt; violation) {
+<span class="nc" id="L262">        String field = violation.getPropertyPath().toString();</span>
+<span class="nc" id="L263">        return new PaymentErrorResponse.ErrorDetail(</span>
+            field,
+            &quot;VALIDATION_ERROR&quot;,
+<span class="nc" id="L266">            violation.getMessage()</span>
+        );
+    }
+
+    private String getOrGenerateCorrelationId() {
+<span class="fc" id="L271">        String correlationId = MDC.get(&quot;correlationId&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (correlationId == null) {</span>
+<span class="fc" id="L273">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+<span class="fc" id="L274">            MDC.put(&quot;correlationId&quot;, correlationId);</span>
+        }
+<span class="fc" id="L276">        return correlationId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

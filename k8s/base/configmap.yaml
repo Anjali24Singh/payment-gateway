@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-gateway-config
+  labels:
+    app: payment-gateway
+data:
+  # Application Configuration
+  JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
+  TZ: "UTC"
+  
+  # Logging Configuration
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_TALENTICA: "DEBUG"
+  LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: "INFO"
+  LOGGING_PATTERN_CONSOLE: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  
+  # Metrics and Monitoring
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "when-authorized"
+  MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: "true"
+  
+  # Actuator Configuration
+  MANAGEMENT_SERVER_PORT: "8081"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED: "true"
+  MANAGEMENT_HEALTH_READINESSSTATE_ENABLED: "true"
+  
+  # Security Configuration
+  SECURITY_REQUIRE_SSL: "true"
+  SECURITY_ENABLE_CSRF: "false"
+  SECURITY_SESSION_CREATION_POLICY: "STATELESS"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "100"
+  RATE_LIMIT_BURST_CAPACITY: "200"
+  
+  # Connection Pool Configuration
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "20"
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "5"
+  SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
+  SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: "600000"
+  SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: "1800000"
+  
+  # Redis Configuration
+  SPRING_REDIS_TIMEOUT: "2000ms"
+  SPRING_REDIS_LETTUCE_POOL_MAX_ACTIVE: "20"
+  SPRING_REDIS_LETTUCE_POOL_MAX_IDLE: "8"
+  SPRING_REDIS_LETTUCE_POOL_MIN_IDLE: "2"
+  
+  # Cache Configuration
+  SPRING_CACHE_TYPE: "redis"
+  SPRING_CACHE_REDIS_TIME_TO_LIVE: "3600000"
+  
+  # Authorize.Net Configuration
+  AUTHNET_ENVIRONMENT: "production"
+  AUTHNET_TIMEOUT_SECONDS: "30"
+  AUTHNET_RETRY_ATTEMPTS: "3"
+  
+  # Distributed Tracing
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "0.1"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin:9411/api/v2/spans"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payment-gateway
+  labels:
+    app: payment-gateway
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payment-gateway
+  labels:
+    app: payment-gateway
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-gateway
+  labels:
+    app: payment-gateway
+subjects:
+- kind: ServiceAccount
+  name: payment-gateway
+roleRef:
+  kind: Role
+  name: payment-gateway
+  apiGroup: rbac.authorization.k8s.io

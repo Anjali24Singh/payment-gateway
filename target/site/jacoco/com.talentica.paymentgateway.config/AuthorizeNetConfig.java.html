@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthorizeNetConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config</a> &gt; <span class="el_source">AuthorizeNetConfig.java</span></div><h1>AuthorizeNetConfig.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config;
+
+import net.authorize.Environment;
+import net.authorize.api.contract.v1.MerchantAuthenticationType;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+/**
+ * Configuration class for Authorize.Net integration.
+ * Provides environment-specific configuration for sandbox and production environments.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Configuration
+@ConfigurationProperties(prefix = &quot;app.authorize-net&quot;)
+@Validated
+<span class="fc" id="L23">public class AuthorizeNetConfig {</span>
+
+    @NotBlank(message = &quot;Authorize.Net API Login ID is required&quot;)
+    private String apiLoginId;
+
+    @NotBlank(message = &quot;Authorize.Net Transaction Key is required&quot;)
+    private String transactionKey;
+
+<span class="fc" id="L31">    @NotNull(message = &quot;Authorize.Net Environment is required&quot;)</span>
+    private AuthNetEnvironment environment = AuthNetEnvironment.SANDBOX;
+
+    @NotBlank(message = &quot;Authorize.Net Base URL is required&quot;)
+    private String baseUrl;
+
+<span class="fc" id="L37">    private Integer timeout = 30000; // 30 seconds default</span>
+<span class="fc" id="L38">    private Integer retryAttempts = 3;</span>
+<span class="fc" id="L39">    private Long retryDelay = 1000L; // 1 second default</span>
+
+    /**
+     * Creates the Authorize.Net environment configuration.
+     * 
+     * @return Environment instance for Authorize.Net API calls
+     */
+    @Bean
+    public Environment authorizeNetEnvironment() {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        return environment == AuthNetEnvironment.PRODUCTION </span>
+<span class="fc" id="L49">            ? Environment.PRODUCTION </span>
+<span class="fc" id="L50">            : Environment.SANDBOX;</span>
+    }
+
+    /**
+     * Creates the merchant authentication type for Authorize.Net API calls.
+     * 
+     * @return MerchantAuthenticationType with configured credentials
+     */
+    @Bean
+    public MerchantAuthenticationType merchantAuthentication() {
+<span class="fc" id="L60">        MerchantAuthenticationType merchant = new MerchantAuthenticationType();</span>
+<span class="fc" id="L61">        merchant.setName(apiLoginId);</span>
+<span class="fc" id="L62">        merchant.setTransactionKey(transactionKey);</span>
+<span class="fc" id="L63">        return merchant;</span>
+    }
+
+    // Getters and Setters
+    public String getApiLoginId() {
+<span class="fc" id="L68">        return apiLoginId;</span>
+    }
+
+    public void setApiLoginId(String apiLoginId) {
+<span class="fc" id="L72">        this.apiLoginId = apiLoginId;</span>
+<span class="fc" id="L73">    }</span>
+
+    public String getTransactionKey() {
+<span class="fc" id="L76">        return transactionKey;</span>
+    }
+
+    public void setTransactionKey(String transactionKey) {
+<span class="fc" id="L80">        this.transactionKey = transactionKey;</span>
+<span class="fc" id="L81">    }</span>
+
+    public AuthNetEnvironment getEnvironment() {
+<span class="fc" id="L84">        return environment;</span>
+    }
+
+    public void setEnvironment(AuthNetEnvironment environment) {
+<span class="fc" id="L88">        this.environment = environment;</span>
+<span class="fc" id="L89">    }</span>
+
+    public String getBaseUrl() {
+<span class="fc" id="L92">        return baseUrl;</span>
+    }
+
+    public void setBaseUrl(String baseUrl) {
+<span class="fc" id="L96">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L97">    }</span>
+
+    public Integer getTimeout() {
+<span class="fc" id="L100">        return timeout;</span>
+    }
+
+    public void setTimeout(Integer timeout) {
+<span class="fc" id="L104">        this.timeout = timeout;</span>
+<span class="fc" id="L105">    }</span>
+
+    public Integer getRetryAttempts() {
+<span class="fc" id="L108">        return retryAttempts;</span>
+    }
+
+    public void setRetryAttempts(Integer retryAttempts) {
+<span class="fc" id="L112">        this.retryAttempts = retryAttempts;</span>
+<span class="fc" id="L113">    }</span>
+
+    public Long getRetryDelay() {
+<span class="fc" id="L116">        return retryDelay;</span>
+    }
+
+    public void setRetryDelay(Long retryDelay) {
+<span class="fc" id="L120">        this.retryDelay = retryDelay;</span>
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * Enum for Authorize.Net environment types.
+     */
+<span class="fc" id="L126">    public enum AuthNetEnvironment {</span>
+<span class="fc" id="L127">        SANDBOX,</span>
+<span class="fc" id="L128">        PRODUCTION</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

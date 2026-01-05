@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">SubscriptionService.java</span></div><h1>SubscriptionService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.subscription.*;
+import com.talentica.paymentgateway.entity.*;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.repository.*;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Service class for managing subscriptions and subscription lifecycle.
+ * Handles subscription creation, updates, cancellation, and billing operations.
+ * 
+ * Features:
+ * - Subscription creation with trial periods
+ * - Plan upgrades and downgrades with proration
+ * - Subscription pause/resume functionality
+ * - Subscription cancellation with different options
+ * - Integration with billing engine for recurring charges
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L34">@Slf4j</span>
+@Service
+@Transactional
+public class SubscriptionService {
+
+    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPlanRepository planRepository;
+    private final CustomerRepository customerRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+    private final SubscriptionInvoiceRepository invoiceRepository;
+    private final MetricsService metricsService;
+    private final ProrationService prorationService;
+
+    public SubscriptionService(SubscriptionRepository subscriptionRepository,
+                             SubscriptionPlanRepository planRepository,
+                             CustomerRepository customerRepository,
+                             PaymentMethodRepository paymentMethodRepository,
+                             SubscriptionInvoiceRepository invoiceRepository,
+                             MetricsService metricsService,
+<span class="fc" id="L53">                             ProrationService prorationService) {</span>
+<span class="fc" id="L54">        this.subscriptionRepository = subscriptionRepository;</span>
+<span class="fc" id="L55">        this.planRepository = planRepository;</span>
+<span class="fc" id="L56">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L57">        this.paymentMethodRepository = paymentMethodRepository;</span>
+<span class="fc" id="L58">        this.invoiceRepository = invoiceRepository;</span>
+<span class="fc" id="L59">        this.metricsService = metricsService;</span>
+<span class="fc" id="L60">        this.prorationService = prorationService;</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Creates a new subscription for a customer.
+     * 
+     * @param request Subscription creation request
+     * @return Created subscription response
+     * @throws PaymentProcessingException if subscription creation fails
+     */
+    public SubscriptionResponse createSubscription(CreateSubscriptionRequest request) {
+<span class="fc" id="L71">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L73">        log.info(&quot;Creating subscription - Customer: {}, Plan: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L74">                   request.getCustomerId(), request.getPlanCode(), correlationId);</span>
+
+        // Check for idempotency (optimized - only if key provided and not empty)
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        if (request.getIdempotencyKey() != null &amp;&amp; !request.getIdempotencyKey().trim().isEmpty()) {</span>
+<span class="fc" id="L78">            log.debug(&quot;Checking idempotency for key: {}&quot;, request.getIdempotencyKey());</span>
+            try {
+<span class="fc" id="L80">                Optional&lt;Subscription&gt; existing = subscriptionRepository</span>
+<span class="fc" id="L81">                    .findByCustomerIdAndIdempotencyKey(request.getCustomerId(), request.getIdempotencyKey());</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                if (existing.isPresent()) {</span>
+<span class="fc" id="L83">                    log.info(&quot;Returning existing subscription for idempotency key: {}&quot;, </span>
+<span class="fc" id="L84">                               request.getIdempotencyKey());</span>
+<span class="fc" id="L85">                    return mapToSubscriptionResponse(existing.get());</span>
+                }
+<span class="fc" id="L87">            } catch (Exception e) {</span>
+<span class="fc" id="L88">                log.warn(&quot;Idempotency check failed, proceeding with subscription creation: {}&quot;, e.getMessage());</span>
+                // Continue with creation if idempotency check fails
+<span class="fc" id="L90">            }</span>
+        }
+
+        // Validate customer exists
+<span class="fc" id="L94">        Customer customer = customerRepository.findByCustomerId(request.getCustomerId())</span>
+<span class="fc" id="L95">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L96">                &quot;Customer not found: &quot; + request.getCustomerId(), &quot;CUSTOMER_NOT_FOUND&quot;));</span>
+
+        // Validate plan exists and is active
+<span class="fc" id="L99">        SubscriptionPlan plan = planRepository.findByPlanCode(request.getPlanCode())</span>
+<span class="fc" id="L100">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L101">                &quot;Plan not found: &quot; + request.getPlanCode(), &quot;PLAN_NOT_FOUND&quot;));</span>
+
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!plan.getIsActive()) {</span>
+<span class="fc" id="L104">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L105">                &quot;Plan is not active: &quot; + request.getPlanCode(), &quot;PLAN_INACTIVE&quot;);</span>
+        }
+
+        // Validate payment method exists
+<span class="fc" id="L109">        PaymentMethod paymentMethod = paymentMethodRepository.findByPaymentMethodId(request.getPaymentMethodId())</span>
+<span class="fc" id="L110">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L111">                &quot;Payment method not found: &quot; + request.getPaymentMethodId(), &quot;PAYMENT_METHOD_NOT_FOUND&quot;));</span>
+
+        // Generate subscription ID
+<span class="fc" id="L114">        String subscriptionId = generateSubscriptionId();</span>
+
+        // Create subscription entity
+<span class="fc" id="L117">        Subscription subscription = new Subscription();</span>
+<span class="fc" id="L118">        subscription.setSubscriptionId(subscriptionId);</span>
+<span class="fc" id="L119">        subscription.setCustomer(customer);</span>
+<span class="fc" id="L120">        subscription.setPlan(plan);</span>
+<span class="fc" id="L121">        subscription.setPaymentMethod(paymentMethod);</span>
+<span class="fc" id="L122">        subscription.setStatus(SubscriptionStatus.PENDING);</span>
+
+        // Set dates
+<span class="fc" id="L125">        ZonedDateTime now = ZonedDateTime.now();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        ZonedDateTime startDate = request.getStartDate() != null ? request.getStartDate() : now;</span>
+<span class="fc" id="L127">        subscription.setCurrentPeriodStart(startDate);</span>
+
+        // Set billing cycle anchor
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (request.getBillingCycleAnchor() != null) {</span>
+<span class="fc" id="L131">            subscription.setBillingCycleAnchor(request.getBillingCycleAnchor());</span>
+        } else {
+<span class="fc" id="L133">            subscription.setBillingCycleAnchor(startDate);</span>
+        }
+
+        // Handle trial period
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (request.getStartTrial() &amp;&amp; plan.hasTrialPeriod()) {</span>
+<span class="fc" id="L138">            subscription.startTrial();</span>
+<span class="fc" id="L139">            log.info(&quot;Started trial period for subscription: {}, Trial ends: {}&quot;, </span>
+<span class="fc" id="L140">                       subscriptionId, subscription.getTrialEnd());</span>
+        } else {
+<span class="fc" id="L142">            subscription.calculateNextBillingCycle();</span>
+        }
+
+        // Set metadata
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (request.getMetadata() != null) {</span>
+<span class="nc" id="L147">            subscription.setMetadata(request.getMetadata());</span>
+        }
+
+        // Add idempotency key to metadata
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (request.getIdempotencyKey() != null) {</span>
+<span class="fc" id="L152">            subscription.addMetadata(&quot;idempotencyKey&quot;, request.getIdempotencyKey());</span>
+        }
+
+        // Save subscription
+<span class="fc" id="L156">        subscription = subscriptionRepository.save(subscription);</span>
+
+        // Activate subscription
+<span class="fc" id="L159">        subscription.activate();</span>
+<span class="fc" id="L160">        subscription = subscriptionRepository.save(subscription);</span>
+
+        // Handle setup fee if applicable
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (plan.getSetupFee() != null &amp;&amp; plan.getSetupFee().compareTo(BigDecimal.ZERO) &gt; 0) {</span>
+            // Create setup fee invoice
+<span class="fc" id="L165">            createSetupFeeInvoice(subscription, plan.getSetupFee());</span>
+        }
+
+        // Handle immediate billing if not in trial
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">        if (!subscription.isInTrial() &amp;&amp; request.getProrated()) {</span>
+<span class="fc" id="L170">            handleImmediateBilling(subscription, startDate);</span>
+        }
+
+<span class="fc" id="L173">        log.info(&quot;Subscription created successfully - ID: {}, Status: {}&quot;, </span>
+<span class="fc" id="L174">                   subscription.getSubscriptionId(), subscription.getStatus());</span>
+
+        // Record metrics
+<span class="fc" id="L177">        metricsService.recordSubscriptionCreated(plan.getPlanCode());</span>
+
+<span class="fc" id="L179">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Updates an existing subscription.
+     * 
+     * @param subscriptionId Subscription identifier
+     * @param request Update request
+     * @return Updated subscription response
+     * @throws PaymentProcessingException if update fails
+     */
+    public SubscriptionResponse updateSubscription(String subscriptionId, UpdateSubscriptionRequest request) {
+<span class="fc" id="L191">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L193">        log.info(&quot;Updating subscription - ID: {}, CorrelationId: {}&quot;, subscriptionId, correlationId);</span>
+
+<span class="fc" id="L195">        Subscription subscription = subscriptionRepository.findBySubscriptionId(subscriptionId)</span>
+<span class="fc" id="L196">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Subscription not found: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_FOUND&quot;));
+
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (!subscription.isActive()) {</span>
+<span class="fc" id="L200">            throw new PaymentProcessingException(</span>
+                &quot;Cannot update inactive subscription: &quot; + subscriptionId, &quot;SUBSCRIPTION_INACTIVE&quot;);
+        }
+
+<span class="fc" id="L204">        boolean hasChanges = false;</span>
+
+        // Handle plan change
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (request.isPlanChange()) {</span>
+<span class="fc" id="L208">            SubscriptionPlan newPlan = planRepository.findByPlanCode(request.getPlanCode())</span>
+<span class="pc" id="L209">                .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="nc" id="L210">                    &quot;Plan not found: &quot; + request.getPlanCode(), &quot;PLAN_NOT_FOUND&quot;));</span>
+
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (!newPlan.getIsActive()) {</span>
+<span class="fc" id="L213">                throw new PaymentProcessingException(</span>
+<span class="fc" id="L214">                    &quot;Plan is not active: &quot; + request.getPlanCode(), &quot;PLAN_INACTIVE&quot;);</span>
+            }
+
+<span class="fc" id="L217">            handlePlanChange(subscription, newPlan, request);</span>
+<span class="fc" id="L218">            hasChanges = true;</span>
+        }
+
+        // Handle payment method change
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (request.isPaymentMethodChange()) {</span>
+<span class="fc" id="L223">            PaymentMethod newPaymentMethod = paymentMethodRepository</span>
+<span class="fc" id="L224">                .findByPaymentMethodId(request.getPaymentMethodId())</span>
+<span class="pc" id="L225">                .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="nc" id="L226">                    &quot;Payment method not found: &quot; + request.getPaymentMethodId(), &quot;PAYMENT_METHOD_NOT_FOUND&quot;));</span>
+
+<span class="fc" id="L228">            subscription.setPaymentMethod(newPaymentMethod);</span>
+<span class="fc" id="L229">            hasChanges = true;</span>
+        }
+
+        // Handle billing cycle anchor change
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (request.getBillingCycleAnchor() != null) {</span>
+<span class="fc" id="L234">            subscription.setBillingCycleAnchor(request.getBillingCycleAnchor());</span>
+<span class="fc" id="L235">            subscription.calculateNextBillingCycle();</span>
+<span class="fc" id="L236">            hasChanges = true;</span>
+        }
+
+        // Update metadata
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (request.getMetadata() != null) {</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (subscription.getMetadata() == null) {</span>
+<span class="nc" id="L242">                subscription.setMetadata(request.getMetadata());</span>
+            } else {
+<span class="fc" id="L244">                subscription.getMetadata().putAll(request.getMetadata());</span>
+            }
+<span class="fc" id="L246">            hasChanges = true;</span>
+        }
+
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (hasChanges) {</span>
+<span class="fc" id="L250">            subscription = subscriptionRepository.save(subscription);</span>
+<span class="fc" id="L251">            log.info(&quot;Subscription updated successfully - ID: {}&quot;, subscriptionId);</span>
+        }
+
+<span class="fc" id="L254">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Cancels a subscription.
+     * 
+     * @param subscriptionId Subscription identifier
+     * @param request Cancellation request
+     * @return Updated subscription response
+     * @throws PaymentProcessingException if cancellation fails
+     */
+    public SubscriptionResponse cancelSubscription(String subscriptionId, CancelSubscriptionRequest request) {
+<span class="fc" id="L266">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L268">        log.info(&quot;Cancelling subscription - ID: {}, When: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L269">                   subscriptionId, request.getWhen(), correlationId);</span>
+
+<span class="fc" id="L271">        Subscription subscription = subscriptionRepository.findBySubscriptionId(subscriptionId)</span>
+<span class="fc" id="L272">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Subscription not found: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_FOUND&quot;));
+
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (subscription.isCancelled()) {</span>
+<span class="fc" id="L276">            log.warn(&quot;Subscription already cancelled: {}&quot;, subscriptionId);</span>
+<span class="fc" id="L277">            return mapToSubscriptionResponse(subscription);</span>
+        }
+
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (request.isImmediateCancellation()) {</span>
+            // Immediate cancellation
+<span class="fc" id="L282">            subscription.cancel(request.getReason());</span>
+            
+            // Handle prorated refund if requested
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">            if (request.getRefundProrated() &amp;&amp; subscription.getCurrentPeriodEnd() != null) {</span>
+<span class="fc" id="L286">                handleProratedRefund(subscription);</span>
+            }
+        } else {
+            // End-of-period cancellation
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            ZonedDateTime cancelAt = request.getCancelAt() != null ? </span>
+<span class="fc" id="L291">                request.getCancelAt() : subscription.getCurrentPeriodEnd();</span>
+            
+<span class="fc" id="L293">            subscription.addMetadata(&quot;scheduledCancellation&quot;, cancelAt);</span>
+<span class="fc" id="L294">            subscription.addMetadata(&quot;cancellationReason&quot;, request.getReason());</span>
+<span class="fc" id="L295">            subscription.addMetadata(&quot;cancelAtPeriodEnd&quot;, true);</span>
+        }
+
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (request.getNotes() != null) {</span>
+<span class="fc" id="L299">            subscription.addMetadata(&quot;cancellationNotes&quot;, request.getNotes());</span>
+        }
+
+<span class="fc" id="L302">        subscription = subscriptionRepository.save(subscription);</span>
+
+<span class="fc" id="L304">        log.info(&quot;Subscription cancellation processed - ID: {}, Status: {}&quot;, </span>
+<span class="fc" id="L305">                   subscriptionId, subscription.getStatus());</span>
+
+        // Record metrics
+<span class="fc" id="L308">        metricsService.recordSubscriptionCancelled(subscription.getPlan().getPlanCode(), request.getReason());</span>
+
+<span class="fc" id="L310">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Pauses a subscription.
+     * 
+     * @param subscriptionId Subscription identifier
+     * @return Updated subscription response
+     */
+    public SubscriptionResponse pauseSubscription(String subscriptionId) {
+<span class="fc" id="L320">        log.info(&quot;Pausing subscription: {}&quot;, subscriptionId);</span>
+
+<span class="fc" id="L322">        Subscription subscription = subscriptionRepository.findBySubscriptionId(subscriptionId)</span>
+<span class="fc" id="L323">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Subscription not found: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_FOUND&quot;));
+
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (!subscription.isActive()) {</span>
+<span class="fc" id="L327">            throw new PaymentProcessingException(</span>
+                &quot;Cannot pause inactive subscription: &quot; + subscriptionId, &quot;SUBSCRIPTION_INACTIVE&quot;);
+        }
+
+<span class="fc" id="L331">        subscription.pause();</span>
+<span class="fc" id="L332">        subscription.addMetadata(&quot;pausedAt&quot;, ZonedDateTime.now());</span>
+<span class="fc" id="L333">        subscription = subscriptionRepository.save(subscription);</span>
+
+<span class="fc" id="L335">        log.info(&quot;Subscription paused successfully: {}&quot;, subscriptionId);</span>
+<span class="fc" id="L336">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Resumes a paused subscription.
+     * 
+     * @param subscriptionId Subscription identifier
+     * @return Updated subscription response
+     */
+    public SubscriptionResponse resumeSubscription(String subscriptionId) {
+<span class="fc" id="L346">        log.info(&quot;Resuming subscription: {}&quot;, subscriptionId);</span>
+
+<span class="fc" id="L348">        Subscription subscription = subscriptionRepository.findBySubscriptionId(subscriptionId)</span>
+<span class="fc" id="L349">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Subscription not found: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_FOUND&quot;));
+
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (subscription.getStatus() != SubscriptionStatus.PAUSED) {</span>
+<span class="fc" id="L353">            throw new PaymentProcessingException(</span>
+                &quot;Cannot resume non-paused subscription: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_PAUSED&quot;);
+        }
+
+<span class="fc" id="L357">        subscription.activate();</span>
+<span class="fc" id="L358">        subscription.calculateNextBillingCycle();</span>
+<span class="fc" id="L359">        subscription.addMetadata(&quot;resumedAt&quot;, ZonedDateTime.now());</span>
+<span class="fc" id="L360">        subscription = subscriptionRepository.save(subscription);</span>
+
+<span class="fc" id="L362">        log.info(&quot;Subscription resumed successfully: {}&quot;, subscriptionId);</span>
+<span class="fc" id="L363">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Retrieves a subscription by ID.
+     * 
+     * @param subscriptionId Subscription identifier
+     * @return Subscription response
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionResponse getSubscription(String subscriptionId) {
+<span class="fc" id="L374">        Subscription subscription = subscriptionRepository.findBySubscriptionId(subscriptionId)</span>
+<span class="fc" id="L375">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Subscription not found: &quot; + subscriptionId, &quot;SUBSCRIPTION_NOT_FOUND&quot;));
+
+<span class="fc" id="L378">        return mapToSubscriptionResponse(subscription);</span>
+    }
+
+    /**
+     * Retrieves subscriptions for a customer.
+     * 
+     * @param customerId Customer identifier
+     * @param pageable Pagination information
+     * @return Page of subscription responses
+     */
+    @Transactional(readOnly = true)
+    public Page&lt;SubscriptionResponse&gt; getCustomerSubscriptions(String customerId, Pageable pageable) {
+<span class="fc" id="L390">        Customer customer = customerRepository.findByCustomerId(customerId)</span>
+<span class="fc" id="L391">            .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+                &quot;Customer not found: &quot; + customerId, &quot;CUSTOMER_NOT_FOUND&quot;));
+
+<span class="fc" id="L394">        Page&lt;Subscription&gt; subscriptions = subscriptionRepository.findByCustomer(customer, pageable);</span>
+<span class="fc" id="L395">        return subscriptions.map(this::mapToSubscriptionResponse);</span>
+    }
+
+    /**
+     * Retrieves subscriptions due for billing.
+     * 
+     * @return List of subscriptions due for billing
+     */
+    @Transactional(readOnly = true)
+    public List&lt;Subscription&gt; getSubscriptionsDueForBilling() {
+<span class="fc" id="L405">        return subscriptionRepository.findSubscriptionsDueForBilling(ZonedDateTime.now());</span>
+    }
+
+    // Private helper methods
+
+    private void handlePlanChange(Subscription subscription, SubscriptionPlan newPlan, UpdateSubscriptionRequest request) {
+<span class="fc" id="L411">        SubscriptionPlan currentPlan = subscription.getPlan();</span>
+        
+<span class="fc" id="L413">        log.info(&quot;Changing subscription plan - ID: {}, From: {}, To: {}&quot;, </span>
+<span class="fc" id="L414">                   subscription.getSubscriptionId(), currentPlan.getPlanCode(), newPlan.getPlanCode());</span>
+
+        // Calculate proration if requested
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (request.getProrated()) {</span>
+<span class="fc" id="L418">            ProrationCalculation proration = prorationService.calculateProration(</span>
+<span class="fc" id="L419">                subscription, newPlan, ZonedDateTime.now());</span>
+            
+<span class="pc bpc" id="L421" title="2 of 4 branches missed.">            if (proration.getProrationApplies() &amp;&amp; proration.hasAmount()) {</span>
+<span class="fc" id="L422">                handleProrationAdjustment(subscription, proration);</span>
+            }
+        }
+
+        // Update subscription
+<span class="fc" id="L427">        subscription.setPlan(newPlan);</span>
+        
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (&quot;IMMEDIATE&quot;.equals(request.getChangeOption())) {</span>
+<span class="fc" id="L430">            subscription.calculateNextBillingCycle();</span>
+        } else {
+            // Schedule change for end of period
+<span class="nc" id="L433">            subscription.addMetadata(&quot;scheduledPlanChange&quot;, newPlan.getPlanCode());</span>
+<span class="nc" id="L434">            subscription.addMetadata(&quot;planChangeDate&quot;, subscription.getCurrentPeriodEnd());</span>
+        }
+
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">        if (request.getChangeReason() != null) {</span>
+<span class="fc" id="L438">            subscription.addMetadata(&quot;planChangeReason&quot;, request.getChangeReason());</span>
+        }
+
+        // Record metrics
+<span class="fc" id="L442">        metricsService.recordPlanChange(currentPlan.getPlanCode(), newPlan.getPlanCode());</span>
+<span class="fc" id="L443">    }</span>
+
+    private void handleProrationAdjustment(Subscription subscription, ProrationCalculation proration) {
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (proration.isCharge()) {</span>
+            // Create invoice for additional amount
+<span class="fc" id="L448">            createProrationInvoice(subscription, proration.getNetAmount(), &quot;Plan upgrade proration&quot;);</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        } else if (proration.isCredit()) {</span>
+            // Create credit for unused amount
+<span class="nc" id="L451">            createProrationCredit(subscription, proration.getNetAmount().abs(), &quot;Plan downgrade credit&quot;);</span>
+        }
+<span class="fc" id="L453">    }</span>
+
+    private void createSetupFeeInvoice(Subscription subscription, BigDecimal setupFee) {
+<span class="fc" id="L456">        String invoiceNumber = generateInvoiceNumber(&quot;SETUP&quot;);</span>
+        
+<span class="fc" id="L458">        SubscriptionInvoice invoice = new SubscriptionInvoice();</span>
+<span class="fc" id="L459">        invoice.setInvoiceNumber(invoiceNumber);</span>
+<span class="fc" id="L460">        invoice.setSubscription(subscription);</span>
+<span class="fc" id="L461">        invoice.setCustomer(subscription.getCustomer());</span>
+<span class="fc" id="L462">        invoice.setAmount(setupFee);</span>
+<span class="fc" id="L463">        invoice.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L464">        invoice.setStatus(&quot;PENDING&quot;);</span>
+<span class="fc" id="L465">        invoice.setPeriodStart(ZonedDateTime.now());</span>
+<span class="fc" id="L466">        invoice.setPeriodEnd(ZonedDateTime.now());</span>
+<span class="fc" id="L467">        invoice.setDueDate(ZonedDateTime.now().plusDays(1)); // Due immediately</span>
+<span class="fc" id="L468">        invoice.addMetadata(&quot;type&quot;, &quot;setup_fee&quot;);</span>
+        
+<span class="fc" id="L470">        invoiceRepository.save(invoice);</span>
+<span class="fc" id="L471">        subscription.addInvoice(invoice);</span>
+        
+<span class="fc" id="L473">        log.info(&quot;Created setup fee invoice: {} for subscription: {}&quot;, </span>
+<span class="fc" id="L474">                   invoiceNumber, subscription.getSubscriptionId());</span>
+<span class="fc" id="L475">    }</span>
+
+    private void createProrationInvoice(Subscription subscription, BigDecimal amount, String description) {
+<span class="fc" id="L478">        String invoiceNumber = generateInvoiceNumber(&quot;PRORATE&quot;);</span>
+        
+<span class="fc" id="L480">        SubscriptionInvoice invoice = new SubscriptionInvoice();</span>
+<span class="fc" id="L481">        invoice.setInvoiceNumber(invoiceNumber);</span>
+<span class="fc" id="L482">        invoice.setSubscription(subscription);</span>
+<span class="fc" id="L483">        invoice.setCustomer(subscription.getCustomer());</span>
+<span class="fc" id="L484">        invoice.setAmount(amount);</span>
+<span class="fc" id="L485">        invoice.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L486">        invoice.setStatus(&quot;PENDING&quot;);</span>
+<span class="fc" id="L487">        invoice.setPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L488">        invoice.setPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L489">        invoice.setDueDate(ZonedDateTime.now().plusDays(1));</span>
+<span class="fc" id="L490">        invoice.addMetadata(&quot;type&quot;, &quot;proration_charge&quot;);</span>
+<span class="fc" id="L491">        invoice.addMetadata(&quot;description&quot;, description);</span>
+        
+<span class="fc" id="L493">        invoiceRepository.save(invoice);</span>
+<span class="fc" id="L494">        subscription.addInvoice(invoice);</span>
+        
+<span class="fc" id="L496">        log.info(&quot;Created proration invoice: {} for subscription: {}&quot;, </span>
+<span class="fc" id="L497">                   invoiceNumber, subscription.getSubscriptionId());</span>
+<span class="fc" id="L498">    }</span>
+
+    private void createProrationCredit(Subscription subscription, BigDecimal amount, String description) {
+        // In a real implementation, this would create a credit note or adjustment
+<span class="fc" id="L502">        subscription.addMetadata(&quot;proratedCredit&quot;, amount);</span>
+<span class="fc" id="L503">        subscription.addMetadata(&quot;proratedCreditDescription&quot;, description);</span>
+<span class="fc" id="L504">        subscription.addMetadata(&quot;proratedCreditDate&quot;, ZonedDateTime.now());</span>
+        
+<span class="fc" id="L506">        log.info(&quot;Created proration credit: {} for subscription: {}&quot;, </span>
+<span class="fc" id="L507">                   amount, subscription.getSubscriptionId());</span>
+<span class="fc" id="L508">    }</span>
+
+    private void handleImmediateBilling(Subscription subscription, ZonedDateTime startDate) {
+        // Create immediate billing invoice for first period
+<span class="fc" id="L512">        String invoiceNumber = generateInvoiceNumber(&quot;BILL&quot;);</span>
+        
+<span class="fc" id="L514">        SubscriptionInvoice invoice = new SubscriptionInvoice();</span>
+<span class="fc" id="L515">        invoice.setInvoiceNumber(invoiceNumber);</span>
+<span class="fc" id="L516">        invoice.setSubscription(subscription);</span>
+<span class="fc" id="L517">        invoice.setCustomer(subscription.getCustomer());</span>
+<span class="fc" id="L518">        invoice.setAmount(subscription.getPlan().getAmount());</span>
+<span class="fc" id="L519">        invoice.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L520">        invoice.setStatus(&quot;PENDING&quot;);</span>
+<span class="fc" id="L521">        invoice.setPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L522">        invoice.setPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L523">        invoice.setDueDate(ZonedDateTime.now().plusDays(1));</span>
+<span class="fc" id="L524">        invoice.addMetadata(&quot;type&quot;, &quot;subscription_billing&quot;);</span>
+        
+<span class="fc" id="L526">        invoiceRepository.save(invoice);</span>
+<span class="fc" id="L527">        subscription.addInvoice(invoice);</span>
+        
+<span class="fc" id="L529">        log.info(&quot;Created immediate billing invoice: {} for subscription: {}&quot;, </span>
+<span class="fc" id="L530">                   invoiceNumber, subscription.getSubscriptionId());</span>
+<span class="fc" id="L531">    }</span>
+
+    private void handleProratedRefund(Subscription subscription) {
+        // Calculate unused portion of current period
+<span class="fc" id="L535">        ZonedDateTime now = ZonedDateTime.now();</span>
+<span class="pc bpc" id="L536" title="2 of 4 branches missed.">        if (subscription.getCurrentPeriodEnd() != null &amp;&amp; now.isBefore(subscription.getCurrentPeriodEnd())) {</span>
+<span class="fc" id="L537">            ProrationCalculation proration = prorationService.calculateRefundProration(subscription, now);</span>
+            
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">            if (proration.hasAmount()) {</span>
+<span class="fc" id="L540">                createProrationCredit(subscription, proration.getNetAmount(), &quot;Cancellation refund&quot;);</span>
+            }
+        }
+<span class="fc" id="L543">    }</span>
+
+    private SubscriptionResponse mapToSubscriptionResponse(Subscription subscription) {
+<span class="fc" id="L546">        SubscriptionResponse response = new SubscriptionResponse();</span>
+        
+        // Basic subscription info
+<span class="fc" id="L549">        response.setSubscriptionId(subscription.getSubscriptionId());</span>
+<span class="fc" id="L550">        response.setStatus(subscription.getStatus());</span>
+<span class="fc" id="L551">        response.setCreatedAt(subscription.getCreatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+<span class="fc" id="L552">        response.setUpdatedAt(subscription.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+        
+        // Customer info
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">        if (subscription.getCustomer() != null) {</span>
+<span class="fc" id="L556">            response.setCustomerId(subscription.getCustomer().getCustomerId());</span>
+<span class="fc" id="L557">            response.setCustomerName(subscription.getCustomer().getFirstName() + &quot; &quot; + </span>
+<span class="fc" id="L558">                                   subscription.getCustomer().getLastName());</span>
+<span class="fc" id="L559">            response.setCustomerEmail(subscription.getCustomer().getEmail());</span>
+        }
+        
+        // Plan info
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (subscription.getPlan() != null) {</span>
+<span class="fc" id="L564">            response.setPlanCode(subscription.getPlan().getPlanCode());</span>
+<span class="fc" id="L565">            response.setPlanName(subscription.getPlan().getName());</span>
+<span class="fc" id="L566">            response.setPlanAmount(subscription.getPlan().getAmount());</span>
+<span class="fc" id="L567">            response.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L568">            response.setIntervalUnit(subscription.getPlan().getIntervalUnit());</span>
+<span class="fc" id="L569">            response.setIntervalCount(subscription.getPlan().getIntervalCount());</span>
+        }
+        
+        // Payment method info
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (subscription.getPaymentMethod() != null) {</span>
+<span class="fc" id="L574">            response.setPaymentMethodId(subscription.getPaymentMethod().getPaymentMethodId());</span>
+<span class="fc" id="L575">            response.setPaymentMethodType(subscription.getPaymentMethod().getType());</span>
+<span class="fc" id="L576">            response.setPaymentMethodLast4(subscription.getPaymentMethod().getLast4());</span>
+        }
+        
+        // Billing dates
+<span class="fc" id="L580">        response.setCurrentPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L581">        response.setCurrentPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L582">        response.setTrialStart(subscription.getTrialStart());</span>
+<span class="fc" id="L583">        response.setTrialEnd(subscription.getTrialEnd());</span>
+<span class="fc" id="L584">        response.setNextBillingDate(subscription.getNextBillingDate());</span>
+<span class="fc" id="L585">        response.setBillingCycleAnchor(subscription.getBillingCycleAnchor());</span>
+        
+        // Cancellation info
+<span class="fc" id="L588">        response.setCancelledAt(subscription.getCancelledAt());</span>
+<span class="fc" id="L589">        response.setCancellationReason(subscription.getCancellationReason());</span>
+        
+        // Calculated fields
+<span class="fc" id="L592">        response.setDaysUntilNextBilling(subscription.getDaysUntilNextBilling());</span>
+<span class="fc" id="L593">        response.setInTrialPeriod(subscription.isInTrial());</span>
+<span class="fc" id="L594">        response.setTrialExpired(subscription.hasTrialExpired());</span>
+        
+        // Invoice info
+<span class="fc" id="L597">        SubscriptionInvoice latestInvoice = subscription.getLatestInvoice();</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        if (latestInvoice != null) {</span>
+<span class="fc" id="L599">            response.setLatestInvoiceId(latestInvoice.getInvoiceNumber());</span>
+        }
+<span class="fc" id="L601">        response.setUnpaidInvoicesCount(subscription.getUnpaidInvoices().size());</span>
+        
+        // Metadata
+<span class="fc" id="L604">        response.setMetadata(subscription.getMetadata());</span>
+        
+        // Pending changes
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">        response.setHasPendingChanges(subscription.getMetadata() != null &amp;&amp; </span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            (subscription.getMetadata().containsKey(&quot;scheduledPlanChange&quot;) ||</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">             subscription.getMetadata().containsKey(&quot;scheduledCancellation&quot;)));</span>
+        
+<span class="pc bpc" id="L611" title="2 of 4 branches missed.">        if (subscription.getMetadata() != null &amp;&amp; subscription.getMetadata().containsKey(&quot;planChangeDate&quot;)) {</span>
+<span class="nc" id="L612">            response.setPendingChangesDate((ZonedDateTime) subscription.getMetadata().get(&quot;planChangeDate&quot;));</span>
+        }
+        
+<span class="fc" id="L615">        return response;</span>
+    }
+
+    private String generateSubscriptionId() {
+<span class="fc" id="L619">        return &quot;sub_&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 20);</span>
+    }
+
+    private String generateInvoiceNumber(String type) {
+<span class="fc" id="L623">        return type + &quot;_&quot; + System.currentTimeMillis() + &quot;_&quot; + </span>
+<span class="fc" id="L624">               UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 8);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

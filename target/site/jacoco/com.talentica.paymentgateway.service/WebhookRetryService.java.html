@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookRetryService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">WebhookRetryService.java</span></div><h1>WebhookRetryService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.entity.Webhook;
+import com.talentica.paymentgateway.entity.WebhookStatus;
+import com.talentica.paymentgateway.repository.WebhookRepository;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
+
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Service for handling webhook delivery retries with exponential backoff.
+ * Implements industry-standard retry patterns for reliable webhook delivery.
+ * 
+ * Features:
+ * - Exponential backoff with jitter
+ * - Dead letter queue for permanently failed webhooks
+ * - Scheduled retry processing
+ * - Comprehensive delivery tracking
+ * - Circuit breaker pattern for problematic endpoints
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L44">@Slf4j</span>
+@Service
+@Transactional
+<span class="fc" id="L47">public class WebhookRetryService {</span>
+    
+    @Autowired
+    private WebhookRepository webhookRepository;
+    
+    @Autowired
+    private MetricsService metricsService;
+    
+    @Autowired
+    private RestTemplate restTemplate;
+    
+    @Value(&quot;${app.webhook.retry.max-attempts:5}&quot;)
+    private int maxRetryAttempts;
+    
+    @Value(&quot;${app.webhook.retry.initial-delay-minutes:1}&quot;)
+    private int initialDelayMinutes;
+    
+    @Value(&quot;${app.webhook.retry.max-delay-minutes:1440}&quot;) // 24 hours
+    private int maxDelayMinutes;
+    
+    @Value(&quot;${app.webhook.retry.multiplier:2.0}&quot;)
+    private double backoffMultiplier;
+    
+    @Value(&quot;${app.webhook.retry.jitter-enabled:true}&quot;)
+    private boolean jitterEnabled;
+    
+    @Value(&quot;${app.webhook.retry.timeout-seconds:30}&quot;)
+    private int timeoutSeconds;
+    
+    @Value(&quot;${app.webhook.cleanup.enabled:true}&quot;)
+    private boolean cleanupEnabled;
+    
+    @Value(&quot;${app.webhook.cleanup.delivered-retention-days:7}&quot;)
+    private int deliveredRetentionDays;
+    
+    @Value(&quot;${app.webhook.cleanup.failed-retention-days:30}&quot;)
+    private int failedRetentionDays;
+    
+    // Circuit breaker state for problematic endpoints
+<span class="fc" id="L86">    private final Map&lt;String, EndpointCircuitBreaker&gt; circuitBreakers = new HashMap&lt;&gt;();</span>
+    
+    /**
+     * Processes webhook delivery retries on a scheduled basis.
+     * Runs every 5 minutes to check for webhooks ready for retry.
+     */
+    @Scheduled(fixedDelay = 300000) // 5 minutes
+    public void processRetries() {
+        try {
+<span class="fc" id="L95">            log.debug(&quot;Starting scheduled webhook retry processing&quot;);</span>
+            
+<span class="fc" id="L97">            List&lt;Webhook&gt; webhooksToRetry = webhookRepository.findWebhooksReadyForRetry();</span>
+            
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (webhooksToRetry.isEmpty()) {</span>
+<span class="fc" id="L100">                log.debug(&quot;No webhooks ready for retry&quot;);</span>
+<span class="fc" id="L101">                return;</span>
+            }
+            
+<span class="fc" id="L104">            log.info(&quot;Found {} webhooks ready for retry&quot;, webhooksToRetry.size());</span>
+            
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (Webhook webhook : webhooksToRetry) {</span>
+                try {
+<span class="fc" id="L108">                    retryWebhookDeliveryAsync(webhook);</span>
+<span class="nc" id="L109">                } catch (Exception e) {</span>
+<span class="nc" id="L110">                    log.error(&quot;Error scheduling retry for webhook {}: {}&quot;, </span>
+<span class="nc" id="L111">                                webhook.getWebhookId(), e.getMessage(), e);</span>
+<span class="fc" id="L112">                }</span>
+<span class="fc" id="L113">            }</span>
+            
+<span class="fc" id="L115">        } catch (Exception e) {</span>
+<span class="fc" id="L116">            log.error(&quot;Error in scheduled retry processing: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">    }</span>
+    
+    /**
+     * Processes webhook delivery cleanup on a scheduled basis.
+     * Runs daily at 2 AM to clean up old webhook records.
+     */
+    @Scheduled(cron = &quot;0 0 2 * * *&quot;) // Daily at 2 AM
+    public void cleanupOldWebhooks() {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!cleanupEnabled) {</span>
+<span class="fc" id="L127">            log.debug(&quot;Webhook cleanup is disabled&quot;);</span>
+<span class="fc" id="L128">            return;</span>
+        }
+        
+        try {
+<span class="fc" id="L132">            log.info(&quot;Starting webhook cleanup process&quot;);</span>
+            
+<span class="fc" id="L134">            ZonedDateTime deliveredCutoff = ZonedDateTime.now().minusDays(deliveredRetentionDays);</span>
+<span class="fc" id="L135">            ZonedDateTime failedCutoff = ZonedDateTime.now().minusDays(failedRetentionDays);</span>
+            
+<span class="fc" id="L137">            List&lt;Webhook&gt; webhooksToCleanup = webhookRepository.findWebhooksForCleanup(</span>
+                deliveredCutoff, failedCutoff);
+            
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (!webhooksToCleanup.isEmpty()) {</span>
+<span class="fc" id="L141">                log.info(&quot;Cleaning up {} old webhook records&quot;, webhooksToCleanup.size());</span>
+                
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                for (Webhook webhook : webhooksToCleanup) {</span>
+<span class="fc" id="L144">                    webhookRepository.delete(webhook);</span>
+<span class="fc" id="L145">                }</span>
+                
+<span class="fc" id="L147">                metricsService.incrementWebhookCleanup(webhooksToCleanup.size());</span>
+            }
+            
+<span class="fc" id="L150">            log.info(&quot;Webhook cleanup completed&quot;);</span>
+            
+<span class="nc" id="L152">        } catch (Exception e) {</span>
+<span class="nc" id="L153">            log.error(&quot;Error in webhook cleanup process: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">    }</span>
+    
+    /**
+     * Retries webhook delivery asynchronously.
+     */
+    @Async(&quot;taskExecutor&quot;)
+    public CompletableFuture&lt;Void&gt; retryWebhookDeliveryAsync(Webhook webhook) {
+<span class="fc" id="L162">        String correlationId = webhook.getCorrelationId();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (correlationId == null) {</span>
+<span class="fc" id="L164">            correlationId = CorrelationIdUtil.generate();</span>
+        }
+        
+        try {
+<span class="fc" id="L168">            MDC.put(&quot;correlationId&quot;, correlationId);</span>
+            
+<span class="fc" id="L170">            log.info(&quot;Starting webhook retry - WebhookID: {}, Attempt: {}/{}, EndpointURL: {}&quot;, </span>
+<span class="fc" id="L171">                       webhook.getWebhookId(), webhook.getAttempts() + 1, </span>
+<span class="fc" id="L172">                       webhook.getMaxAttempts(), webhook.getEndpointUrl());</span>
+            
+            // Check circuit breaker for this endpoint
+<span class="fc" id="L175">            EndpointCircuitBreaker circuitBreaker = getOrCreateCircuitBreaker(webhook.getEndpointUrl());</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (circuitBreaker.isOpen()) {</span>
+<span class="fc" id="L177">                log.warn(&quot;Circuit breaker is open for endpoint: {}, skipping retry&quot;, </span>
+<span class="fc" id="L178">                           webhook.getEndpointUrl());</span>
+<span class="fc" id="L179">                scheduleNextRetry(webhook, &quot;Circuit breaker is open&quot;);</span>
+<span class="fc" id="L180">                return CompletableFuture.completedFuture(null);</span>
+            }
+            
+            // Attempt webhook delivery
+<span class="fc" id="L184">            deliverWebhook(webhook);</span>
+            
+<span class="fc" id="L186">            return CompletableFuture.completedFuture(null);</span>
+            
+<span class="nc" id="L188">        } catch (Exception e) {</span>
+<span class="nc" id="L189">            log.error(&quot;Error in async webhook retry - WebhookID: {}, Error: {}&quot;, </span>
+<span class="nc" id="L190">                        webhook.getWebhookId(), e.getMessage(), e);</span>
+<span class="nc" id="L191">            return CompletableFuture.completedFuture(null);</span>
+        } finally {
+<span class="fc" id="L193">            MDC.clear();</span>
+        }
+    }
+    
+    /**
+     * Delivers webhook to the target endpoint.
+     */
+    @Retryable(value = {ResourceAccessException.class}, 
+               maxAttempts = 2, 
+               backoff = @Backoff(delay = 1000))
+    public void deliverWebhook(Webhook webhook) {
+        try {
+            // Mark webhook as processing
+<span class="fc" id="L206">            webhook.markAsProcessing();</span>
+<span class="fc" id="L207">            webhookRepository.save(webhook);</span>
+            
+            // Prepare HTTP request
+<span class="fc" id="L210">            HttpHeaders headers = new HttpHeaders();</span>
+<span class="fc" id="L211">            headers.setContentType(MediaType.APPLICATION_JSON);</span>
+            
+            // Add custom headers from webhook configuration
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (webhook.getRequestHeaders() != null) {</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                for (Map.Entry&lt;String, Object&gt; entry : webhook.getRequestHeaders().entrySet()) {</span>
+<span class="fc" id="L216">                    headers.add(entry.getKey(), String.valueOf(entry.getValue()));</span>
+<span class="fc" id="L217">                }</span>
+            }
+            
+            // Add correlation ID and timestamp
+<span class="fc" id="L221">            headers.add(&quot;X-Correlation-ID&quot;, webhook.getCorrelationId());</span>
+<span class="fc" id="L222">            headers.add(&quot;X-Webhook-ID&quot;, webhook.getWebhookId());</span>
+<span class="fc" id="L223">            headers.add(&quot;X-Event-Type&quot;, webhook.getEventType());</span>
+<span class="fc" id="L224">            headers.add(&quot;X-Attempt&quot;, String.valueOf(webhook.getAttempts() + 1));</span>
+<span class="fc" id="L225">            headers.add(&quot;X-Timestamp&quot;, String.valueOf(System.currentTimeMillis()));</span>
+            
+<span class="fc" id="L227">            HttpEntity&lt;Map&lt;String, Object&gt;&gt; entity = new HttpEntity&lt;&gt;(webhook.getRequestBody(), headers);</span>
+            
+            // Make HTTP request
+<span class="fc" id="L230">            ResponseEntity&lt;String&gt; response = restTemplate.exchange(</span>
+<span class="fc" id="L231">                webhook.getEndpointUrl(),</span>
+<span class="fc" id="L232">                HttpMethod.valueOf(webhook.getHttpMethod()),</span>
+                entity,
+                String.class
+            );
+            
+            // Process successful response
+<span class="fc" id="L238">            handleSuccessfulDelivery(webhook, response);</span>
+            
+            // Record success in circuit breaker
+<span class="fc" id="L241">            EndpointCircuitBreaker circuitBreaker = getOrCreateCircuitBreaker(webhook.getEndpointUrl());</span>
+<span class="fc" id="L242">            circuitBreaker.recordSuccess();</span>
+            
+<span class="fc" id="L244">        } catch (HttpClientErrorException e) {</span>
+<span class="fc" id="L245">            handleClientError(webhook, e);</span>
+<span class="fc" id="L246">        } catch (HttpServerErrorException e) {</span>
+<span class="fc" id="L247">            handleServerError(webhook, e);</span>
+<span class="fc" id="L248">        } catch (ResourceAccessException e) {</span>
+<span class="fc" id="L249">            handleTimeoutError(webhook, e);</span>
+<span class="fc" id="L250">        } catch (Exception e) {</span>
+<span class="fc" id="L251">            handleUnknownError(webhook, e);</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">    }</span>
+    
+    /**
+     * Handles successful webhook delivery.
+     */
+    private void handleSuccessfulDelivery(Webhook webhook, ResponseEntity&lt;String&gt; response) {
+<span class="fc" id="L259">        Map&lt;String, Object&gt; responseHeaders = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L260">        response.getHeaders().forEach((key, values) -&gt; </span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            responseHeaders.put(key, values.size() == 1 ? values.get(0) : values));</span>
+        
+<span class="fc" id="L263">        webhook.markAsDelivered(response.getStatusCodeValue(), responseHeaders, response.getBody());</span>
+<span class="fc" id="L264">        webhookRepository.save(webhook);</span>
+        
+<span class="fc" id="L266">        log.info(&quot;Webhook delivered successfully - WebhookID: {}, StatusCode: {}, Attempt: {}&quot;, </span>
+<span class="fc" id="L267">                   webhook.getWebhookId(), response.getStatusCodeValue(), webhook.getAttempts());</span>
+        
+<span class="fc" id="L269">        metricsService.incrementWebhookDeliverySuccess(webhook.getEventType(), webhook.getAttempts());</span>
+<span class="fc" id="L270">    }</span>
+    
+    /**
+     * Handles client errors (4xx status codes).
+     */
+    private void handleClientError(Webhook webhook, HttpClientErrorException e) {
+<span class="fc" id="L276">        String errorMessage = String.format(&quot;Client error: %d %s&quot;, </span>
+<span class="fc" id="L277">                                           e.getStatusCode().value(), e.getStatusText());</span>
+        
+<span class="fc" id="L279">        Map&lt;String, Object&gt; responseHeaders = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (e.getResponseHeaders() != null) {</span>
+<span class="nc" id="L281">            e.getResponseHeaders().forEach((key, values) -&gt; </span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                responseHeaders.put(key, values.size() == 1 ? values.get(0) : values));</span>
+        }
+        
+        // For client errors, don't retry (except for specific cases like 429 Too Many Requests)
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {</span>
+<span class="fc" id="L287">            scheduleNextRetry(webhook, errorMessage);</span>
+        } else {
+<span class="fc" id="L289">            webhook.markAsFailedWithResponse(e.getStatusCode().value(), responseHeaders, </span>
+<span class="fc" id="L290">                                           e.getResponseBodyAsString(), errorMessage);</span>
+<span class="fc" id="L291">            webhook.setMaxAttempts(webhook.getAttempts() + 1); // Stop retrying</span>
+<span class="fc" id="L292">            webhookRepository.save(webhook);</span>
+        }
+        
+<span class="fc" id="L295">        log.warn(&quot;Webhook client error - WebhookID: {}, StatusCode: {}, Error: {}&quot;, </span>
+<span class="fc" id="L296">                   webhook.getWebhookId(), e.getStatusCode().value(), errorMessage);</span>
+        
+<span class="fc" id="L298">        metricsService.incrementWebhookDeliveryFailure(webhook.getEventType(), </span>
+<span class="fc" id="L299">                                                      webhook.getAttempts(), &quot;client_error&quot;);</span>
+<span class="fc" id="L300">    }</span>
+    
+    /**
+     * Handles server errors (5xx status codes).
+     */
+    private void handleServerError(Webhook webhook, HttpServerErrorException e) {
+<span class="fc" id="L306">        String errorMessage = String.format(&quot;Server error: %d %s&quot;, </span>
+<span class="fc" id="L307">                                           e.getStatusCode().value(), e.getStatusText());</span>
+        
+<span class="fc" id="L309">        Map&lt;String, Object&gt; responseHeaders = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (e.getResponseHeaders() != null) {</span>
+<span class="nc" id="L311">            e.getResponseHeaders().forEach((key, values) -&gt; </span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                responseHeaders.put(key, values.size() == 1 ? values.get(0) : values));</span>
+        }
+        
+<span class="fc" id="L315">        webhook.markAsFailedWithResponse(e.getStatusCode().value(), responseHeaders, </span>
+<span class="fc" id="L316">                                       e.getResponseBodyAsString(), errorMessage);</span>
+        
+        // Schedule retry for server errors
+<span class="fc" id="L319">        scheduleNextRetry(webhook, errorMessage);</span>
+        
+<span class="fc" id="L321">        log.warn(&quot;Webhook server error - WebhookID: {}, StatusCode: {}, Attempt: {}/{}&quot;, </span>
+<span class="fc" id="L322">                   webhook.getWebhookId(), e.getStatusCode().value(), </span>
+<span class="fc" id="L323">                   webhook.getAttempts(), webhook.getMaxAttempts());</span>
+        
+        // Record failure in circuit breaker
+<span class="fc" id="L326">        EndpointCircuitBreaker circuitBreaker = getOrCreateCircuitBreaker(webhook.getEndpointUrl());</span>
+<span class="fc" id="L327">        circuitBreaker.recordFailure();</span>
+        
+<span class="fc" id="L329">        metricsService.incrementWebhookDeliveryFailure(webhook.getEventType(), </span>
+<span class="fc" id="L330">                                                      webhook.getAttempts(), &quot;server_error&quot;);</span>
+<span class="fc" id="L331">    }</span>
+    
+    /**
+     * Handles timeout errors.
+     */
+    private void handleTimeoutError(Webhook webhook, ResourceAccessException e) {
+<span class="fc" id="L337">        String errorMessage = &quot;Timeout error: &quot; + e.getMessage();</span>
+        
+<span class="fc" id="L339">        webhook.markAsFailed(errorMessage);</span>
+<span class="fc" id="L340">        scheduleNextRetry(webhook, errorMessage);</span>
+        
+<span class="fc" id="L342">        log.warn(&quot;Webhook timeout error - WebhookID: {}, Attempt: {}/{}, Error: {}&quot;, </span>
+<span class="fc" id="L343">                   webhook.getWebhookId(), webhook.getAttempts(), </span>
+<span class="fc" id="L344">                   webhook.getMaxAttempts(), e.getMessage());</span>
+        
+        // Record failure in circuit breaker
+<span class="fc" id="L347">        EndpointCircuitBreaker circuitBreaker = getOrCreateCircuitBreaker(webhook.getEndpointUrl());</span>
+<span class="fc" id="L348">        circuitBreaker.recordFailure();</span>
+        
+<span class="fc" id="L350">        metricsService.incrementWebhookDeliveryFailure(webhook.getEventType(), </span>
+<span class="fc" id="L351">                                                      webhook.getAttempts(), &quot;timeout&quot;);</span>
+<span class="fc" id="L352">    }</span>
+    
+    /**
+     * Handles unknown/unexpected errors.
+     */
+    private void handleUnknownError(Webhook webhook, Exception e) {
+<span class="fc" id="L358">        String errorMessage = &quot;Unknown error: &quot; + e.getMessage();</span>
+        
+<span class="fc" id="L360">        webhook.markAsFailed(errorMessage);</span>
+<span class="fc" id="L361">        scheduleNextRetry(webhook, errorMessage);</span>
+        
+<span class="fc" id="L363">        log.error(&quot;Webhook unknown error - WebhookID: {}, Attempt: {}/{}, Error: {}&quot;, </span>
+<span class="fc" id="L364">                    webhook.getWebhookId(), webhook.getAttempts(), </span>
+<span class="fc" id="L365">                    webhook.getMaxAttempts(), e.getMessage(), e);</span>
+        
+<span class="fc" id="L367">        metricsService.incrementWebhookDeliveryFailure(webhook.getEventType(), </span>
+<span class="fc" id="L368">                                                      webhook.getAttempts(), &quot;unknown&quot;);</span>
+<span class="fc" id="L369">    }</span>
+    
+    /**
+     * Schedules the next retry attempt with exponential backoff.
+     */
+    private void scheduleNextRetry(Webhook webhook, String errorMessage) {
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (webhook.getAttempts() &gt;= webhook.getMaxAttempts()) {</span>
+<span class="fc" id="L376">            webhook.setStatus(WebhookStatus.FAILED);</span>
+<span class="fc" id="L377">            webhook.setNextAttemptAt(null);</span>
+<span class="fc" id="L378">            log.warn(&quot;Webhook max attempts reached - WebhookID: {}, giving up&quot;, </span>
+<span class="fc" id="L379">                       webhook.getWebhookId());</span>
+<span class="fc" id="L380">            metricsService.incrementWebhookMaxAttemptsReached(webhook.getEventType());</span>
+        } else {
+<span class="fc" id="L382">            webhook.setStatus(WebhookStatus.RETRYING);</span>
+            
+            // Calculate next retry time with exponential backoff
+<span class="fc" id="L385">            int delayMinutes = calculateBackoffDelay(webhook.getAttempts());</span>
+<span class="fc" id="L386">            ZonedDateTime nextAttempt = ZonedDateTime.now().plusMinutes(delayMinutes);</span>
+<span class="fc" id="L387">            webhook.setNextAttemptAt(nextAttempt);</span>
+            
+<span class="fc" id="L389">            log.info(&quot;Scheduled webhook retry - WebhookID: {}, NextAttempt: {}, DelayMinutes: {}&quot;, </span>
+<span class="fc" id="L390">                       webhook.getWebhookId(), nextAttempt, delayMinutes);</span>
+        }
+        
+<span class="fc" id="L393">        webhookRepository.save(webhook);</span>
+<span class="fc" id="L394">    }</span>
+    
+    /**
+     * Calculates exponential backoff delay with optional jitter.
+     */
+    private int calculateBackoffDelay(int attemptNumber) {
+        // Calculate exponential backoff: initial * (multiplier ^ attempt)
+<span class="fc" id="L401">        double delay = initialDelayMinutes * Math.pow(backoffMultiplier, attemptNumber);</span>
+        
+        // Apply maximum delay limit
+<span class="fc" id="L404">        delay = Math.min(delay, maxDelayMinutes);</span>
+        
+        // Add jitter to prevent thundering herd
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (jitterEnabled) {</span>
+<span class="fc" id="L408">            double jitter = delay * 0.1; // 10% jitter</span>
+<span class="fc" id="L409">            delay += ThreadLocalRandom.current().nextDouble(-jitter, jitter);</span>
+        }
+        
+<span class="fc" id="L412">        return Math.max(1, (int) delay); // Minimum 1 minute delay</span>
+    }
+    
+    /**
+     * Gets or creates a circuit breaker for an endpoint.
+     */
+    private EndpointCircuitBreaker getOrCreateCircuitBreaker(String endpointUrl) {
+<span class="fc" id="L419">        return circuitBreakers.computeIfAbsent(endpointUrl, </span>
+<span class="fc" id="L420">            url -&gt; new EndpointCircuitBreaker(url, 5, Duration.ofMinutes(5)));</span>
+    }
+    
+    /**
+     * Gets retry statistics for monitoring.
+     */
+    public Map&lt;String, Object&gt; getRetryStatistics() {
+<span class="fc" id="L427">        Map&lt;String, Object&gt; stats = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L429">        ZonedDateTime last24Hours = ZonedDateTime.now().minusHours(24);</span>
+        
+<span class="fc" id="L431">        stats.put(&quot;pendingRetries&quot;, webhookRepository.countByStatus(WebhookStatus.RETRYING));</span>
+<span class="fc" id="L432">        stats.put(&quot;failedWebhooks&quot;, webhookRepository.countByStatus(WebhookStatus.FAILED));</span>
+<span class="fc" id="L433">        stats.put(&quot;webhooksReadyForRetry&quot;, webhookRepository.findWebhooksReadyForRetry().size());</span>
+        
+        // Circuit breaker states
+<span class="fc" id="L436">        Map&lt;String, Object&gt; circuitBreakerStates = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        for (Map.Entry&lt;String, EndpointCircuitBreaker&gt; entry : circuitBreakers.entrySet()) {</span>
+<span class="fc" id="L438">            EndpointCircuitBreaker cb = entry.getValue();</span>
+<span class="fc" id="L439">            Map&lt;String, Object&gt; cbState = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            cbState.put(&quot;state&quot;, cb.isOpen() ? &quot;OPEN&quot; : &quot;CLOSED&quot;);</span>
+<span class="fc" id="L441">            cbState.put(&quot;failures&quot;, cb.getFailureCount());</span>
+<span class="fc" id="L442">            cbState.put(&quot;lastFailure&quot;, cb.getLastFailureTime());</span>
+<span class="fc" id="L443">            circuitBreakerStates.put(entry.getKey(), cbState);</span>
+<span class="fc" id="L444">        }</span>
+<span class="fc" id="L445">        stats.put(&quot;circuitBreakers&quot;, circuitBreakerStates);</span>
+        
+<span class="fc" id="L447">        return stats;</span>
+    }
+    
+    /**
+     * Simple circuit breaker implementation for webhook endpoints.
+     */
+    private static class EndpointCircuitBreaker {
+        private final String endpointUrl;
+        private final int failureThreshold;
+        private final Duration timeout;
+<span class="fc" id="L457">        private int failureCount = 0;</span>
+        private ZonedDateTime lastFailureTime;
+<span class="fc" id="L459">        private boolean isOpen = false;</span>
+        
+<span class="fc" id="L461">        public EndpointCircuitBreaker(String endpointUrl, int failureThreshold, Duration timeout) {</span>
+<span class="fc" id="L462">            this.endpointUrl = endpointUrl;</span>
+<span class="fc" id="L463">            this.failureThreshold = failureThreshold;</span>
+<span class="fc" id="L464">            this.timeout = timeout;</span>
+<span class="fc" id="L465">        }</span>
+        
+        public void recordSuccess() {
+<span class="fc" id="L468">            this.failureCount = 0;</span>
+<span class="fc" id="L469">            this.isOpen = false;</span>
+<span class="fc" id="L470">        }</span>
+        
+        public void recordFailure() {
+<span class="fc" id="L473">            this.failureCount++;</span>
+<span class="fc" id="L474">            this.lastFailureTime = ZonedDateTime.now();</span>
+            
+<span class="fc bfc" id="L476" title="All 2 branches covered.">            if (this.failureCount &gt;= this.failureThreshold) {</span>
+<span class="fc" id="L477">                this.isOpen = true;</span>
+            }
+<span class="fc" id="L479">        }</span>
+        
+        public boolean isOpen() {
+<span class="pc bpc" id="L482" title="1 of 4 branches missed.">            if (isOpen &amp;&amp; lastFailureTime != null) {</span>
+                // Check if timeout period has passed
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                if (ZonedDateTime.now().isAfter(lastFailureTime.plus(timeout))) {</span>
+<span class="nc" id="L485">                    isOpen = false; // Half-open state</span>
+<span class="nc" id="L486">                    failureCount = 0;</span>
+                }
+            }
+<span class="fc" id="L489">            return isOpen;</span>
+        }
+        
+        public int getFailureCount() {
+<span class="fc" id="L493">            return failureCount;</span>
+        }
+        
+        public ZonedDateTime getLastFailureTime() {
+<span class="fc" id="L497">            return lastFailureTime;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

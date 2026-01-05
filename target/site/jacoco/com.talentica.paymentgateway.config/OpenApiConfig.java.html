@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenApiConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config</a> &gt; <span class="el_source">OpenApiConfig.java</span></div><h1>OpenApiConfig.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.ExternalDocumentation;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.tags.Tag;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * OpenAPI 3.0 configuration for the Payment Gateway API.
+ * Provides comprehensive API documentation with security schemes, examples, and server configurations.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Configuration
+<span class="fc" id="L29">public class OpenApiConfig {</span>
+
+    @Value(&quot;${app.version:1.0.0}&quot;)
+    private String appVersion;
+
+    @Value(&quot;${server.port:8080}&quot;)
+    private String serverPort;
+
+    @Value(&quot;${server.servlet.context-path:/api/v1}&quot;)
+    private String contextPath;
+
+    @Bean
+    public OpenAPI paymentGatewayOpenAPI() {
+<span class="fc" id="L42">        return new OpenAPI()</span>
+<span class="fc" id="L43">            .info(createApiInfo())</span>
+<span class="fc" id="L44">            .externalDocs(createExternalDocumentation())</span>
+<span class="fc" id="L45">            .servers(createServers())</span>
+<span class="fc" id="L46">            .tags(createTags())</span>
+<span class="fc" id="L47">            .components(createComponents())</span>
+<span class="fc" id="L48">            .addSecurityItem(new SecurityRequirement().addList(&quot;Bearer Authentication&quot;));</span>
+    }
+
+    @Bean
+    public GroupedOpenApi publicApi() {
+<span class="fc" id="L53">        return GroupedOpenApi.builder()</span>
+<span class="fc" id="L54">                .group(&quot;payment-gateway-api&quot;)</span>
+<span class="fc" id="L55">                .pathsToMatch(&quot;/api/v1/**&quot;)</span>
+<span class="fc" id="L56">                .build();</span>
+    }
+
+    private Info createApiInfo() {
+<span class="fc" id="L60">        return new Info()</span>
+<span class="fc" id="L61">            .title(&quot;Payment Gateway API&quot;)</span>
+<span class="fc" id="L62">            .description(&quot;&quot;&quot;</span>
+                # Payment Gateway Integration Platform
+                
+                A comprehensive payment processing API with Authorize.Net integration, designed for enterprise-grade 
+                payment processing solutions.
+                
+                ## Features
+                - **Secure Payment Processing**: Full PCI DSS compliant payment processing
+                - **Multiple Payment Types**: Support for credit cards, ACH, and digital wallets
+                - **Real-time Processing**: Instant authorization and capture capabilities
+                - **Subscription Management**: Recurring billing and subscription handling
+                - **Webhook Support**: Real-time event notifications
+                - **Analytics &amp; Reporting**: Comprehensive transaction analytics
+                - **Rate Limiting**: Built-in protection against abuse
+                - **Idempotency**: Safe retry mechanisms for reliable processing
+                
+                ## Authentication
+                All API endpoints require Bearer token authentication. Obtain your access token using the 
+                `/auth/login` endpoint.
+                
+                ## Error Handling
+                The API uses standard HTTP status codes and returns detailed error information in a 
+                consistent format with correlation IDs for tracking.
+                
+                ## Rate Limiting
+                API requests are rate limited to prevent abuse. Current limits:
+                - 1000 requests per hour per API key
+                - Burst capacity of 100 requests
+                
+                ## Idempotency
+                All mutation operations support idempotency using the `Idempotency-Key` header to safely 
+                retry requests.
+                
+                ## Versioning
+                This API uses URL path versioning (v1). Breaking changes will be introduced in new versions.
+                &quot;&quot;&quot;)
+<span class="fc" id="L98">            .version(appVersion)</span>
+<span class="fc" id="L99">            .contact(new Contact()</span>
+<span class="fc" id="L100">                .name(&quot;Payment Gateway Team&quot;)</span>
+<span class="fc" id="L101">                .email(&quot;support@talentica.com&quot;)</span>
+<span class="fc" id="L102">                .url(&quot;https://talentica.com/support&quot;))</span>
+<span class="fc" id="L103">            .license(new License()</span>
+<span class="fc" id="L104">                .name(&quot;API License&quot;)</span>
+<span class="fc" id="L105">                .url(&quot;https://talentica.com/api-license&quot;))</span>
+<span class="fc" id="L106">            .termsOfService(&quot;https://talentica.com/terms&quot;);</span>
+    }
+
+    private ExternalDocumentation createExternalDocumentation() {
+<span class="fc" id="L110">        return new ExternalDocumentation()</span>
+<span class="fc" id="L111">            .description(&quot;Payment Gateway Documentation&quot;)</span>
+<span class="fc" id="L112">            .url(&quot;https://docs.talentica.com/payment-gateway&quot;);</span>
+    }
+
+    private List&lt;Server&gt; createServers() {
+<span class="fc" id="L116">        return Arrays.asList(</span>
+            new Server()
+<span class="fc" id="L118">                .url(&quot;http://localhost:&quot; + serverPort + contextPath)</span>
+<span class="fc" id="L119">                .description(&quot;Local Development Server&quot;),</span>
+            new Server()
+<span class="fc" id="L121">                .url(&quot;https://api-staging.talentica.com/v1&quot;)</span>
+<span class="fc" id="L122">                .description(&quot;Staging Environment&quot;),</span>
+            new Server()
+<span class="fc" id="L124">                .url(&quot;https://api.talentica.com/v1&quot;)</span>
+<span class="fc" id="L125">                .description(&quot;Production Environment&quot;),</span>
+            new Server()
+<span class="fc" id="L127">                .url(&quot;https://sandbox.talentica.com/v1&quot;)</span>
+<span class="fc" id="L128">                .description(&quot;Sandbox Environment for Testing&quot;)</span>
+        );
+    }
+
+    private List&lt;Tag&gt; createTags() {
+<span class="fc" id="L133">        return Arrays.asList(</span>
+            new Tag()
+<span class="fc" id="L135">                .name(&quot;Authentication&quot;)</span>
+<span class="fc" id="L136">                .description(&quot;User authentication and token management operations&quot;),</span>
+            new Tag()
+<span class="fc" id="L138">                .name(&quot;Payment Processing&quot;)</span>
+<span class="fc" id="L139">                .description(&quot;Core payment processing operations including purchase, authorize, capture, void, and refund&quot;),</span>
+            new Tag()
+<span class="fc" id="L141">                .name(&quot;Subscriptions&quot;)</span>
+<span class="fc" id="L142">                .description(&quot;Recurring billing and subscription management&quot;),</span>
+            new Tag()
+<span class="fc" id="L144">                .name(&quot;Subscription Plans&quot;)</span>
+<span class="fc" id="L145">                .description(&quot;Subscription plan configuration and management&quot;),</span>
+            new Tag()
+<span class="fc" id="L147">                .name(&quot;Webhooks&quot;)</span>
+<span class="fc" id="L148">                .description(&quot;Webhook management and event processing&quot;),</span>
+            new Tag()
+<span class="fc" id="L150">                .name(&quot;Analytics&quot;)</span>
+<span class="fc" id="L151">                .description(&quot;Transaction analytics and reporting&quot;),</span>
+            new Tag()
+<span class="fc" id="L153">                .name(&quot;Health&quot;)</span>
+<span class="fc" id="L154">                .description(&quot;Health check and monitoring endpoints&quot;)</span>
+        );
+    }
+
+    private Components createComponents() {
+<span class="fc" id="L159">        return new Components()</span>
+<span class="fc" id="L160">            .addSecuritySchemes(&quot;Bearer Authentication&quot;, createSecurityScheme())</span>
+<span class="fc" id="L161">            .addSchemas(&quot;Error&quot;, createErrorSchema())</span>
+<span class="fc" id="L162">            .addSchemas(&quot;PaginationMeta&quot;, createPaginationSchema());</span>
+    }
+
+    private SecurityScheme createSecurityScheme() {
+<span class="fc" id="L166">        return new SecurityScheme()</span>
+<span class="fc" id="L167">            .type(SecurityScheme.Type.HTTP)</span>
+<span class="fc" id="L168">            .scheme(&quot;bearer&quot;)</span>
+<span class="fc" id="L169">            .bearerFormat(&quot;JWT&quot;)</span>
+<span class="fc" id="L170">            .description(&quot;&quot;&quot;</span>
+                JWT Bearer token authentication. 
+                
+                To authenticate:
+                1. Obtain an access token using the `/auth/login` endpoint
+                2. Include the token in the Authorization header: `Authorization: Bearer &lt;token&gt;`
+                
+                Example:
+                ```
+                Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                ```
+                &quot;&quot;&quot;);
+    }
+
+    private io.swagger.v3.oas.models.media.Schema&lt;?&gt; createErrorSchema() {
+<span class="fc" id="L185">        return new io.swagger.v3.oas.models.media.Schema&lt;&gt;()</span>
+<span class="fc" id="L186">            .type(&quot;object&quot;)</span>
+<span class="fc" id="L187">            .description(&quot;Standard error response format&quot;)</span>
+<span class="fc" id="L188">            .addProperty(&quot;error_code&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L189">                .description(&quot;Unique error code for the error type&quot;))</span>
+<span class="fc" id="L190">            .addProperty(&quot;message&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L191">                .description(&quot;Human-readable error message&quot;))</span>
+<span class="fc" id="L192">            .addProperty(&quot;description&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L193">                .description(&quot;Detailed error description&quot;))</span>
+<span class="fc" id="L194">            .addProperty(&quot;category&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L195">                .description(&quot;Error category (VALIDATION_ERROR, PAYMENT_ERROR, etc.)&quot;))</span>
+<span class="fc" id="L196">            .addProperty(&quot;correlation_id&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L197">                .description(&quot;Unique correlation ID for tracking the request&quot;))</span>
+<span class="fc" id="L198">            .addProperty(&quot;timestamp&quot;, new io.swagger.v3.oas.models.media.StringSchema()</span>
+<span class="fc" id="L199">                .format(&quot;date-time&quot;)</span>
+<span class="fc" id="L200">                .description(&quot;Error timestamp&quot;))</span>
+<span class="fc" id="L201">            .addProperty(&quot;details&quot;, new io.swagger.v3.oas.models.media.ArraySchema()</span>
+<span class="fc" id="L202">                .items(new io.swagger.v3.oas.models.media.Schema&lt;&gt;()</span>
+<span class="fc" id="L203">                    .type(&quot;object&quot;)</span>
+<span class="fc" id="L204">                    .addProperty(&quot;field&quot;, new io.swagger.v3.oas.models.media.StringSchema())</span>
+<span class="fc" id="L205">                    .addProperty(&quot;code&quot;, new io.swagger.v3.oas.models.media.StringSchema())</span>
+<span class="fc" id="L206">                    .addProperty(&quot;message&quot;, new io.swagger.v3.oas.models.media.StringSchema()))</span>
+<span class="fc" id="L207">                .description(&quot;Detailed validation errors&quot;));</span>
+    }
+
+    private io.swagger.v3.oas.models.media.Schema&lt;?&gt; createPaginationSchema() {
+<span class="fc" id="L211">        return new io.swagger.v3.oas.models.media.Schema&lt;&gt;()</span>
+<span class="fc" id="L212">            .type(&quot;object&quot;)</span>
+<span class="fc" id="L213">            .description(&quot;Pagination metadata for list responses&quot;)</span>
+<span class="fc" id="L214">            .addProperty(&quot;page&quot;, new io.swagger.v3.oas.models.media.IntegerSchema()</span>
+<span class="fc" id="L215">                .description(&quot;Current page number (0-based)&quot;))</span>
+<span class="fc" id="L216">            .addProperty(&quot;size&quot;, new io.swagger.v3.oas.models.media.IntegerSchema()</span>
+<span class="fc" id="L217">                .description(&quot;Number of items per page&quot;))</span>
+<span class="fc" id="L218">            .addProperty(&quot;total_elements&quot;, new io.swagger.v3.oas.models.media.IntegerSchema()</span>
+<span class="fc" id="L219">                .format(&quot;int64&quot;)</span>
+<span class="fc" id="L220">                .description(&quot;Total number of items&quot;))</span>
+<span class="fc" id="L221">            .addProperty(&quot;total_pages&quot;, new io.swagger.v3.oas.models.media.IntegerSchema()</span>
+<span class="fc" id="L222">                .description(&quot;Total number of pages&quot;))</span>
+<span class="fc" id="L223">            .addProperty(&quot;has_next&quot;, new io.swagger.v3.oas.models.media.BooleanSchema()</span>
+<span class="fc" id="L224">                .description(&quot;Whether there are more pages&quot;))</span>
+<span class="fc" id="L225">            .addProperty(&quot;has_previous&quot;, new io.swagger.v3.oas.models.media.BooleanSchema()</span>
+<span class="fc" id="L226">                .description(&quot;Whether there are previous pages&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

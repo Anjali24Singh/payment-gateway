@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- 
+        OWASP Dependency Check suppressions file.
+        This file contains suppressions for known false positives or accepted vulnerabilities.
+        Each suppression should be documented with a reason and review date.
+    -->
+    
+    <!-- Example suppression for test dependencies -->
+    <suppress>
+        <notes><![CDATA[
+        H2 database is only used for testing and not in production.
+        Vulnerabilities in test dependencies are acceptable.
+        Review date: 2025-01-01
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.h2database/h2@.*$</packageUrl>
+        <cve>CVE-2018-10054</cve>
+    </suppress>
+    
+    <!-- Suppress test container vulnerabilities as they're not production dependencies -->
+    <suppress>
+        <notes><![CDATA[
+        TestContainers is only used for integration testing.
+        Vulnerabilities in test dependencies are acceptable.
+        Review date: 2025-01-01
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.testcontainers/.*@.*$</packageUrl>
+    </suppress>
+    
+    <!-- Add specific suppressions here as needed -->
+    <!-- 
+    <suppress>
+        <notes><![CDATA[
+        Description of why this vulnerability is suppressed.
+        Review date: YYYY-MM-DD
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/group\.id/artifact\-id@.*$</packageUrl>
+        <cve>CVE-YYYY-NNNN</cve>
+    </suppress>
+    -->
+</suppressions>

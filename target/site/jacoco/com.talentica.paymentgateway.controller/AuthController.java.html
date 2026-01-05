@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.AuthenticationRequest;
+import com.talentica.paymentgateway.dto.AuthenticationResponse;
+import com.talentica.paymentgateway.dto.RegistrationRequest;
+import com.talentica.paymentgateway.entity.User;
+import com.talentica.paymentgateway.service.JwtService;
+import com.talentica.paymentgateway.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+/**
+ * Authentication Controller handling login, registration, and token refresh.
+ * Provides JWT-based authentication endpoints for the payment gateway.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L29">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/auth&quot;)
+@Tag(name = &quot;Authentication&quot;, description = &quot;User authentication and token management&quot;)
+public class AuthController {
+
+    private final JwtService jwtService;
+    private final UserService userService;
+
+<span class="fc" id="L38">    public AuthController(JwtService jwtService, UserService userService) {</span>
+<span class="fc" id="L39">        this.jwtService = jwtService;</span>
+<span class="fc" id="L40">        this.userService = userService;</span>
+<span class="fc" id="L41">    }</span>
+
+    /**
+     * User login endpoint.
+     * 
+     * @param request Authentication request containing email and password
+     * @return Authentication response with JWT tokens
+     */
+    @PostMapping(&quot;/login&quot;)
+    @Operation(summary = &quot;User login&quot;, description = &quot;Authenticate user and return JWT tokens&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Login successful&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Invalid credentials&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request format&quot;)
+    })
+    public ResponseEntity&lt;?&gt; login(@Valid @RequestBody AuthenticationRequest request) {
+        try {
+<span class="fc" id="L58">            log.info(&quot;=== LOGIN ATTEMPT START ===&quot;);</span>
+<span class="fc" id="L59">            log.info(&quot;Login attempt for email: {}&quot;, request.getEmail());</span>
+<span class="fc" id="L60">            log.debug(&quot;Request details - Email: {}, Password length: {}&quot;, </span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                        request.getEmail(), request.getPassword() != null ? request.getPassword().length() : 0);</span>
+
+            // Validate user credentials using UserService
+<span class="fc" id="L64">            log.debug(&quot;Step 1: Validating user credentials...&quot;);</span>
+<span class="fc" id="L65">            boolean credentialsValid = userService.validateCredentials(request.getEmail(), request.getPassword());</span>
+<span class="fc" id="L66">            log.info(&quot;Credentials validation result: {}&quot;, credentialsValid);</span>
+            
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (!credentialsValid) {</span>
+<span class="fc" id="L69">                log.warn(&quot;Invalid login attempt for email: {}&quot;, request.getEmail());</span>
+<span class="fc" id="L70">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="fc" id="L71">                    .body(Map.of(&quot;error&quot;, &quot;Invalid credentials&quot;));</span>
+            }
+
+            // Get user from database
+<span class="fc" id="L75">            log.debug(&quot;Step 2: Fetching user from database...&quot;);</span>
+<span class="fc" id="L76">            Optional&lt;User&gt; userOpt = userService.findByEmail(request.getEmail());</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (userOpt.isEmpty()) {</span>
+<span class="nc" id="L78">                log.error(&quot;User not found after successful credential validation for email: {}&quot;, request.getEmail());</span>
+<span class="nc" id="L79">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="nc" id="L80">                    .body(Map.of(&quot;error&quot;, &quot;Invalid credentials&quot;));</span>
+            }
+
+<span class="fc" id="L83">            User user = userOpt.get();</span>
+<span class="fc" id="L84">            log.info(&quot;Found user: ID={}, Email={}, Active={}&quot;, user.getId(), user.getEmail(), user.getIsActive());</span>
+
+            // Create user details for JWT
+<span class="fc" id="L87">            log.debug(&quot;Step 3: Loading UserDetails for JWT generation...&quot;);</span>
+<span class="fc" id="L88">            UserDetails userDetails = userService.loadUserByUsername(user.getEmail());</span>
+<span class="fc" id="L89">            log.debug(&quot;UserDetails loaded successfully for: {}&quot;, userDetails.getUsername());</span>
+
+            // Generate tokens
+<span class="fc" id="L92">            log.debug(&quot;Step 4: Generating JWT tokens...&quot;);</span>
+<span class="fc" id="L93">            String accessToken = jwtService.generateAccessToken(userDetails);</span>
+<span class="fc" id="L94">            String refreshToken = jwtService.generateRefreshToken(userDetails);</span>
+<span class="fc" id="L95">            log.debug(&quot;JWT tokens generated successfully&quot;);</span>
+
+            // Update last login timestamp
+<span class="fc" id="L98">            log.debug(&quot;Step 5: Updating last login timestamp...&quot;);</span>
+<span class="fc" id="L99">            userService.updateLastLogin(user.getId());</span>
+
+            // Determine user roles based on email (simple role assignment)
+<span class="fc" id="L102">            log.debug(&quot;Step 6: Determining user roles...&quot;);</span>
+<span class="fc" id="L103">            String[] roles = getUserRoles(user.getEmail());</span>
+<span class="fc" id="L104">            log.debug(&quot;User roles assigned: {}&quot;, java.util.Arrays.toString(roles));</span>
+
+            // Prepare response
+<span class="fc" id="L107">            log.debug(&quot;Step 7: Preparing authentication response...&quot;);</span>
+<span class="fc" id="L108">            AuthenticationResponse response = new AuthenticationResponse(</span>
+                    accessToken,
+                    refreshToken,
+                    &quot;Bearer&quot;,
+                    86400000L, // 24 hours in milliseconds
+<span class="fc" id="L113">                    user.getId().toString(),</span>
+<span class="fc" id="L114">                    user.getEmail(),</span>
+                    roles
+            );
+
+<span class="fc" id="L118">            log.info(&quot;=== LOGIN SUCCESS === User: {}&quot;, request.getEmail());</span>
+<span class="fc" id="L119">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L121">        } catch (Exception e) {</span>
+<span class="nc" id="L122">            log.error(&quot;=== LOGIN ERROR === Email: {}, Error: {}&quot;, request.getEmail(), e.getMessage(), e);</span>
+<span class="nc" id="L123">            log.error(&quot;Full stack trace:&quot;, e);</span>
+<span class="nc" id="L124">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)</span>
+<span class="nc" id="L125">                    .body(Map.of(&quot;error&quot;, &quot;Authentication failed&quot;, &quot;details&quot;, e.getMessage()));</span>
+        }
+    }
+
+    /**
+     */
+    private String[] getUserRoles(String email) {
+<span class="fc" id="L132">        String emailLower = email.toLowerCase();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (emailLower.startsWith(&quot;admin&quot;)) {</span>
+<span class="nc" id="L134">            return new String[]{&quot;ROLE_ADMIN&quot;, &quot;ROLE_USER&quot;};</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        } else if (emailLower.startsWith(&quot;manager&quot;)) {</span>
+<span class="nc" id="L136">            return new String[]{&quot;ROLE_MANAGER&quot;, &quot;ROLE_USER&quot;};</span>
+        } else {
+<span class="fc" id="L138">            return new String[]{&quot;ROLE_USER&quot;};</span>
+        }
+    }
+
+    /**
+     * User registration endpoint.
+     * 
+     * @param request Registration request containing user details
+     * @return Registration response with user information
+     */
+    @PostMapping(&quot;/register&quot;)
+    @Operation(summary = &quot;User registration&quot;, description = &quot;Register a new user account&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Registration successful&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;User already exists&quot;),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request format&quot;)
+    })
+    public ResponseEntity&lt;?&gt; register(@Valid @RequestBody RegistrationRequest request) {
+        try {
+<span class="fc" id="L157">            log.info(&quot;Registration attempt for email: {}&quot;, request.getEmail());</span>
+
+            // Register user using UserService
+<span class="fc" id="L160">            User user = userService.registerUser(request);</span>
+
+            // Create user details for JWT generation
+<span class="fc" id="L163">            UserDetails userDetails = userService.loadUserByUsername(user.getEmail());</span>
+
+            // Generate tokens
+<span class="fc" id="L166">            String accessToken = jwtService.generateAccessToken(userDetails);</span>
+<span class="fc" id="L167">            String refreshToken = jwtService.generateRefreshToken(userDetails);</span>
+
+            // Determine user roles based on email
+<span class="fc" id="L170">            String[] roles = getUserRoles(user.getEmail());</span>
+
+            // Prepare response
+<span class="fc" id="L173">            AuthenticationResponse response = new AuthenticationResponse(</span>
+                    accessToken,
+                    refreshToken,
+                    &quot;Bearer&quot;,
+                    86400000L, // 24 hours in milliseconds
+<span class="fc" id="L178">                    user.getId().toString(),</span>
+<span class="fc" id="L179">                    user.getEmail(),</span>
+                    roles
+            );
+
+<span class="fc" id="L183">            log.info(&quot;Successful registration for user: {}&quot;, request.getEmail());</span>
+<span class="fc" id="L184">            return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+
+<span class="nc" id="L186">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L187">            log.warn(&quot;Registration attempt for existing user: {}&quot;, request.getEmail());</span>
+<span class="nc" id="L188">            return ResponseEntity.status(HttpStatus.CONFLICT)</span>
+<span class="nc" id="L189">                    .body(Map.of(&quot;error&quot;, e.getMessage()));</span>
+<span class="nc" id="L190">        } catch (Exception e) {</span>
+<span class="nc" id="L191">            log.error(&quot;Error during registration for email {}: {}&quot;, request.getEmail(), e.getMessage(), e);</span>
+<span class="nc" id="L192">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)</span>
+<span class="nc" id="L193">                    .body(Map.of(&quot;error&quot;, &quot;Registration failed&quot;));</span>
+        }
+    }
+
+    /**
+     * Token refresh endpoint.
+     * 
+     * @param refreshToken Refresh token
+     * @return New access token
+     */
+    @PostMapping(&quot;/refresh&quot;)
+    @Operation(summary = &quot;Refresh access token&quot;, description = &quot;Generate new access token using refresh token&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Token refreshed successfully&quot;),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Invalid refresh token&quot;)
+    })
+    public ResponseEntity&lt;?&gt; refresh(@RequestBody Map&lt;String, String&gt; request) {
+        try {
+<span class="fc" id="L211">            String refreshToken = request.get(&quot;refresh_token&quot;);</span>
+            
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">            if (refreshToken == null || refreshToken.trim().isEmpty()) {</span>
+<span class="nc" id="L214">                return ResponseEntity.status(HttpStatus.BAD_REQUEST)</span>
+<span class="nc" id="L215">                        .body(Map.of(&quot;error&quot;, &quot;Refresh token is required&quot;));</span>
+            }
+
+            // Validate refresh token
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (!jwtService.isRefreshToken(refreshToken)) {</span>
+<span class="nc" id="L220">                log.warn(&quot;Invalid token type provided for refresh&quot;);</span>
+<span class="nc" id="L221">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="nc" id="L222">                        .body(Map.of(&quot;error&quot;, &quot;Invalid refresh token&quot;));</span>
+            }
+
+<span class="fc" id="L225">            String username = jwtService.extractUsername(refreshToken);</span>
+<span class="fc" id="L226">            Optional&lt;User&gt; userOpt = userService.findByEmail(username.toLowerCase());</span>
+            
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (userOpt.isEmpty()) {</span>
+<span class="nc" id="L229">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="nc" id="L230">                        .body(Map.of(&quot;error&quot;, &quot;User not found&quot;));</span>
+            }
+
+            // Create user details using UserService
+<span class="fc" id="L234">            UserDetails userDetails = userService.loadUserByUsername(username);</span>
+
+            // Validate refresh token
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (!jwtService.isTokenValid(refreshToken, userDetails)) {</span>
+<span class="nc" id="L238">                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="nc" id="L239">                        .body(Map.of(&quot;error&quot;, &quot;Invalid refresh token&quot;));</span>
+            }
+
+            // Generate new access token
+<span class="fc" id="L243">            String accessToken = jwtService.generateAccessToken(userDetails);</span>
+
+<span class="fc" id="L245">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L246">            response.put(&quot;access_token&quot;, accessToken);</span>
+<span class="fc" id="L247">            response.put(&quot;token_type&quot;, &quot;Bearer&quot;);</span>
+<span class="fc" id="L248">            response.put(&quot;expires_in&quot;, 86400000L);</span>
+
+<span class="fc" id="L250">            log.info(&quot;Token refreshed for user: {}&quot;, username);</span>
+<span class="fc" id="L251">            return ResponseEntity.ok(response);</span>
+
+<span class="nc" id="L253">        } catch (Exception e) {</span>
+<span class="nc" id="L254">            log.error(&quot;Error during token refresh: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L255">            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)</span>
+<span class="nc" id="L256">                    .body(Map.of(&quot;error&quot;, &quot;Token refresh failed&quot;));</span>
+        }
+    }
+
+    /**
+     * Get current user information.
+     * 
+     * @return Current user details
+     */
+    @GetMapping(&quot;/me&quot;)
+    @Operation(summary = &quot;Get current user&quot;, description = &quot;Get authenticated user information&quot;)
+    public ResponseEntity&lt;?&gt; getCurrentUser() {
+        // This endpoint requires authentication - implementation depends on security context
+<span class="nc" id="L269">        return ResponseEntity.ok(Map.of(&quot;message&quot;, &quot;User profile endpoint - requires authentication&quot;));</span>
+    }
+
+    /**
+     * User logout endpoint.
+     * 
+     * @return Logout confirmation
+     */
+    @PostMapping(&quot;/logout&quot;)
+    @Operation(summary = &quot;User logout&quot;, description = &quot;Invalidate user session&quot;)
+    public ResponseEntity&lt;?&gt; logout() {
+        // In a stateless JWT system, logout is typically handled client-side
+        // Here you could add token to blacklist if needed
+<span class="nc" id="L282">        return ResponseEntity.ok(Map.of(&quot;message&quot;, &quot;Logged out successfully&quot;));</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

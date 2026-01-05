@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UpdateSubscriptionRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">UpdateSubscriptionRequest.java</span></div><h1>UpdateSubscriptionRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
+
+import java.time.ZonedDateTime;
+import java.util.Map;
+
+/**
+ * Request DTO for updating an existing subscription.
+ * Supports plan changes, payment method updates, and metadata modifications.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Request to update an existing subscription&quot;)
+public class UpdateSubscriptionRequest {
+
+    @Size(max = 100, message = &quot;Plan code must not exceed 100 characters&quot;)
+    @Schema(description = &quot;New plan code for subscription upgrade/downgrade&quot;, example = &quot;premium_yearly&quot;)
+    @JsonProperty(&quot;planCode&quot;)
+    private String planCode;
+
+    @Size(max = 100, message = &quot;Payment method ID must not exceed 100 characters&quot;)
+    @Schema(description = &quot;New payment method identifier&quot;, example = &quot;pm_67890&quot;)
+    @JsonProperty(&quot;paymentMethodId&quot;)
+    private String paymentMethodId;
+
+    @Schema(description = &quot;New billing cycle anchor date&quot;, example = &quot;2024-02-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;billingCycleAnchor&quot;)
+    private ZonedDateTime billingCycleAnchor;
+
+<span class="fc" id="L34">    @Schema(description = &quot;Whether to prorate plan changes&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;prorated&quot;)
+<span class="fc" id="L36">    private Boolean prorated = true;</span>
+
+<span class="fc" id="L38">    @Schema(description = &quot;When to apply the plan change&quot;, example = &quot;IMMEDIATE&quot;, </span>
+            allowableValues = {&quot;IMMEDIATE&quot;, &quot;END_OF_PERIOD&quot;})
+    @JsonProperty(&quot;changeOption&quot;)
+    private String changeOption = &quot;IMMEDIATE&quot;;
+
+    @Schema(description = &quot;Additional metadata for the subscription&quot;)
+    @JsonProperty(&quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata;
+
+    @Schema(description = &quot;Reason for the subscription change&quot;, example = &quot;Customer upgrade to premium plan&quot;)
+    @JsonProperty(&quot;changeReason&quot;)
+    private String changeReason;
+
+<span class="fc" id="L51">    @Schema(description = &quot;Whether to send notification about the change&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;notifyCustomer&quot;)
+<span class="fc" id="L53">    private Boolean notifyCustomer = true;</span>
+
+    // Default constructor
+<span class="fc" id="L56">    public UpdateSubscriptionRequest() {</span>
+<span class="fc" id="L57">    }</span>
+
+    // Getters and Setters
+    public String getPlanCode() {
+<span class="fc" id="L61">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L65">        this.planCode = planCode;</span>
+<span class="fc" id="L66">    }</span>
+
+    public String getPaymentMethodId() {
+<span class="fc" id="L69">        return paymentMethodId;</span>
+    }
+
+    public void setPaymentMethodId(String paymentMethodId) {
+<span class="fc" id="L73">        this.paymentMethodId = paymentMethodId;</span>
+<span class="fc" id="L74">    }</span>
+
+    public ZonedDateTime getBillingCycleAnchor() {
+<span class="fc" id="L77">        return billingCycleAnchor;</span>
+    }
+
+    public void setBillingCycleAnchor(ZonedDateTime billingCycleAnchor) {
+<span class="fc" id="L81">        this.billingCycleAnchor = billingCycleAnchor;</span>
+<span class="fc" id="L82">    }</span>
+
+    public Boolean getProrated() {
+<span class="fc" id="L85">        return prorated;</span>
+    }
+
+    public void setProrated(Boolean prorated) {
+<span class="fc" id="L89">        this.prorated = prorated;</span>
+<span class="fc" id="L90">    }</span>
+
+    public String getChangeOption() {
+<span class="fc" id="L93">        return changeOption;</span>
+    }
+
+    public void setChangeOption(String changeOption) {
+<span class="fc" id="L97">        this.changeOption = changeOption;</span>
+<span class="fc" id="L98">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L101">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L105">        this.metadata = metadata;</span>
+<span class="fc" id="L106">    }</span>
+
+    public String getChangeReason() {
+<span class="fc" id="L109">        return changeReason;</span>
+    }
+
+    public void setChangeReason(String changeReason) {
+<span class="fc" id="L113">        this.changeReason = changeReason;</span>
+<span class="fc" id="L114">    }</span>
+
+    public Boolean getNotifyCustomer() {
+<span class="fc" id="L117">        return notifyCustomer;</span>
+    }
+
+    public void setNotifyCustomer(Boolean notifyCustomer) {
+<span class="fc" id="L121">        this.notifyCustomer = notifyCustomer;</span>
+<span class="fc" id="L122">    }</span>
+
+    public boolean hasChanges() {
+<span class="nc bnc" id="L125" title="All 8 branches missed.">        return planCode != null || paymentMethodId != null || billingCycleAnchor != null || </span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">               (metadata != null &amp;&amp; !metadata.isEmpty());</span>
+    }
+
+    public boolean isPlanChange() {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        return planCode != null;</span>
+    }
+
+    public boolean isPaymentMethodChange() {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        return paymentMethodId != null;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L139">        return &quot;UpdateSubscriptionRequest{&quot; +</span>
+                &quot;planCode='&quot; + planCode + '\'' +
+                &quot;, paymentMethodId='&quot; + paymentMethodId + '\'' +
+                &quot;, billingCycleAnchor=&quot; + billingCycleAnchor +
+                &quot;, prorated=&quot; + prorated +
+                &quot;, changeOption='&quot; + changeOption + '\'' +
+                &quot;, changeReason='&quot; + changeReason + '\'' +
+                &quot;, notifyCustomer=&quot; + notifyCustomer +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

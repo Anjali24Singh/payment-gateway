@@ -1,0 +1,157 @@
+# Sandbox Environment Configuration
+# Extends base configuration with sandbox-specific settings
+
+spring:
+  profiles:
+    active: sandbox
+  
+  # Database Configuration for Sandbox
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payment_gateway_sandbox
+    username: ${DB_USERNAME:your_sandbox_db_user}
+    password: ${DB_PASSWORD:your_sandbox_db_password}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+      
+  # Redis Configuration for Sandbox
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 1 # Use different database for sandbox
+      
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: create-drop # Reset schema on restart for sandbox
+    show-sql: true
+
+# Application Configuration
+app:
+  # Sandbox-specific configuration
+  sandbox:
+    enabled: true
+    mock-payments: true
+    generate-test-data: true
+    default-api-key: ${SANDBOX_API_KEY:your_sandbox_api_key}
+    test-cards:
+      success-card: "4111111111111111"
+      decline-card: "4000000000000002"
+      error-card: "4000000000000119"
+      expired-card: "4000000000000069"
+      cvv-fail-card: "4000000000000127"
+    mock-responses:
+      delay-ms: 500
+      failure-rate: 0.05 # 5% failure rate for testing
+      random-failures: true
+      
+  # Payment Configuration for Sandbox
+  payment:
+    timeout: 10000 # Shorter timeout for sandbox
+    retry:
+      max-attempts: 2
+      delay: 500
+  
+  # Authorize.Net Configuration (moved to app level)
+  authorize-net:
+    environment: SANDBOX
+    api-login-id: ${AUTHORIZE_NET_API_LOGIN_ID:YOUR_SANDBOX_API_LOGIN_ID}
+    transaction-key: ${AUTHORIZE_NET_TRANSACTION_KEY:YOUR_SANDBOX_TRANSACTION_KEY}
+    base-url: https://apitest.authorize.net/xml/v1/request.api
+    timeout: 30000
+    retry-attempts: 3
+    retry-delay: 1000
+      
+  # JWT Configuration with longer expiration for development
+  jwt:
+    secret: ${JWT_SECRET:YOUR_JWT_SECRET_KEY_256_BITS_LONG}
+    expiration: 604800000 # 7 days for development convenience
+    refresh-expiration: 2592000000 # 30 days
+    
+  # Rate Limiting - More lenient for sandbox
+  rate-limit:
+    enabled: true
+    default-limit: 5000 # Higher limit for testing
+    burst-limit: 500
+
+# Logging Configuration for Sandbox
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
+# OpenAPI Documentation Configuration for Sandbox
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+    display-request-duration: true
+  info:
+    title: Payment Gateway API - Sandbox
+    description: |
+      # Payment Gateway API - Sandbox Environment
+      
+      This is the sandbox environment for the Payment Gateway API, designed for testing and development.
+      
+      ## Sandbox Features
+      - **Test Data Generation**: Automatically generate test transactions
+      - **Mock Payment Processing**: Simulate different payment scenarios
+      - **Test Credit Cards**: Use predefined test card numbers for different outcomes
+      - **No Real Charges**: All transactions are simulated
+      - **Extended Logging**: Detailed logging for debugging
+      
+      ## Test Credit Cards
+      - **Success**: 4111111111111111 (Visa)
+      - **Decline**: 4000000000000002 (Insufficient funds)
+      - **Error**: 4000000000000119 (Processing error)
+      - **Expired**: 4000000000000069 (Expired card)
+      - **CVV Fail**: 4000000000000127 (CVV verification failure)
+      
+      ## Authentication
+      Use the following test credentials:
+      - **Email**: admin@paymentgateway.com
+      - **Password**: Admin123!
+      
+      ## API Rate Limits
+      - 5,000 requests per hour
+      - Burst capacity: 500 requests
+      
+      ## Sandbox Utilities
+      Visit `/api/v1/sandbox/info` for sandbox-specific utilities and test data generation.
+    version: 1.0.0-sandbox
+    contact:
+      name: Payment Gateway Development Team
+      email: dev-support@talentica.com
+  servers:
+    - url: http://localhost:8080/api/v1
+      description: Local Sandbox Server
+    - url: https://sandbox.talentica.com/v1
+      description: Hosted Sandbox Environment
+
+# Management/Actuator Configuration for Sandbox
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # Expose all endpoints in sandbox
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    env:
+      show-values: always # Show environment values in sandbox
+  security:
+    enabled: false # Disable security for actuator endpoints in sandbox

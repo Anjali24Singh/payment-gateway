@@ -1,0 +1,705 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetricsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">MetricsService.java</span></div><h1>MetricsService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.entity.PaymentStatus;
+import com.talentica.paymentgateway.entity.TransactionType;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Metrics Service for Payment Gateway Operations.
+ * 
+ * Provides comprehensive metrics collection for payment processing, system health,
+ * and operational insights. Tracks payment volumes, success rates, error rates,
+ * and performance metrics using Micrometer.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L28">@Slf4j</span>
+@Service
+public class MetricsService {
+
+    private final MeterRegistry meterRegistry;
+
+    // Payment operation counters
+    private final Counter paymentRequestsTotal;
+    private final Counter paymentSuccessTotal;
+    private final Counter paymentFailuresTotal;
+    private final Counter paymentErrorsTotal;
+    
+    // Transaction type counters
+    private final Counter purchaseTransactions;
+    private final Counter authorizeTransactions;
+    private final Counter captureTransactions;
+    private final Counter voidTransactions;
+    private final Counter refundTransactions;
+    
+    // Security and authentication counters
+    private final Counter authenticationAttemptsTotal;
+    private final Counter authenticationSuccessTotal;
+    private final Counter authenticationFailuresTotal;
+    private final Counter rateLimitExceededTotal;
+    private final Counter apiKeyUsageTotal;
+    
+    // System health counters
+    private final Counter databaseConnectionErrors;
+    private final Counter redisConnectionErrors;
+    private final Counter authorizeNetErrors;
+    
+    // Payment processing timers
+    private final Timer paymentProcessingDuration;
+    private final Timer authorizationDuration;
+    private final Timer captureDuration;
+    private final Timer refundDuration;
+    
+    // Database operation timers
+    private final Timer databaseQueryDuration;
+    private final Timer redisOperationDuration;
+    
+    // Real-time gauges
+<span class="fc" id="L70">    private final AtomicInteger activePaymentProcessing = new AtomicInteger(0);</span>
+<span class="fc" id="L71">    private final AtomicLong totalPaymentVolume = new AtomicLong(0);</span>
+<span class="fc" id="L72">    private final AtomicInteger databaseConnectionsActive = new AtomicInteger(0);</span>
+<span class="fc" id="L73">    private final ConcurrentHashMap&lt;String, AtomicInteger&gt; paymentMethodCounts = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L75">    public MetricsService(MeterRegistry meterRegistry) {</span>
+<span class="fc" id="L76">        this.meterRegistry = meterRegistry;</span>
+        
+        // Initialize payment operation counters
+<span class="fc" id="L79">        this.paymentRequestsTotal = Counter.builder(&quot;payment.requests.total&quot;)</span>
+<span class="fc" id="L80">                .description(&quot;Total number of payment requests&quot;)</span>
+<span class="fc" id="L81">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L83">        this.paymentSuccessTotal = Counter.builder(&quot;payment.success.total&quot;)</span>
+<span class="fc" id="L84">                .description(&quot;Total number of successful payments&quot;)</span>
+<span class="fc" id="L85">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L87">        this.paymentFailuresTotal = Counter.builder(&quot;payment.failures.total&quot;)</span>
+<span class="fc" id="L88">                .description(&quot;Total number of failed payments&quot;)</span>
+<span class="fc" id="L89">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L91">        this.paymentErrorsTotal = Counter.builder(&quot;payment.errors.total&quot;)</span>
+<span class="fc" id="L92">                .description(&quot;Total number of payment processing errors&quot;)</span>
+<span class="fc" id="L93">                .register(meterRegistry);</span>
+        
+        // Initialize transaction type counters
+<span class="fc" id="L96">        this.purchaseTransactions = Counter.builder(&quot;payment.transactions.total&quot;)</span>
+<span class="fc" id="L97">                .tag(&quot;type&quot;, &quot;purchase&quot;)</span>
+<span class="fc" id="L98">                .description(&quot;Total purchase transactions&quot;)</span>
+<span class="fc" id="L99">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L101">        this.authorizeTransactions = Counter.builder(&quot;payment.transactions.total&quot;)</span>
+<span class="fc" id="L102">                .tag(&quot;type&quot;, &quot;authorize&quot;)</span>
+<span class="fc" id="L103">                .description(&quot;Total authorize transactions&quot;)</span>
+<span class="fc" id="L104">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L106">        this.captureTransactions = Counter.builder(&quot;payment.transactions.total&quot;)</span>
+<span class="fc" id="L107">                .tag(&quot;type&quot;, &quot;capture&quot;)</span>
+<span class="fc" id="L108">                .description(&quot;Total capture transactions&quot;)</span>
+<span class="fc" id="L109">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L111">        this.voidTransactions = Counter.builder(&quot;payment.transactions.total&quot;)</span>
+<span class="fc" id="L112">                .tag(&quot;type&quot;, &quot;void&quot;)</span>
+<span class="fc" id="L113">                .description(&quot;Total void transactions&quot;)</span>
+<span class="fc" id="L114">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L116">        this.refundTransactions = Counter.builder(&quot;payment.transactions.total&quot;)</span>
+<span class="fc" id="L117">                .tag(&quot;type&quot;, &quot;refund&quot;)</span>
+<span class="fc" id="L118">                .description(&quot;Total refund transactions&quot;)</span>
+<span class="fc" id="L119">                .register(meterRegistry);</span>
+        
+        // Initialize security counters
+<span class="fc" id="L122">        this.authenticationAttemptsTotal = Counter.builder(&quot;auth.attempts.total&quot;)</span>
+<span class="fc" id="L123">                .description(&quot;Total authentication attempts&quot;)</span>
+<span class="fc" id="L124">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L126">        this.authenticationSuccessTotal = Counter.builder(&quot;auth.success.total&quot;)</span>
+<span class="fc" id="L127">                .description(&quot;Total successful authentications&quot;)</span>
+<span class="fc" id="L128">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L130">        this.authenticationFailuresTotal = Counter.builder(&quot;auth.failures.total&quot;)</span>
+<span class="fc" id="L131">                .description(&quot;Total failed authentications&quot;)</span>
+<span class="fc" id="L132">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L134">        this.rateLimitExceededTotal = Counter.builder(&quot;rate.limit.exceeded.total&quot;)</span>
+<span class="fc" id="L135">                .description(&quot;Total rate limit exceeded events&quot;)</span>
+<span class="fc" id="L136">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L138">        this.apiKeyUsageTotal = Counter.builder(&quot;api.key.usage.total&quot;)</span>
+<span class="fc" id="L139">                .description(&quot;Total API key usage&quot;)</span>
+<span class="fc" id="L140">                .register(meterRegistry);</span>
+        
+        // Initialize system health counters
+<span class="fc" id="L143">        this.databaseConnectionErrors = Counter.builder(&quot;database.connection.errors.total&quot;)</span>
+<span class="fc" id="L144">                .description(&quot;Total database connection errors&quot;)</span>
+<span class="fc" id="L145">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L147">        this.redisConnectionErrors = Counter.builder(&quot;redis.connection.errors.total&quot;)</span>
+<span class="fc" id="L148">                .description(&quot;Total Redis connection errors&quot;)</span>
+<span class="fc" id="L149">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L151">        this.authorizeNetErrors = Counter.builder(&quot;authorize.net.errors.total&quot;)</span>
+<span class="fc" id="L152">                .description(&quot;Total Authorize.Net API errors&quot;)</span>
+<span class="fc" id="L153">                .register(meterRegistry);</span>
+        
+        // Initialize timers
+<span class="fc" id="L156">        this.paymentProcessingDuration = Timer.builder(&quot;payment.processing.duration&quot;)</span>
+<span class="fc" id="L157">                .description(&quot;Payment processing duration&quot;)</span>
+<span class="fc" id="L158">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L160">        this.authorizationDuration = Timer.builder(&quot;payment.authorization.duration&quot;)</span>
+<span class="fc" id="L161">                .description(&quot;Payment authorization duration&quot;)</span>
+<span class="fc" id="L162">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L164">        this.captureDuration = Timer.builder(&quot;payment.capture.duration&quot;)</span>
+<span class="fc" id="L165">                .description(&quot;Payment capture duration&quot;)</span>
+<span class="fc" id="L166">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L168">        this.refundDuration = Timer.builder(&quot;payment.refund.duration&quot;)</span>
+<span class="fc" id="L169">                .description(&quot;Payment refund duration&quot;)</span>
+<span class="fc" id="L170">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L172">        this.databaseQueryDuration = Timer.builder(&quot;database.query.duration&quot;)</span>
+<span class="fc" id="L173">                .description(&quot;Database query duration&quot;)</span>
+<span class="fc" id="L174">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L176">        this.redisOperationDuration = Timer.builder(&quot;redis.operation.duration&quot;)</span>
+<span class="fc" id="L177">                .description(&quot;Redis operation duration&quot;)</span>
+<span class="fc" id="L178">                .register(meterRegistry);</span>
+        
+        // Initialize gauges
+<span class="fc" id="L181">        Gauge.builder(&quot;payment.processing.active&quot;, activePaymentProcessing, AtomicInteger::doubleValue)</span>
+<span class="fc" id="L182">                .description(&quot;Number of payment processing operations currently active&quot;)</span>
+<span class="fc" id="L183">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L185">        Gauge.builder(&quot;payment.volume.total&quot;, totalPaymentVolume, AtomicLong::doubleValue)</span>
+<span class="fc" id="L186">                .description(&quot;Total payment volume in cents&quot;)</span>
+<span class="fc" id="L187">                .register(meterRegistry);</span>
+                
+<span class="fc" id="L189">        Gauge.builder(&quot;database.connections.active&quot;, databaseConnectionsActive, AtomicInteger::doubleValue)</span>
+<span class="fc" id="L190">                .description(&quot;Number of active database connections&quot;)</span>
+<span class="fc" id="L191">                .register(meterRegistry);</span>
+<span class="fc" id="L192">    }</span>
+
+    // Payment metrics methods
+    
+    /**
+     * Record a payment request.
+     */
+    public void recordPaymentRequest() {
+<span class="fc" id="L200">        paymentRequestsTotal.increment();</span>
+<span class="fc" id="L201">        activePaymentProcessing.incrementAndGet();</span>
+<span class="fc" id="L202">    }</span>
+
+    /**
+     * Record a payment completion.
+     * 
+     * @param status Payment status
+     * @param amount Payment amount in cents
+     * @param duration Processing duration
+     */
+public void recordPaymentCompletion(PaymentStatus status, BigDecimal amount, Duration duration) {
+<span class="fc" id="L212">        activePaymentProcessing.decrementAndGet();</span>
+        
+<span class="pc bpc" id="L214" title="2 of 6 branches missed.">        if (status == PaymentStatus.SETTLED || status == PaymentStatus.CAPTURED || status == PaymentStatus.AUTHORIZED) {</span>
+<span class="fc" id="L215">            paymentSuccessTotal.increment();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (amount != null) {</span>
+<span class="fc" id="L217">                totalPaymentVolume.addAndGet(amount.longValue());</span>
+            }
+        } else {
+<span class="fc" id="L220">            paymentFailuresTotal.increment();</span>
+        }
+        
+<span class="fc" id="L223">        paymentProcessingDuration.record(duration);</span>
+<span class="fc" id="L224">    }</span>
+
+    /**
+     * Record a transaction by type.
+     * 
+     * @param transactionType Type of transaction
+     * @param duration Processing duration
+     */
+    public void recordTransaction(TransactionType transactionType, Duration duration) {
+<span class="pc bpc" id="L233" title="5 of 7 branches missed.">        switch (transactionType) {</span>
+            case PURCHASE -&gt; {
+<span class="fc" id="L235">                purchaseTransactions.increment();</span>
+<span class="fc" id="L236">                paymentProcessingDuration.record(duration);</span>
+<span class="fc" id="L237">            }</span>
+            case AUTHORIZE -&gt; {
+<span class="nc" id="L239">                authorizeTransactions.increment();</span>
+<span class="nc" id="L240">                authorizationDuration.record(duration);</span>
+<span class="nc" id="L241">            }</span>
+            case CAPTURE -&gt; {
+<span class="nc" id="L243">                captureTransactions.increment();</span>
+<span class="nc" id="L244">                captureDuration.record(duration);</span>
+<span class="nc" id="L245">            }</span>
+<span class="nc" id="L246">            case VOID -&gt; voidTransactions.increment();</span>
+            case REFUND -&gt; {
+<span class="fc" id="L248">                refundTransactions.increment();</span>
+<span class="fc" id="L249">                refundDuration.record(duration);</span>
+<span class="fc" id="L250">            }</span>
+            case PARTIAL_REFUND -&gt; {
+<span class="nc" id="L252">                refundTransactions.increment();</span>
+<span class="nc" id="L253">                refundDuration.record(duration);</span>
+            }
+        }
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Record analytics request.
+     * 
+     * @param requestType Type of analytics request
+     */
+    public void recordAnalyticsRequest(String requestType) {
+<span class="fc" id="L264">        Counter analyticsRequestCounter = Counter.builder(&quot;analytics.requests.total&quot;)</span>
+<span class="fc" id="L265">                .tag(&quot;type&quot;, requestType)</span>
+<span class="fc" id="L266">                .description(&quot;Total analytics requests by type&quot;)</span>
+<span class="fc" id="L267">                .register(meterRegistry);</span>
+<span class="fc" id="L268">        analyticsRequestCounter.increment();</span>
+<span class="fc" id="L269">    }</span>
+
+    /**
+     * Record payment method usage.
+     * 
+     * @param paymentMethod Payment method type
+     */
+    public void recordPaymentMethodUsage(String paymentMethod) {
+<span class="fc" id="L277">        paymentMethodCounts.computeIfAbsent(paymentMethod, k -&gt; {</span>
+<span class="fc" id="L278">            AtomicInteger counter = new AtomicInteger(0);</span>
+<span class="fc" id="L279">            Gauge.builder(&quot;payment.method.usage&quot;, counter, AtomicInteger::doubleValue)</span>
+<span class="fc" id="L280">                    .tag(&quot;method&quot;, k)</span>
+<span class="fc" id="L281">                    .description(&quot;Payment method usage count&quot;)</span>
+<span class="fc" id="L282">                    .register(meterRegistry);</span>
+<span class="fc" id="L283">            return counter;</span>
+<span class="fc" id="L284">        }).incrementAndGet();</span>
+<span class="fc" id="L285">    }</span>
+
+    /**
+     * Record a payment processing error.
+     * 
+     * @param errorType Type of error
+     * @param errorCode Error code
+     */
+    public void recordPaymentError(String errorType, String errorCode) {
+<span class="fc" id="L294">        paymentErrorsTotal.increment();</span>
+<span class="fc" id="L295">        activePaymentProcessing.decrementAndGet();</span>
+        
+<span class="fc" id="L297">        Counter.builder(&quot;payment.errors.by.type&quot;)</span>
+<span class="fc" id="L298">                .tag(&quot;error.type&quot;, errorType)</span>
+<span class="fc" id="L299">                .tag(&quot;error.code&quot;, errorCode)</span>
+<span class="fc" id="L300">                .description(&quot;Payment errors by type and code&quot;)</span>
+<span class="fc" id="L301">                .register(meterRegistry)</span>
+<span class="fc" id="L302">                .increment();</span>
+<span class="fc" id="L303">    }</span>
+
+    // Authentication metrics methods
+    
+    /**
+     * Record an authentication attempt.
+     * 
+     * @param method Authentication method (jwt, api_key)
+     */
+    public void recordAuthenticationAttempt(String method) {
+<span class="fc" id="L313">        authenticationAttemptsTotal.increment();</span>
+        
+<span class="fc" id="L315">        Counter.builder(&quot;auth.attempts.by.method&quot;)</span>
+<span class="fc" id="L316">                .tag(&quot;method&quot;, method)</span>
+<span class="fc" id="L317">                .description(&quot;Authentication attempts by method&quot;)</span>
+<span class="fc" id="L318">                .register(meterRegistry)</span>
+<span class="fc" id="L319">                .increment();</span>
+<span class="fc" id="L320">    }</span>
+
+    /**
+     * Record authentication success.
+     * 
+     * @param method Authentication method
+     */
+    public void recordAuthenticationSuccess(String method) {
+<span class="fc" id="L328">        authenticationSuccessTotal.increment();</span>
+        
+<span class="fc" id="L330">        Counter.builder(&quot;auth.success.by.method&quot;)</span>
+<span class="fc" id="L331">                .tag(&quot;method&quot;, method)</span>
+<span class="fc" id="L332">                .description(&quot;Successful authentications by method&quot;)</span>
+<span class="fc" id="L333">                .register(meterRegistry)</span>
+<span class="fc" id="L334">                .increment();</span>
+<span class="fc" id="L335">    }</span>
+
+    /**
+     * Record authentication failure.
+     * 
+     * @param method Authentication method
+     * @param reason Failure reason
+     */
+    public void recordAuthenticationFailure(String method, String reason) {
+<span class="fc" id="L344">        authenticationFailuresTotal.increment();</span>
+        
+<span class="fc" id="L346">        Counter.builder(&quot;auth.failures.by.method&quot;)</span>
+<span class="fc" id="L347">                .tag(&quot;method&quot;, method)</span>
+<span class="fc" id="L348">                .tag(&quot;reason&quot;, reason)</span>
+<span class="fc" id="L349">                .description(&quot;Failed authentications by method and reason&quot;)</span>
+<span class="fc" id="L350">                .register(meterRegistry)</span>
+<span class="fc" id="L351">                .increment();</span>
+<span class="fc" id="L352">    }</span>
+
+    /**
+     * Record rate limit exceeded event.
+     * 
+     * @param identifier Rate limit identifier
+     */
+    public void recordRateLimitExceeded(String identifier) {
+<span class="fc" id="L360">        rateLimitExceededTotal.increment();</span>
+        
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        String identifierType = identifier.startsWith(&quot;api:&quot;) ? &quot;api_key&quot; : </span>
+<span class="pc bnc" id="L363" title="All 2 branches missed.">                               identifier.startsWith(&quot;user:&quot;) ? &quot;user&quot; : &quot;ip&quot;;</span>
+        
+<span class="fc" id="L365">        Counter.builder(&quot;rate.limit.exceeded.by.type&quot;)</span>
+<span class="fc" id="L366">                .tag(&quot;type&quot;, identifierType)</span>
+<span class="fc" id="L367">                .description(&quot;Rate limit exceeded by identifier type&quot;)</span>
+<span class="fc" id="L368">                .register(meterRegistry)</span>
+<span class="fc" id="L369">                .increment();</span>
+<span class="fc" id="L370">    }</span>
+
+    /**
+     * Record API key usage.
+     * 
+     * @param apiKeyId API key identifier
+     */
+    public void recordApiKeyUsage(String apiKeyId) {
+<span class="fc" id="L378">        apiKeyUsageTotal.increment();</span>
+        
+<span class="fc" id="L380">        Counter.builder(&quot;api.key.usage.by.key&quot;)</span>
+<span class="fc" id="L381">                .tag(&quot;key_id&quot;, apiKeyId)</span>
+<span class="fc" id="L382">                .description(&quot;API key usage by key ID&quot;)</span>
+<span class="fc" id="L383">                .register(meterRegistry)</span>
+<span class="fc" id="L384">                .increment();</span>
+<span class="fc" id="L385">    }</span>
+
+    // System health metrics methods
+    
+    /**
+     * Record database operation.
+     * 
+     * @param operation Operation type
+     * @param duration Operation duration
+     */
+    public void recordDatabaseOperation(String operation, Duration duration) {
+<span class="fc" id="L396">        Timer.builder(&quot;database.operation.duration&quot;)</span>
+<span class="fc" id="L397">                .tag(&quot;operation&quot;, operation)</span>
+<span class="fc" id="L398">                .description(&quot;Database operation duration by type&quot;)</span>
+<span class="fc" id="L399">                .register(meterRegistry)</span>
+<span class="fc" id="L400">                .record(duration);</span>
+        
+<span class="fc" id="L402">        databaseQueryDuration.record(duration);</span>
+<span class="fc" id="L403">    }</span>
+
+    /**
+     * Record database connection error.
+     */
+    public void recordDatabaseConnectionError() {
+<span class="fc" id="L409">        databaseConnectionErrors.increment();</span>
+<span class="fc" id="L410">    }</span>
+
+    /**
+     * Record Redis operation.
+     * 
+     * @param operation Operation type
+     * @param duration Operation duration
+     */
+    public void recordRedisOperation(String operation, Duration duration) {
+<span class="fc" id="L419">        Timer.builder(&quot;redis.operation.duration&quot;)</span>
+<span class="fc" id="L420">                .tag(&quot;operation&quot;, operation)</span>
+<span class="fc" id="L421">                .description(&quot;Redis operation duration by type&quot;)</span>
+<span class="fc" id="L422">                .register(meterRegistry)</span>
+<span class="fc" id="L423">                .record(duration);</span>
+        
+<span class="fc" id="L425">        redisOperationDuration.record(duration);</span>
+<span class="fc" id="L426">    }</span>
+
+    /**
+     * Record Redis connection error.
+     */
+    public void recordRedisConnectionError() {
+<span class="fc" id="L432">        redisConnectionErrors.increment();</span>
+<span class="fc" id="L433">    }</span>
+
+    /**
+     * Record Authorize.Net API error.
+     * 
+     * @param errorCode Error code from Authorize.Net
+     */
+    public void recordAuthorizeNetError(String errorCode) {
+<span class="fc" id="L441">        authorizeNetErrors.increment();</span>
+        
+<span class="fc" id="L443">        Counter.builder(&quot;authorize.net.errors.by.code&quot;)</span>
+<span class="fc" id="L444">                .tag(&quot;error.code&quot;, errorCode)</span>
+<span class="fc" id="L445">                .description(&quot;Authorize.Net errors by error code&quot;)</span>
+<span class="fc" id="L446">                .register(meterRegistry)</span>
+<span class="fc" id="L447">                .increment();</span>
+<span class="fc" id="L448">    }</span>
+
+    /**
+     * Update active database connections count.
+     * 
+     * @param count Current active connections
+     */
+    public void updateActiveDatabaseConnections(int count) {
+<span class="fc" id="L456">        databaseConnectionsActive.set(count);</span>
+<span class="fc" id="L457">    }</span>
+
+    /**
+     * Get current payment processing statistics.
+     * 
+     * @return Processing statistics
+     */
+    public PaymentStats getPaymentStats() {
+<span class="fc" id="L465">        return new PaymentStats(</span>
+<span class="fc" id="L466">                (long) paymentRequestsTotal.count(),</span>
+<span class="fc" id="L467">                (long) paymentSuccessTotal.count(),</span>
+<span class="fc" id="L468">                (long) paymentFailuresTotal.count(),</span>
+<span class="fc" id="L469">                activePaymentProcessing.get(),</span>
+<span class="fc" id="L470">                totalPaymentVolume.get()</span>
+        );
+    }
+
+    /**
+     * Payment statistics data class.
+     */
+<span class="fc" id="L477">    public record PaymentStats(</span>
+            long totalRequests,
+            long totalSuccess,
+            long totalFailures,
+            int activeProcessing,
+            long totalVolume
+    ) {}
+
+    // Webhook metrics methods
+    
+    /**
+     * Record webhook received.
+     * 
+     * @param eventType Webhook event type
+     */
+    public void incrementWebhookReceived(String eventType) {
+<span class="fc" id="L493">        Counter.builder(&quot;webhook.received.total&quot;)</span>
+<span class="fc" id="L494">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L495">                .description(&quot;Total webhooks received by event type&quot;)</span>
+<span class="fc" id="L496">                .register(meterRegistry)</span>
+<span class="fc" id="L497">                .increment();</span>
+<span class="fc" id="L498">    }</span>
+
+    /**
+     * Record webhook processed.
+     * 
+     * @param eventType Webhook event type
+     * @param status Processing status
+     */
+    public void incrementWebhookProcessed(String eventType, String status) {
+<span class="fc" id="L507">        Counter.builder(&quot;webhook.processed.total&quot;)</span>
+<span class="fc" id="L508">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L509">                .tag(&quot;status&quot;, status)</span>
+<span class="fc" id="L510">                .description(&quot;Total webhooks processed by event type and status&quot;)</span>
+<span class="fc" id="L511">                .register(meterRegistry)</span>
+<span class="fc" id="L512">                .increment();</span>
+<span class="fc" id="L513">    }</span>
+
+    /**
+     * Record webhook signature failure.
+     */
+    public void incrementWebhookSignatureFailure() {
+<span class="nc" id="L519">        Counter.builder(&quot;webhook.signature.failures.total&quot;)</span>
+<span class="nc" id="L520">                .description(&quot;Total webhook signature verification failures&quot;)</span>
+<span class="nc" id="L521">                .register(meterRegistry)</span>
+<span class="nc" id="L522">                .increment();</span>
+<span class="nc" id="L523">    }</span>
+
+    /**
+     * Record webhook duplicate.
+     * 
+     * @param eventType Webhook event type
+     */
+    public void incrementWebhookDuplicate(String eventType) {
+<span class="nc" id="L531">        Counter.builder(&quot;webhook.duplicates.total&quot;)</span>
+<span class="nc" id="L532">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="nc" id="L533">                .description(&quot;Total duplicate webhooks by event type&quot;)</span>
+<span class="nc" id="L534">                .register(meterRegistry)</span>
+<span class="nc" id="L535">                .increment();</span>
+<span class="nc" id="L536">    }</span>
+
+    /**
+     * Record webhook processing time.
+     * 
+     * @param eventType Webhook event type
+     * @param processingTimeMs Processing time in milliseconds
+     */
+    public void recordWebhookProcessingTime(String eventType, long processingTimeMs) {
+<span class="fc" id="L545">        Timer.builder(&quot;webhook.processing.duration&quot;)</span>
+<span class="fc" id="L546">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L547">                .description(&quot;Webhook processing duration by event type&quot;)</span>
+<span class="fc" id="L548">                .register(meterRegistry)</span>
+<span class="fc" id="L549">                .record(Duration.ofMillis(processingTimeMs));</span>
+<span class="fc" id="L550">    }</span>
+
+    /**
+     * Record webhook delivery success.
+     * 
+     * @param eventType Webhook event type
+     * @param attempts Number of attempts required
+     */
+    public void incrementWebhookDeliverySuccess(String eventType, int attempts) {
+<span class="fc" id="L559">        Counter.builder(&quot;webhook.delivery.success.total&quot;)</span>
+<span class="fc" id="L560">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L561">                .description(&quot;Total successful webhook deliveries&quot;)</span>
+<span class="fc" id="L562">                .register(meterRegistry)</span>
+<span class="fc" id="L563">                .increment();</span>
+
+<span class="fc" id="L565">        Timer.builder(&quot;webhook.delivery.attempts&quot;)</span>
+<span class="fc" id="L566">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L567">                .tag(&quot;result&quot;, &quot;success&quot;)</span>
+<span class="fc" id="L568">                .description(&quot;Number of attempts for webhook delivery&quot;)</span>
+<span class="fc" id="L569">                .register(meterRegistry)</span>
+<span class="fc" id="L570">                .record(attempts, java.util.concurrent.TimeUnit.SECONDS);</span>
+<span class="fc" id="L571">    }</span>
+
+    /**
+     * Record webhook delivery failure.
+     * 
+     * @param eventType Webhook event type
+     * @param attempts Number of attempts
+     * @param failureType Type of failure
+     */
+    public void incrementWebhookDeliveryFailure(String eventType, int attempts, String failureType) {
+<span class="fc" id="L581">        Counter.builder(&quot;webhook.delivery.failures.total&quot;)</span>
+<span class="fc" id="L582">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L583">                .tag(&quot;failure_type&quot;, failureType)</span>
+<span class="fc" id="L584">                .description(&quot;Total failed webhook deliveries&quot;)</span>
+<span class="fc" id="L585">                .register(meterRegistry)</span>
+<span class="fc" id="L586">                .increment();</span>
+
+<span class="fc" id="L588">        Timer.builder(&quot;webhook.delivery.attempts&quot;)</span>
+<span class="fc" id="L589">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="fc" id="L590">                .tag(&quot;result&quot;, &quot;failure&quot;)</span>
+<span class="fc" id="L591">                .description(&quot;Number of attempts for webhook delivery&quot;)</span>
+<span class="fc" id="L592">                .register(meterRegistry)</span>
+<span class="fc" id="L593">                .record(attempts, java.util.concurrent.TimeUnit.SECONDS);</span>
+<span class="fc" id="L594">    }</span>
+
+    /**
+     * Record webhook max attempts reached.
+     * 
+     * @param eventType Webhook event type
+     */
+    public void incrementWebhookMaxAttemptsReached(String eventType) {
+<span class="nc" id="L602">        Counter.builder(&quot;webhook.max.attempts.reached.total&quot;)</span>
+<span class="nc" id="L603">                .tag(&quot;event_type&quot;, eventType)</span>
+<span class="nc" id="L604">                .description(&quot;Total webhooks that reached max retry attempts&quot;)</span>
+<span class="nc" id="L605">                .register(meterRegistry)</span>
+<span class="nc" id="L606">                .increment();</span>
+<span class="nc" id="L607">    }</span>
+
+    /**
+     * Record webhook cleanup.
+     * 
+     * @param cleanedCount Number of webhooks cleaned up
+     */
+    public void incrementWebhookCleanup(int cleanedCount) {
+<span class="nc" id="L615">        Counter.builder(&quot;webhook.cleanup.total&quot;)</span>
+<span class="nc" id="L616">                .description(&quot;Total webhooks cleaned up&quot;)</span>
+<span class="nc" id="L617">                .register(meterRegistry)</span>
+<span class="nc" id="L618">                .increment(cleanedCount);</span>
+<span class="nc" id="L619">    }</span>
+
+    // Subscription metrics
+    public void recordSubscriptionCreated(String planCode) {
+<span class="fc" id="L623">        Counter.builder(&quot;subscriptions.created&quot;)</span>
+<span class="fc" id="L624">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="fc" id="L625">                .description(&quot;Subscriptions created&quot;)</span>
+<span class="fc" id="L626">                .register(meterRegistry)</span>
+<span class="fc" id="L627">                .increment();</span>
+<span class="fc" id="L628">    }</span>
+
+    public void recordSubscriptionCancelled(String planCode, String reason) {
+<span class="fc" id="L631">        Counter.builder(&quot;subscriptions.cancelled&quot;)</span>
+<span class="fc" id="L632">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="fc" id="L633">                .tag(&quot;reason&quot;, reason)</span>
+<span class="fc" id="L634">                .description(&quot;Subscriptions cancelled&quot;)</span>
+<span class="fc" id="L635">                .register(meterRegistry)</span>
+<span class="fc" id="L636">                .increment();</span>
+<span class="fc" id="L637">    }</span>
+
+    public void recordPlanChange(String fromPlan, String toPlan) {
+<span class="nc" id="L640">        Counter.builder(&quot;subscriptions.plan_change&quot;)</span>
+<span class="nc" id="L641">                .tag(&quot;from_plan&quot;, fromPlan)</span>
+<span class="nc" id="L642">                .tag(&quot;to_plan&quot;, toPlan)</span>
+<span class="nc" id="L643">                .description(&quot;Subscription plan changes&quot;)</span>
+<span class="nc" id="L644">                .register(meterRegistry)</span>
+<span class="nc" id="L645">                .increment();</span>
+<span class="nc" id="L646">    }</span>
+
+    public void recordPlanCreated(String planCode, java.math.BigDecimal amount) {
+<span class="nc" id="L649">        Counter.builder(&quot;plans.created&quot;)</span>
+<span class="nc" id="L650">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="nc" id="L651">                .description(&quot;Plans created&quot;)</span>
+<span class="nc" id="L652">                .register(meterRegistry)</span>
+<span class="nc" id="L653">                .increment();</span>
+<span class="nc" id="L654">    }</span>
+
+    // Billing metrics
+    public void recordSuccessfulBilling(String planCode, java.math.BigDecimal amount) {
+<span class="fc" id="L658">        Counter.builder(&quot;billing.successful&quot;)</span>
+<span class="fc" id="L659">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="fc" id="L660">                .description(&quot;Successful billing operations&quot;)</span>
+<span class="fc" id="L661">                .register(meterRegistry)</span>
+<span class="fc" id="L662">                .increment();</span>
+        
+<span class="fc" id="L664">        Counter.builder(&quot;billing.revenue&quot;)</span>
+<span class="fc" id="L665">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="fc" id="L666">                .description(&quot;Billing revenue&quot;)</span>
+<span class="fc" id="L667">                .register(meterRegistry)</span>
+<span class="fc" id="L668">                .increment(amount.doubleValue());</span>
+<span class="fc" id="L669">    }</span>
+
+    public void recordFailedBilling(String planCode, java.math.BigDecimal amount) {
+<span class="fc" id="L672">        Counter.builder(&quot;billing.failed&quot;)</span>
+<span class="fc" id="L673">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="fc" id="L674">                .description(&quot;Failed billing operations&quot;)</span>
+<span class="fc" id="L675">                .register(meterRegistry)</span>
+<span class="fc" id="L676">                .increment();</span>
+<span class="fc" id="L677">    }</span>
+
+    public void recordBillingError(String planCode) {
+<span class="nc" id="L680">        Counter.builder(&quot;billing.errors&quot;)</span>
+<span class="nc" id="L681">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="nc" id="L682">                .description(&quot;Billing errors&quot;)</span>
+<span class="nc" id="L683">                .register(meterRegistry)</span>
+<span class="nc" id="L684">                .increment();</span>
+<span class="nc" id="L685">    }</span>
+
+    public void recordPaymentRetry(String planCode, Integer attemptNumber, boolean successful) {
+<span class="nc" id="L688">        Counter.builder(&quot;payment.retry&quot;)</span>
+<span class="nc" id="L689">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="nc" id="L690">                .tag(&quot;attempt&quot;, attemptNumber.toString())</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">                .tag(&quot;successful&quot;, successful ? &quot;true&quot; : &quot;false&quot;)</span>
+<span class="nc" id="L692">                .description(&quot;Payment retry attempts&quot;)</span>
+<span class="nc" id="L693">                .register(meterRegistry)</span>
+<span class="nc" id="L694">                .increment();</span>
+<span class="nc" id="L695">    }</span>
+
+    public void recordSubscriptionCancelledForNonPayment(String planCode) {
+<span class="nc" id="L698">        Counter.builder(&quot;subscriptions.cancelled_nonpayment&quot;)</span>
+<span class="nc" id="L699">                .tag(&quot;plan&quot;, planCode)</span>
+<span class="nc" id="L700">                .description(&quot;Subscriptions cancelled for non-payment&quot;)</span>
+<span class="nc" id="L701">                .register(meterRegistry)</span>
+<span class="nc" id="L702">                .increment();</span>
+<span class="nc" id="L703">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,269 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: payment-gateway-db-backup
+  labels:
+    app: payment-gateway
+    component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: payment-gateway
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: payment-gateway-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            fsGroup: 10001
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Generate timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="payment_gateway_backup_${TIMESTAMP}.sql"
+              
+              echo "Starting database backup: ${BACKUP_FILE}"
+              
+              # Create backup
+              pg_dump \
+                --host=${DB_HOST} \
+                --port=${DB_PORT} \
+                --username=${DB_USERNAME} \
+                --dbname=${DB_NAME} \
+                --no-password \
+                --verbose \
+                --clean \
+                --if-exists \
+                --format=plain \
+                --no-owner \
+                --no-privileges \
+                > /backup/${BACKUP_FILE}
+              
+              # Compress backup
+              gzip /backup/${BACKUP_FILE}
+              
+              echo "Backup completed: ${BACKUP_FILE}.gz"
+              
+              # Upload to cloud storage (AWS S3 example)
+              if [ ! -z "${AWS_S3_BUCKET}" ]; then
+                echo "Uploading backup to S3..."
+                aws s3 cp /backup/${BACKUP_FILE}.gz s3://${AWS_S3_BUCKET}/database-backups/
+                echo "Backup uploaded to S3"
+              fi
+              
+              # Cleanup old local backups (keep last 7 days)
+              find /backup -name "payment_gateway_backup_*.sql.gz" -mtime +7 -delete
+              
+              echo "Backup process completed successfully"
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: password
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: database
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: username
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: s3-bucket
+                  optional: true
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: payment-gateway-backup
+---
+# Weekly full backup with retention
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: payment-gateway-db-weekly-backup
+  labels:
+    app: payment-gateway
+    component: backup
+spec:
+  schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: payment-gateway
+            component: backup
+            backup-type: weekly
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: payment-gateway-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            fsGroup: 10001
+          containers:
+          - name: postgres-weekly-backup
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Generate timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="payment_gateway_weekly_backup_${TIMESTAMP}.sql"
+              
+              echo "Starting weekly database backup: ${BACKUP_FILE}"
+              
+              # Create full backup with additional metadata
+              pg_dump \
+                --host=${DB_HOST} \
+                --port=${DB_PORT} \
+                --username=${DB_USERNAME} \
+                --dbname=${DB_NAME} \
+                --no-password \
+                --verbose \
+                --clean \
+                --if-exists \
+                --format=custom \
+                --compress=9 \
+                --no-owner \
+                --no-privileges \
+                --file=/backup/${BACKUP_FILE}.backup
+              
+              echo "Weekly backup completed: ${BACKUP_FILE}.backup"
+              
+              # Upload to cloud storage with weekly retention
+              if [ ! -z "${AWS_S3_BUCKET}" ]; then
+                echo "Uploading weekly backup to S3..."
+                aws s3 cp /backup/${BACKUP_FILE}.backup s3://${AWS_S3_BUCKET}/database-backups/weekly/
+                echo "Weekly backup uploaded to S3"
+              fi
+              
+              # Cleanup old weekly backups (keep last 12 weeks)
+              find /backup -name "payment_gateway_weekly_backup_*.backup" -mtime +84 -delete
+              
+              echo "Weekly backup process completed successfully"
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: password
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: database
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-db
+                  key: username
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: s3-bucket
+                  optional: true
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gateway-backup
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "200m"
+              limits:
+                memory: "512Mi"
+                cpu: "400m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: payment-gateway-backup

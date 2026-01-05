@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.repository</a> &gt; <span class="el_source">CustomerRepository.java</span></div><h1>CustomerRepository.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.repository;
+
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Repository interface for Customer entity.
+ * Provides data access methods for customer management and queries.
+ */
+@Repository
+public interface CustomerRepository extends JpaRepository&lt;Customer, UUID&gt; {
+
+    /**
+     * Find customer by email (case-insensitive).
+     */
+    Optional&lt;Customer&gt; findByEmailIgnoreCase(String email);
+
+    /**
+     * Find customer by customer reference.
+     */
+    Optional&lt;Customer&gt; findByCustomerReference(String customerReference);
+
+    /**
+     * Find customer by customer ID (alias for customer reference).
+     */
+    default Optional&lt;Customer&gt; findByCustomerId(String customerId) {
+<span class="nc" id="L38">        return findByCustomerReference(customerId);</span>
+    }
+
+    /**
+     * Check if customer exists by email.
+     */
+    boolean existsByEmailIgnoreCase(String email);
+
+    /**
+     * Check if customer reference exists.
+     */
+    boolean existsByCustomerReference(String customerReference);
+
+    /**
+     * Find all active customers.
+     */
+    List&lt;Customer&gt; findByIsActiveTrue();
+
+    /**
+     * Find customers by user.
+     */
+    List&lt;Customer&gt; findByUser(User user);
+
+    /**
+     * Find customers by user ID.
+     */
+    List&lt;Customer&gt; findByUserId(UUID userId);
+
+    /**
+     * Find customers by partial name or email match.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE &quot; +
+           &quot;LOWER(c.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.company) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.customerReference) LIKE LOWER(CONCAT('%', :searchTerm, '%'))&quot;)
+    List&lt;Customer&gt; findBySearchTerm(@Param(&quot;searchTerm&quot;) String searchTerm);
+
+    /**
+     * Find customers with filters and pagination.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE &quot; +
+           &quot;(:searchTerm IS NULL OR &quot; +
+           &quot;LOWER(c.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.company) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR &quot; +
+           &quot;LOWER(c.customerReference) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND &quot; +
+           &quot;(:isActive IS NULL OR c.isActive = :isActive) AND &quot; +
+           &quot;(:userId IS NULL OR c.user.id = :userId)&quot;)
+    Page&lt;Customer&gt; findCustomersWithFilters(@Param(&quot;searchTerm&quot;) String searchTerm,
+                                          @Param(&quot;isActive&quot;) Boolean isActive,
+                                          @Param(&quot;userId&quot;) UUID userId,
+                                          Pageable pageable);
+
+    /**
+     * Find customers by billing country.
+     */
+    List&lt;Customer&gt; findByBillingCountry(String country);
+
+    /**
+     * Find customers by shipping country.
+     */
+    List&lt;Customer&gt; findByShippingCountry(String country);
+
+    /**
+     * Find customers with complete billing address.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE &quot; +
+           &quot;c.billingAddressLine1 IS NOT NULL AND &quot; +
+           &quot;c.billingCity IS NOT NULL AND &quot; +
+           &quot;c.billingState IS NOT NULL AND &quot; +
+           &quot;c.billingPostalCode IS NOT NULL&quot;)
+    List&lt;Customer&gt; findCustomersWithCompleteBillingAddress();
+
+    /**
+     * Find customers with incomplete address information.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE &quot; +
+           &quot;c.billingAddressLine1 IS NULL OR &quot; +
+           &quot;c.billingCity IS NULL OR &quot; +
+           &quot;c.billingState IS NULL OR &quot; +
+           &quot;c.billingPostalCode IS NULL&quot;)
+    List&lt;Customer&gt; findCustomersWithIncompleteBillingAddress();
+
+    /**
+     * Find customers created within a date range.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE c.createdAt BETWEEN :startDate AND :endDate&quot;)
+    List&lt;Customer&gt; findCustomersCreatedBetween(@Param(&quot;startDate&quot;) ZonedDateTime startDate,
+                                             @Param(&quot;endDate&quot;) ZonedDateTime endDate);
+
+    /**
+     * Count active customers.
+     */
+    long countByIsActiveTrue();
+
+    /**
+     * Count customers created today.
+     */
+    @Query(&quot;SELECT COUNT(c) FROM Customer c WHERE &quot; +
+           &quot;DATE_TRUNC('day', c.createdAt) = DATE_TRUNC('day', CURRENT_TIMESTAMP)&quot;)
+    long countCustomersCreatedToday();
+
+    /**
+     * Count customers by billing country.
+     */
+    long countByBillingCountry(String country);
+
+    /**
+     * Find customers with payment methods.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE SIZE(c.paymentMethods) &gt; 0&quot;)
+    List&lt;Customer&gt; findCustomersWithPaymentMethods();
+
+    /**
+     * Find customers without payment methods.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE SIZE(c.paymentMethods) = 0&quot;)
+    List&lt;Customer&gt; findCustomersWithoutPaymentMethods();
+
+    /**
+     * Find customers with active subscriptions.
+     */
+    @Query(&quot;SELECT DISTINCT c FROM Customer c JOIN c.subscriptions s WHERE s.status = 'ACTIVE'&quot;)
+    List&lt;Customer&gt; findCustomersWithActiveSubscriptions();
+
+    /**
+     * Find customers with orders.
+     */
+    @Query(&quot;SELECT c FROM Customer c WHERE SIZE(c.orders) &gt; 0&quot;)
+    List&lt;Customer&gt; findCustomersWithOrders();
+
+    /**
+     * Find top customers by order count.
+     */
+    @Query(&quot;SELECT c FROM Customer c LEFT JOIN c.orders o &quot; +
+           &quot;GROUP BY c.id ORDER BY COUNT(o) DESC&quot;)
+    List&lt;Customer&gt; findTopCustomersByOrderCount(Pageable pageable);
+
+    /**
+     * Find top customers by transaction volume.
+     */
+    @Query(&quot;SELECT c FROM Customer c LEFT JOIN c.transactions t &quot; +
+           &quot;WHERE t.status IN ('CAPTURED', 'SETTLED') &quot; +
+           &quot;GROUP BY c.id ORDER BY COALESCE(SUM(t.amount), 0) DESC&quot;)
+    List&lt;Customer&gt; findTopCustomersByTransactionVolume(Pageable pageable);
+
+    /**
+     * Find customers by phone number.
+     */
+    List&lt;Customer&gt; findByPhoneContaining(String phone);
+
+    /**
+     * Find customers by company name.
+     */
+    List&lt;Customer&gt; findByCompanyContainingIgnoreCase(String company);
+
+    /**
+     * Find customers in a specific city.
+     */
+    List&lt;Customer&gt; findByBillingCityIgnoreCase(String city);
+
+    /**
+     * Find customers in a specific state.
+     */
+    List&lt;Customer&gt; findByBillingStateIgnoreCase(String state);
+
+    /**
+     * Find customers by postal code.
+     */
+    List&lt;Customer&gt; findByBillingPostalCode(String postalCode);
+
+    /**
+     * Update customer active status.
+     */
+    @Query(&quot;UPDATE Customer c SET c.isActive = :isActive WHERE c.id = :customerId&quot;)
+    void updateActiveStatus(@Param(&quot;customerId&quot;) UUID customerId, @Param(&quot;isActive&quot;) Boolean isActive);
+
+    /**
+     * Find customers with transactions in date range.
+     */
+    @Query(&quot;SELECT DISTINCT c FROM Customer c JOIN c.transactions t &quot; +
+           &quot;WHERE t.createdAt BETWEEN :startDate AND :endDate&quot;)
+    List&lt;Customer&gt; findCustomersWithTransactionsBetween(@Param(&quot;startDate&quot;) ZonedDateTime startDate,
+                                                       @Param(&quot;endDate&quot;) ZonedDateTime endDate);
+
+    /**
+     * Find customer by Authorize.Net customer profile ID.
+     */
+    Optional&lt;Customer&gt; findByAuthorizeNetCustomerProfileId(String authorizeNetCustomerProfileId);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

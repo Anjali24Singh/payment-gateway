@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentMethodRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">PaymentMethodRequest.java</span></div><h1>PaymentMethodRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.talentica.paymentgateway.validation.ValidCreditCard;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Payment method request DTO for credit card and token-based payments.
+ * Supports both direct credit card input and tokenized payment methods.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="pc bpc" id="L20" title="101 of 102 branches missed.">@Data</span>
+<span class="pc" id="L21">@Builder</span>
+<span class="fc" id="L22">@NoArgsConstructor</span>
+<span class="fc" id="L23">@AllArgsConstructor</span>
+@Schema(description = &quot;Payment method information for transaction processing&quot;)
+public class PaymentMethodRequest {
+
+    @NotBlank(message = &quot;Payment method type is required&quot;)
+    @Pattern(regexp = &quot;^(CREDIT_CARD|TOKEN|BANK_ACCOUNT)$&quot;, 
+             message = &quot;Payment method type must be CREDIT_CARD, TOKEN, or BANK_ACCOUNT&quot;)
+    @Schema(description = &quot;Payment method type&quot;, example = &quot;CREDIT_CARD&quot;, required = true,
+            allowableValues = {&quot;CREDIT_CARD&quot;, &quot;TOKEN&quot;, &quot;BANK_ACCOUNT&quot;})
+    @JsonProperty(&quot;type&quot;)
+<span class="fc" id="L33">    private String type;</span>
+
+    // Credit Card Fields
+    @ValidCreditCard(message = &quot;Invalid credit card number&quot;)
+    @Schema(description = &quot;Credit card number (for CREDIT_CARD type)&quot;, example = &quot;4111111111111111&quot;)
+    @JsonProperty(&quot;cardNumber&quot;)
+<span class="fc" id="L39">    private String cardNumber;</span>
+
+    @Pattern(regexp = &quot;^(0[1-9]|1[0-2])$&quot;, message = &quot;Expiry month must be between 01 and 12&quot;)
+    @Schema(description = &quot;Credit card expiry month (MM)&quot;, example = &quot;12&quot;)
+    @JsonProperty(&quot;expiryMonth&quot;)
+<span class="fc" id="L44">    private String expiryMonth;</span>
+
+    @Pattern(regexp = &quot;^\\d{4}$&quot;, message = &quot;Expiry year must be a 4-digit year&quot;)
+    @Schema(description = &quot;Credit card expiry year (YYYY)&quot;, example = &quot;2025&quot;)
+    @JsonProperty(&quot;expiryYear&quot;)
+<span class="fc" id="L49">    private String expiryYear;</span>
+
+    @Pattern(regexp = &quot;^\\d{3,4}$&quot;, message = &quot;CVV must be 3 or 4 digits&quot;)
+    @Schema(description = &quot;Credit card CVV/CVC&quot;, example = &quot;123&quot;)
+    @JsonProperty(&quot;cvv&quot;)
+<span class="fc" id="L54">    private String cvv;</span>
+
+    @Size(max = 100, message = &quot;Cardholder name must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Cardholder name&quot;, example = &quot;John Doe&quot;)
+    @JsonProperty(&quot;cardholderName&quot;)
+<span class="fc" id="L59">    private String cardholderName;</span>
+
+    // Token Fields
+    @Size(max = 255, message = &quot;Payment token must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Payment token (for TOKEN type)&quot;, example = &quot;pm_1234567890abcdef&quot;)
+    @JsonProperty(&quot;token&quot;)
+<span class="fc" id="L65">    private String token;</span>
+
+    // Bank Account Fields (for ACH payments)
+    @Size(max = 17, message = &quot;Routing number must not exceed 17 characters&quot;)
+    @Pattern(regexp = &quot;^\\d{9}$&quot;, message = &quot;Routing number must be 9 digits&quot;, 
+             groups = BankAccountValidation.class)
+    @Schema(description = &quot;Bank routing number (for BANK_ACCOUNT type)&quot;, example = &quot;123456789&quot;)
+    @JsonProperty(&quot;routingNumber&quot;)
+<span class="fc" id="L73">    private String routingNumber;</span>
+
+    @Size(max = 20, message = &quot;Account number must not exceed 20 characters&quot;)
+    @Pattern(regexp = &quot;^\\d{4,20}$&quot;, message = &quot;Account number must be 4-20 digits&quot;, 
+             groups = BankAccountValidation.class)
+    @Schema(description = &quot;Bank account number (for BANK_ACCOUNT type)&quot;, example = &quot;1234567890&quot;)
+    @JsonProperty(&quot;accountNumber&quot;)
+<span class="fc" id="L80">    private String accountNumber;</span>
+
+    @Pattern(regexp = &quot;^(CHECKING|SAVINGS|BUSINESS_CHECKING)$&quot;, 
+             message = &quot;Account type must be CHECKING, SAVINGS, or BUSINESS_CHECKING&quot;,
+             groups = BankAccountValidation.class)
+    @Schema(description = &quot;Bank account type (for BANK_ACCOUNT type)&quot;, 
+            allowableValues = {&quot;CHECKING&quot;, &quot;SAVINGS&quot;, &quot;BUSINESS_CHECKING&quot;})
+    @JsonProperty(&quot;accountType&quot;)
+<span class="fc" id="L88">    private String accountType;</span>
+
+    @Size(max = 22, message = &quot;Bank name must not exceed 22 characters&quot;)
+    @Schema(description = &quot;Bank name (for BANK_ACCOUNT type)&quot;, example = &quot;Wells Fargo&quot;)
+    @JsonProperty(&quot;bankName&quot;)
+<span class="fc" id="L93">    private String bankName;</span>
+
+    @Size(max = 50, message = &quot;Account holder name must not exceed 50 characters&quot;)
+    @Schema(description = &quot;Account holder name (for BANK_ACCOUNT type)&quot;, example = &quot;John Doe&quot;)
+    @JsonProperty(&quot;accountHolderName&quot;)
+<span class="fc" id="L98">    private String accountHolderName;</span>
+
+    // Validation interface for bank account fields
+    public interface BankAccountValidation {
+    }
+
+    /**
+     * Masks sensitive payment information for logging.
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L109">        return &quot;PaymentMethodRequest{&quot; +</span>
+                &quot;type='&quot; + type + '\'' +
+<span class="fc" id="L111">                &quot;, cardNumber='&quot; + maskCardNumber(cardNumber) + '\'' +</span>
+                &quot;, expiryMonth='&quot; + expiryMonth + '\'' +
+                &quot;, expiryYear='&quot; + expiryYear + '\'' +
+                &quot;, cardholderName='&quot; + cardholderName + '\'' +
+<span class="fc" id="L115">                &quot;, token='&quot; + maskToken(token) + '\'' +</span>
+<span class="fc" id="L116">                &quot;, routingNumber='&quot; + maskRoutingNumber(routingNumber) + '\'' +</span>
+<span class="fc" id="L117">                &quot;, accountNumber='&quot; + maskAccountNumber(accountNumber) + '\'' +</span>
+                &quot;, accountType='&quot; + accountType + '\'' +
+                &quot;, bankName='&quot; + bankName + '\'' +
+                &quot;, accountHolderName='&quot; + accountHolderName + '\'' +
+                '}';
+    }
+
+    private String maskCardNumber(String cardNumber) {
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (cardNumber == null || cardNumber.length() &lt; 4) {</span>
+<span class="fc" id="L126">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L128">        return &quot;****-****-****-&quot; + cardNumber.substring(cardNumber.length() - 4);</span>
+    }
+
+    private String maskToken(String token) {
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (token == null || token.length() &lt; 8) {</span>
+<span class="fc" id="L133">            return &quot;****&quot;;</span>
+        }
+<span class="nc" id="L135">        return token.substring(0, 4) + &quot;****&quot; + token.substring(token.length() - 4);</span>
+    }
+
+    private String maskRoutingNumber(String routingNumber) {
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (routingNumber == null || routingNumber.length() &lt; 4) {</span>
+<span class="fc" id="L140">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L142">        return &quot;****&quot; + routingNumber.substring(routingNumber.length() - 4);</span>
+    }
+
+    private String maskAccountNumber(String accountNumber) {
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        if (accountNumber == null || accountNumber.length() &lt; 4) {</span>
+<span class="fc" id="L147">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L149">        return &quot;****&quot; + accountNumber.substring(accountNumber.length() - 4);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

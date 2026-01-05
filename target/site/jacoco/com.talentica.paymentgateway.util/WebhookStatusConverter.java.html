@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookStatusConverter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.util</a> &gt; <span class="el_source">WebhookStatusConverter.java</span></div><h1>WebhookStatusConverter.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.util;
+
+import com.talentica.paymentgateway.entity.WebhookStatus;
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
+
+/**
+ * JPA converter for WebhookStatus enum to PostgreSQL webhook_status enum type.
+ * Handles conversion between Java enum and PostgreSQL enum.
+ */
+@Converter(autoApply = true)
+<span class="fc" id="L12">public class WebhookStatusConverter implements AttributeConverter&lt;WebhookStatus, String&gt; {</span>
+
+    @Override
+    public String convertToDatabaseColumn(WebhookStatus attribute) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (attribute == null) {</span>
+<span class="fc" id="L17">            return null;</span>
+        }
+<span class="fc" id="L19">        return attribute.name();</span>
+    }
+
+    @Override
+    public WebhookStatus convertToEntityAttribute(String dbData) {
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (dbData == null || dbData.trim().isEmpty()) {</span>
+<span class="fc" id="L25">            return null;</span>
+        }
+        
+        try {
+<span class="fc" id="L29">            return WebhookStatus.valueOf(dbData.toUpperCase());</span>
+<span class="fc" id="L30">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;Unknown webhook status: &quot; + dbData, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

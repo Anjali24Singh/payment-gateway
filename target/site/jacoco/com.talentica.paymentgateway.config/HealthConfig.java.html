@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config</a> &gt; <span class="el_source">HealthConfig.java</span></div><h1>HealthConfig.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config;
+
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Health Check Configuration for Payment Gateway Dependencies.
+ * 
+ * Provides comprehensive health checks for all critical system dependencies
+ * including database, Redis, and external payment services.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Configuration
+<span class="fc" id="L30">public class HealthConfig {</span>
+
+    /**
+     * Database health indicator.
+     * 
+     * @param dataSource Database data source
+     * @return Database health indicator
+     */
+    @Bean
+    public HealthIndicator databaseHealthIndicator(DataSource dataSource) {
+<span class="fc" id="L40">        return new DatabaseHealthIndicator(dataSource);</span>
+    }
+
+    /**
+     * Redis health indicator.
+     * 
+     * @param redisConnectionFactory Redis connection factory
+     * @param redisTemplate Redis template
+     * @return Redis health indicator
+     */
+    @Bean
+    @ConditionalOnClass(RedisTemplate.class)
+    @ConditionalOnBean({RedisConnectionFactory.class, RedisTemplate.class})
+    public HealthIndicator redisHealthIndicator(
+            RedisConnectionFactory redisConnectionFactory,
+            RedisTemplate&lt;String, Object&gt; redisTemplate) {
+<span class="fc" id="L56">        return new RedisHealthIndicator(redisConnectionFactory, redisTemplate);</span>
+    }
+
+    /**
+     * Authorize.Net health indicator.
+     * 
+     * @param authorizeNetConfig Authorize.Net configuration
+     * @return Authorize.Net health indicator
+     */
+    @Bean
+    public HealthIndicator authorizeNetHealthIndicator(AuthorizeNetConfig authorizeNetConfig) {
+<span class="fc" id="L67">        return new AuthorizeNetHealthIndicator(authorizeNetConfig);</span>
+    }
+
+    /**
+     * Database health indicator implementation.
+     */
+    private static class DatabaseHealthIndicator implements HealthIndicator {
+        
+        private final DataSource dataSource;
+        
+<span class="fc" id="L77">        public DatabaseHealthIndicator(DataSource dataSource) {</span>
+<span class="fc" id="L78">            this.dataSource = dataSource;</span>
+<span class="fc" id="L79">        }</span>
+        
+        @Override
+        public Health health() {
+            try {
+<span class="nc" id="L84">                Instant start = Instant.now();</span>
+                
+<span class="nc" id="L86">                try (Connection connection = dataSource.getConnection()) {</span>
+                    // Test database connectivity and basic query
+<span class="nc" id="L88">                    boolean isValid = connection.isValid(5); // 5 second timeout</span>
+<span class="nc" id="L89">                    Duration responseTime = Duration.between(start, Instant.now());</span>
+                    
+<span class="nc" id="L91">                    Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L92">                    details.put(&quot;database&quot;, connection.getMetaData().getDatabaseProductName());</span>
+<span class="nc" id="L93">                    details.put(&quot;version&quot;, connection.getMetaData().getDatabaseProductVersion());</span>
+<span class="nc" id="L94">                    details.put(&quot;url&quot;, connection.getMetaData().getURL());</span>
+<span class="nc" id="L95">                    details.put(&quot;responseTime&quot;, responseTime.toMillis() + &quot;ms&quot;);</span>
+<span class="nc" id="L96">                    details.put(&quot;validationQuery&quot;, &quot;connection.isValid()&quot;);</span>
+<span class="nc" id="L97">                    details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                    
+<span class="nc bnc" id="L99" title="All 4 branches missed.">                    if (isValid &amp;&amp; responseTime.toMillis() &lt; 5000) {</span>
+<span class="nc" id="L100">                        return Health.up()</span>
+<span class="nc" id="L101">                                .withDetails(details)</span>
+<span class="nc" id="L102">                                .build();</span>
+                    } else {
+<span class="nc" id="L104">                        details.put(&quot;issue&quot;, &quot;Database connection validation failed or slow response&quot;);</span>
+<span class="nc" id="L105">                        return Health.down()</span>
+<span class="nc" id="L106">                                .withDetails(details)</span>
+<span class="nc" id="L107">                                .build();</span>
+                    }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                }</span>
+                
+<span class="nc" id="L111">            } catch (Exception e) {</span>
+<span class="nc" id="L112">                Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L113">                details.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L114">                details.put(&quot;cause&quot;, e.getClass().getSimpleName());</span>
+<span class="nc" id="L115">                details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                
+<span class="nc" id="L117">                return Health.down()</span>
+<span class="nc" id="L118">                        .withException(e)</span>
+<span class="nc" id="L119">                        .withDetails(details)</span>
+<span class="nc" id="L120">                        .build();</span>
+            }
+        }
+    }
+
+    /**
+     * Redis health indicator implementation.
+     */
+    private static class RedisHealthIndicator implements HealthIndicator {
+        
+        private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+        
+        public RedisHealthIndicator(RedisConnectionFactory connectionFactory, 
+<span class="fc" id="L133">                                  RedisTemplate&lt;String, Object&gt; redisTemplate) {</span>
+<span class="fc" id="L134">            this.redisTemplate = redisTemplate;</span>
+<span class="fc" id="L135">        }</span>
+        
+        @Override
+        public Health health() {
+            try {
+<span class="nc" id="L140">                Instant start = Instant.now();</span>
+                
+                // Test Redis connectivity with ping
+<span class="nc" id="L143">                String pingResult = &quot;PONG&quot;; // Simplified ping test</span>
+                try {
+<span class="nc" id="L145">                    redisTemplate.getConnectionFactory().getConnection().ping();</span>
+<span class="nc" id="L146">                } catch (Exception e) {</span>
+<span class="nc" id="L147">                    throw new RuntimeException(&quot;Redis ping failed&quot;, e);</span>
+<span class="nc" id="L148">                }</span>
+                
+<span class="nc" id="L150">                Duration responseTime = Duration.between(start, Instant.now());</span>
+                
+<span class="nc" id="L152">                Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L153">                details.put(&quot;ping&quot;, pingResult);</span>
+<span class="nc" id="L154">                details.put(&quot;responseTime&quot;, responseTime.toMillis() + &quot;ms&quot;);</span>
+<span class="nc" id="L155">                details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                
+                // Test basic operations
+                try {
+<span class="nc" id="L159">                    String testKey = &quot;health:check:&quot; + System.currentTimeMillis();</span>
+<span class="nc" id="L160">                    String testValue = &quot;test&quot;;</span>
+                    
+<span class="nc" id="L162">                    redisTemplate.opsForValue().set(testKey, testValue, Duration.ofSeconds(10));</span>
+<span class="nc" id="L163">                    String retrievedValue = (String) redisTemplate.opsForValue().get(testKey);</span>
+<span class="nc" id="L164">                    redisTemplate.delete(testKey);</span>
+                    
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                    if (testValue.equals(retrievedValue)) {</span>
+<span class="nc" id="L167">                        details.put(&quot;operations&quot;, &quot;read/write test successful&quot;);</span>
+                        
+<span class="nc" id="L169">                        return Health.up()</span>
+<span class="nc" id="L170">                                .withDetails(details)</span>
+<span class="nc" id="L171">                                .build();</span>
+                    } else {
+<span class="nc" id="L173">                        details.put(&quot;issue&quot;, &quot;Redis read/write test failed&quot;);</span>
+<span class="nc" id="L174">                        return Health.down()</span>
+<span class="nc" id="L175">                                .withDetails(details)</span>
+<span class="nc" id="L176">                                .build();</span>
+                    }
+                    
+<span class="nc" id="L179">                } catch (Exception operationException) {</span>
+<span class="nc" id="L180">                    details.put(&quot;operations&quot;, &quot;failed: &quot; + operationException.getMessage());</span>
+<span class="nc" id="L181">                    return Health.down()</span>
+<span class="nc" id="L182">                            .withDetails(details)</span>
+<span class="nc" id="L183">                            .build();</span>
+                }
+                
+<span class="nc" id="L186">            } catch (Exception e) {</span>
+<span class="nc" id="L187">                Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L188">                details.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L189">                details.put(&quot;cause&quot;, e.getClass().getSimpleName());</span>
+<span class="nc" id="L190">                details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                
+<span class="nc" id="L192">                return Health.down()</span>
+<span class="nc" id="L193">                        .withException(e)</span>
+<span class="nc" id="L194">                        .withDetails(details)</span>
+<span class="nc" id="L195">                        .build();</span>
+            }
+        }
+    }
+
+    /**
+     * Authorize.Net health indicator implementation.
+     */
+    private static class AuthorizeNetHealthIndicator implements HealthIndicator {
+        
+        private final AuthorizeNetConfig authorizeNetConfig;
+        
+<span class="fc" id="L207">        public AuthorizeNetHealthIndicator(AuthorizeNetConfig authorizeNetConfig) {</span>
+<span class="fc" id="L208">            this.authorizeNetConfig = authorizeNetConfig;</span>
+<span class="fc" id="L209">        }</span>
+        
+        @Override
+        public Health health() {
+            try {
+<span class="nc" id="L214">                Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+                
+                // Check configuration
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                boolean isConfigured = authorizeNetConfig.getApiLoginId() != null &amp;&amp; </span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                                     !authorizeNetConfig.getApiLoginId().isEmpty() &amp;&amp;</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                                     authorizeNetConfig.getTransactionKey() != null &amp;&amp; </span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                                     !authorizeNetConfig.getTransactionKey().isEmpty();</span>
+                
+<span class="nc" id="L222">                details.put(&quot;configured&quot;, isConfigured);</span>
+<span class="nc" id="L223">                details.put(&quot;environment&quot;, authorizeNetConfig.getEnvironment());</span>
+<span class="nc" id="L224">                details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                if (!isConfigured) {</span>
+<span class="nc" id="L227">                    details.put(&quot;issue&quot;, &quot;Authorize.Net credentials not properly configured&quot;);</span>
+<span class="nc" id="L228">                    return Health.down()</span>
+<span class="nc" id="L229">                            .withDetails(details)</span>
+<span class="nc" id="L230">                            .build();</span>
+                }
+                
+                // In a real implementation, you might want to test connectivity
+                // to Authorize.Net API endpoints, but be careful about rate limits
+                // and authentication requirements
+                
+                // For now, we'll just verify configuration
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                Status status = isConfigured ? Status.UP : Status.DOWN;</span>
+                
+<span class="nc" id="L240">                return Health.status(status)</span>
+<span class="nc" id="L241">                        .withDetails(details)</span>
+<span class="nc" id="L242">                        .build();</span>
+                
+<span class="nc" id="L244">            } catch (Exception e) {</span>
+<span class="nc" id="L245">                Map&lt;String, Object&gt; details = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L246">                details.put(&quot;error&quot;, e.getMessage());</span>
+<span class="nc" id="L247">                details.put(&quot;cause&quot;, e.getClass().getSimpleName());</span>
+<span class="nc" id="L248">                details.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+                
+<span class="nc" id="L250">                return Health.down()</span>
+<span class="nc" id="L251">                        .withException(e)</span>
+<span class="nc" id="L252">                        .withDetails(details)</span>
+<span class="nc" id="L253">                        .build();</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

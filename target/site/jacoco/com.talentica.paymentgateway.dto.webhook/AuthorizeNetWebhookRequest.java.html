@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthorizeNetWebhookRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.webhook</a> &gt; <span class="el_source">AuthorizeNetWebhookRequest.java</span></div><h1>AuthorizeNetWebhookRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.webhook;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.ZonedDateTime;
+import java.util.Map;
+
+/**
+ * DTO for incoming Authorize.Net webhook requests.
+ * Represents the structure of webhook payloads sent by Authorize.Net.
+ * 
+ * Authorize.Net webhook events include:
+ * - net.authorize.payment.authcapture.created
+ * - net.authorize.payment.authorization.created
+ * - net.authorize.payment.capture.created
+ * - net.authorize.payment.refund.created
+ * - net.authorize.payment.void.created
+ * - net.authorize.payment.fraud.approved
+ * - net.authorize.payment.fraud.declined
+ * - net.authorize.payment.fraud.held
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public class AuthorizeNetWebhookRequest {
+    
+    @JsonProperty(&quot;notificationId&quot;)
+    @NotBlank(message = &quot;Notification ID is required&quot;)
+    private String notificationId;
+    
+    @JsonProperty(&quot;eventType&quot;)
+    @NotBlank(message = &quot;Event type is required&quot;)
+    private String eventType;
+    
+    @JsonProperty(&quot;eventDate&quot;)
+    @NotNull(message = &quot;Event date is required&quot;)
+    private ZonedDateTime eventDate;
+    
+    @JsonProperty(&quot;webhookId&quot;)
+    @NotBlank(message = &quot;Webhook ID is required&quot;)
+    private String webhookId;
+    
+    @JsonProperty(&quot;payload&quot;)
+    @NotNull(message = &quot;Payload is required&quot;)
+    private AuthorizeNetPayload payload;
+    
+    // Default constructor
+<span class="fc" id="L50">    public AuthorizeNetWebhookRequest() {}</span>
+    
+    // Parameterized constructor
+    public AuthorizeNetWebhookRequest(String notificationId, String eventType, ZonedDateTime eventDate, 
+<span class="fc" id="L54">                                    String webhookId, AuthorizeNetPayload payload) {</span>
+<span class="fc" id="L55">        this.notificationId = notificationId;</span>
+<span class="fc" id="L56">        this.eventType = eventType;</span>
+<span class="fc" id="L57">        this.eventDate = eventDate;</span>
+<span class="fc" id="L58">        this.webhookId = webhookId;</span>
+<span class="fc" id="L59">        this.payload = payload;</span>
+<span class="fc" id="L60">    }</span>
+    
+    // Getters and Setters
+    public String getNotificationId() {
+<span class="fc" id="L64">        return notificationId;</span>
+    }
+    
+    public void setNotificationId(String notificationId) {
+<span class="fc" id="L68">        this.notificationId = notificationId;</span>
+<span class="fc" id="L69">    }</span>
+    
+    public String getEventType() {
+<span class="fc" id="L72">        return eventType;</span>
+    }
+    
+    public void setEventType(String eventType) {
+<span class="fc" id="L76">        this.eventType = eventType;</span>
+<span class="fc" id="L77">    }</span>
+    
+    public ZonedDateTime getEventDate() {
+<span class="fc" id="L80">        return eventDate;</span>
+    }
+    
+    public void setEventDate(ZonedDateTime eventDate) {
+<span class="fc" id="L84">        this.eventDate = eventDate;</span>
+<span class="fc" id="L85">    }</span>
+    
+    public String getWebhookId() {
+<span class="fc" id="L88">        return webhookId;</span>
+    }
+    
+    public void setWebhookId(String webhookId) {
+<span class="fc" id="L92">        this.webhookId = webhookId;</span>
+<span class="fc" id="L93">    }</span>
+    
+    public AuthorizeNetPayload getPayload() {
+<span class="fc" id="L96">        return payload;</span>
+    }
+    
+    public void setPayload(AuthorizeNetPayload payload) {
+<span class="fc" id="L100">        this.payload = payload;</span>
+<span class="fc" id="L101">    }</span>
+    
+    // Utility methods
+    public boolean isPaymentEvent() {
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">        return eventType != null &amp;&amp; eventType.startsWith(&quot;net.authorize.payment.&quot;);</span>
+    }
+    
+    public boolean isSuccessfulPayment() {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        return isPaymentEvent() &amp;&amp; </span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">               (eventType.contains(&quot;.authcapture.created&quot;) || </span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                eventType.contains(&quot;.authorization.created&quot;) || </span>
+<span class="pc bnc" id="L112" title="All 2 branches missed.">                eventType.contains(&quot;.capture.created&quot;));</span>
+    }
+    
+    public boolean isRefundEvent() {
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        return eventType != null &amp;&amp; eventType.contains(&quot;.refund.created&quot;);</span>
+    }
+    
+    public boolean isVoidEvent() {
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        return eventType != null &amp;&amp; eventType.contains(&quot;.void.created&quot;);</span>
+    }
+    
+    public boolean isFraudEvent() {
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        return eventType != null &amp;&amp; eventType.contains(&quot;.fraud.&quot;);</span>
+    }
+    
+    public String getTransactionId() {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        return payload != null ? payload.getId() : null;</span>
+    }
+    
+    public String getTransactionType() {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (eventType == null) return &quot;UNKNOWN&quot;;</span>
+        
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (eventType.contains(&quot;.authcapture.&quot;)) return &quot;PURCHASE&quot;;</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (eventType.contains(&quot;.authorization.&quot;)) return &quot;AUTHORIZE&quot;;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (eventType.contains(&quot;.capture.&quot;)) return &quot;CAPTURE&quot;;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (eventType.contains(&quot;.refund.&quot;)) return &quot;REFUND&quot;;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (eventType.contains(&quot;.void.&quot;)) return &quot;VOID&quot;;</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (eventType.contains(&quot;.fraud.&quot;)) return &quot;FRAUD_REVIEW&quot;;</span>
+        
+<span class="nc" id="L141">        return &quot;UNKNOWN&quot;;</span>
+    }
+    
+    @Override
+    public String toString() {
+<span class="fc" id="L146">        return &quot;AuthorizeNetWebhookRequest{&quot; +</span>
+               &quot;notificationId='&quot; + notificationId + '\'' +
+               &quot;, eventType='&quot; + eventType + '\'' +
+               &quot;, eventDate=&quot; + eventDate +
+               &quot;, webhookId='&quot; + webhookId + '\'' +
+<span class="fc" id="L151">               &quot;, transactionId='&quot; + getTransactionId() + '\'' +</span>
+               '}';
+    }
+    
+    /**
+     * Nested class representing the webhook payload structure.
+     */
+    public static class AuthorizeNetPayload {
+        
+        @JsonProperty(&quot;responseCode&quot;)
+        private Integer responseCode;
+        
+        @JsonProperty(&quot;authCode&quot;)
+        private String authCode;
+        
+        @JsonProperty(&quot;avsResponse&quot;)
+        private String avsResponse;
+        
+        @JsonProperty(&quot;id&quot;)
+        private String id; // Transaction ID
+        
+        @JsonProperty(&quot;accountType&quot;)
+        private String accountType;
+        
+        @JsonProperty(&quot;accountNumber&quot;)
+        private String accountNumber; // Masked
+        
+        @JsonProperty(&quot;invoiceNumber&quot;)
+        private String invoiceNumber;
+        
+        @JsonProperty(&quot;description&quot;)
+        private String description;
+        
+        @JsonProperty(&quot;authAmount&quot;)
+        private Double authAmount;
+        
+        @JsonProperty(&quot;settleAmount&quot;)
+        private Double settleAmount;
+        
+        @JsonProperty(&quot;merchantReferenceId&quot;)
+        private String merchantReferenceId;
+        
+        @JsonProperty(&quot;customerProfileId&quot;)
+        private String customerProfileId;
+        
+        @JsonProperty(&quot;customerPaymentProfileId&quot;)
+        private String customerPaymentProfileId;
+        
+        @JsonProperty(&quot;customerShippingAddressId&quot;)
+        private String customerShippingAddressId;
+        
+        @JsonProperty(&quot;order&quot;)
+        private Map&lt;String, Object&gt; order;
+        
+        @JsonProperty(&quot;billTo&quot;)
+        private Map&lt;String, Object&gt; billTo;
+        
+        @JsonProperty(&quot;shipTo&quot;)
+        private Map&lt;String, Object&gt; shipTo;
+        
+        @JsonProperty(&quot;recurringBilling&quot;)
+        private Boolean recurringBilling;
+        
+        @JsonProperty(&quot;cardCodeResponse&quot;)
+        private String cardCodeResponse;
+        
+        @JsonProperty(&quot;cavvResponse&quot;)
+        private String cavvResponse;
+        
+        @JsonProperty(&quot;emvResponse&quot;)
+        private Map&lt;String, Object&gt; emvResponse;
+        
+        @JsonProperty(&quot;transHashSha2&quot;)
+        private String transHashSha2;
+        
+        @JsonProperty(&quot;profile&quot;)
+        private Map&lt;String, Object&gt; profile;
+        
+        @JsonProperty(&quot;solution&quot;)
+        private Map&lt;String, Object&gt; solution;
+        
+        @JsonProperty(&quot;emvDetails&quot;)
+        private Map&lt;String, Object&gt; emvDetails;
+        
+        // Default constructor
+<span class="fc" id="L236">        public AuthorizeNetPayload() {}</span>
+        
+        // Getters and Setters
+        public Integer getResponseCode() {
+<span class="fc" id="L240">            return responseCode;</span>
+        }
+        
+        public void setResponseCode(Integer responseCode) {
+<span class="fc" id="L244">            this.responseCode = responseCode;</span>
+<span class="fc" id="L245">        }</span>
+        
+        public String getAuthCode() {
+<span class="fc" id="L248">            return authCode;</span>
+        }
+        
+        public void setAuthCode(String authCode) {
+<span class="fc" id="L252">            this.authCode = authCode;</span>
+<span class="fc" id="L253">        }</span>
+        
+        public String getAvsResponse() {
+<span class="fc" id="L256">            return avsResponse;</span>
+        }
+        
+        public void setAvsResponse(String avsResponse) {
+<span class="fc" id="L260">            this.avsResponse = avsResponse;</span>
+<span class="fc" id="L261">        }</span>
+        
+        public String getId() {
+<span class="fc" id="L264">            return id;</span>
+        }
+        
+        public void setId(String id) {
+<span class="fc" id="L268">            this.id = id;</span>
+<span class="fc" id="L269">        }</span>
+        
+        public String getAccountType() {
+<span class="fc" id="L272">            return accountType;</span>
+        }
+        
+        public void setAccountType(String accountType) {
+<span class="fc" id="L276">            this.accountType = accountType;</span>
+<span class="fc" id="L277">        }</span>
+        
+        public String getAccountNumber() {
+<span class="fc" id="L280">            return accountNumber;</span>
+        }
+        
+        public void setAccountNumber(String accountNumber) {
+<span class="fc" id="L284">            this.accountNumber = accountNumber;</span>
+<span class="fc" id="L285">        }</span>
+        
+        public String getInvoiceNumber() {
+<span class="fc" id="L288">            return invoiceNumber;</span>
+        }
+        
+        public void setInvoiceNumber(String invoiceNumber) {
+<span class="fc" id="L292">            this.invoiceNumber = invoiceNumber;</span>
+<span class="fc" id="L293">        }</span>
+        
+        public String getDescription() {
+<span class="fc" id="L296">            return description;</span>
+        }
+        
+        public void setDescription(String description) {
+<span class="fc" id="L300">            this.description = description;</span>
+<span class="fc" id="L301">        }</span>
+        
+        public Double getAuthAmount() {
+<span class="fc" id="L304">            return authAmount;</span>
+        }
+        
+        public void setAuthAmount(Double authAmount) {
+<span class="fc" id="L308">            this.authAmount = authAmount;</span>
+<span class="fc" id="L309">        }</span>
+        
+        public Double getSettleAmount() {
+<span class="fc" id="L312">            return settleAmount;</span>
+        }
+        
+        public void setSettleAmount(Double settleAmount) {
+<span class="fc" id="L316">            this.settleAmount = settleAmount;</span>
+<span class="fc" id="L317">        }</span>
+        
+        public String getMerchantReferenceId() {
+<span class="fc" id="L320">            return merchantReferenceId;</span>
+        }
+        
+        public void setMerchantReferenceId(String merchantReferenceId) {
+<span class="fc" id="L324">            this.merchantReferenceId = merchantReferenceId;</span>
+<span class="fc" id="L325">        }</span>
+        
+        public String getCustomerProfileId() {
+<span class="fc" id="L328">            return customerProfileId;</span>
+        }
+        
+        public void setCustomerProfileId(String customerProfileId) {
+<span class="fc" id="L332">            this.customerProfileId = customerProfileId;</span>
+<span class="fc" id="L333">        }</span>
+        
+        public String getCustomerPaymentProfileId() {
+<span class="fc" id="L336">            return customerPaymentProfileId;</span>
+        }
+        
+        public void setCustomerPaymentProfileId(String customerPaymentProfileId) {
+<span class="fc" id="L340">            this.customerPaymentProfileId = customerPaymentProfileId;</span>
+<span class="fc" id="L341">        }</span>
+        
+        public String getCustomerShippingAddressId() {
+<span class="fc" id="L344">            return customerShippingAddressId;</span>
+        }
+        
+        public void setCustomerShippingAddressId(String customerShippingAddressId) {
+<span class="fc" id="L348">            this.customerShippingAddressId = customerShippingAddressId;</span>
+<span class="fc" id="L349">        }</span>
+        
+        public Map&lt;String, Object&gt; getOrder() {
+<span class="fc" id="L352">            return order;</span>
+        }
+        
+        public void setOrder(Map&lt;String, Object&gt; order) {
+<span class="fc" id="L356">            this.order = order;</span>
+<span class="fc" id="L357">        }</span>
+        
+        public Map&lt;String, Object&gt; getBillTo() {
+<span class="fc" id="L360">            return billTo;</span>
+        }
+        
+        public void setBillTo(Map&lt;String, Object&gt; billTo) {
+<span class="fc" id="L364">            this.billTo = billTo;</span>
+<span class="fc" id="L365">        }</span>
+        
+        public Map&lt;String, Object&gt; getShipTo() {
+<span class="fc" id="L368">            return shipTo;</span>
+        }
+        
+        public void setShipTo(Map&lt;String, Object&gt; shipTo) {
+<span class="fc" id="L372">            this.shipTo = shipTo;</span>
+<span class="fc" id="L373">        }</span>
+        
+        public Boolean getRecurringBilling() {
+<span class="fc" id="L376">            return recurringBilling;</span>
+        }
+        
+        public void setRecurringBilling(Boolean recurringBilling) {
+<span class="fc" id="L380">            this.recurringBilling = recurringBilling;</span>
+<span class="fc" id="L381">        }</span>
+        
+        public String getCardCodeResponse() {
+<span class="fc" id="L384">            return cardCodeResponse;</span>
+        }
+        
+        public void setCardCodeResponse(String cardCodeResponse) {
+<span class="fc" id="L388">            this.cardCodeResponse = cardCodeResponse;</span>
+<span class="fc" id="L389">        }</span>
+        
+        public String getCavvResponse() {
+<span class="fc" id="L392">            return cavvResponse;</span>
+        }
+        
+        public void setCavvResponse(String cavvResponse) {
+<span class="fc" id="L396">            this.cavvResponse = cavvResponse;</span>
+<span class="fc" id="L397">        }</span>
+        
+        public Map&lt;String, Object&gt; getEmvResponse() {
+<span class="fc" id="L400">            return emvResponse;</span>
+        }
+        
+        public void setEmvResponse(Map&lt;String, Object&gt; emvResponse) {
+<span class="fc" id="L404">            this.emvResponse = emvResponse;</span>
+<span class="fc" id="L405">        }</span>
+        
+        public String getTransHashSha2() {
+<span class="fc" id="L408">            return transHashSha2;</span>
+        }
+        
+        public void setTransHashSha2(String transHashSha2) {
+<span class="fc" id="L412">            this.transHashSha2 = transHashSha2;</span>
+<span class="fc" id="L413">        }</span>
+        
+        public Map&lt;String, Object&gt; getProfile() {
+<span class="fc" id="L416">            return profile;</span>
+        }
+        
+        public void setProfile(Map&lt;String, Object&gt; profile) {
+<span class="fc" id="L420">            this.profile = profile;</span>
+<span class="fc" id="L421">        }</span>
+        
+        public Map&lt;String, Object&gt; getSolution() {
+<span class="fc" id="L424">            return solution;</span>
+        }
+        
+        public void setSolution(Map&lt;String, Object&gt; solution) {
+<span class="fc" id="L428">            this.solution = solution;</span>
+<span class="fc" id="L429">        }</span>
+        
+        public Map&lt;String, Object&gt; getEmvDetails() {
+<span class="fc" id="L432">            return emvDetails;</span>
+        }
+        
+        public void setEmvDetails(Map&lt;String, Object&gt; emvDetails) {
+<span class="fc" id="L436">            this.emvDetails = emvDetails;</span>
+<span class="fc" id="L437">        }</span>
+        
+        @Override
+        public String toString() {
+<span class="fc" id="L441">            return &quot;AuthorizeNetPayload{&quot; +</span>
+                   &quot;id='&quot; + id + '\'' +
+                   &quot;, responseCode=&quot; + responseCode +
+                   &quot;, authCode='&quot; + authCode + '\'' +
+                   &quot;, authAmount=&quot; + authAmount +
+                   &quot;, settleAmount=&quot; + settleAmount +
+                   '}';
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

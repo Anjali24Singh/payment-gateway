@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiConstants.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.constants</a> &gt; <span class="el_source">ApiConstants.java</span></div><h1>ApiConstants.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.constants;
+
+/**
+ * HTTP and API-related constants.
+ * Centralizes header names, content types, and API versioning.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public final class ApiConstants {
+
+<span class="nc" id="L12">    private ApiConstants() {</span>
+<span class="nc" id="L13">        throw new UnsupportedOperationException(&quot;This is a constants class and cannot be instantiated&quot;);</span>
+    }
+
+    // API Version
+    public static final String API_VERSION = &quot;v1&quot;;
+    public static final String API_BASE_PATH = &quot;/api/&quot; + API_VERSION;
+
+    // HTTP Headers
+    public static final String HEADER_API_KEY = &quot;X-API-Key&quot;;
+    public static final String HEADER_CORRELATION_ID = &quot;X-Correlation-ID&quot;;
+    public static final String HEADER_REQUEST_ID = &quot;X-Request-ID&quot;;
+    public static final String HEADER_IDEMPOTENCY_KEY = &quot;Idempotency-Key&quot;;
+    public static final String HEADER_AUTHORIZATION = &quot;Authorization&quot;;
+    public static final String HEADER_CONTENT_TYPE = &quot;Content-Type&quot;;
+    public static final String HEADER_ACCEPT = &quot;Accept&quot;;
+
+    // Webhook Headers
+    public static final String WEBHOOK_SIGNATURE_HEADER = &quot;X-ANET-Signature&quot;;
+    public static final String WEBHOOK_SIGNATURE_HEADER_ALT = &quot;X-Signature&quot;;
+    public static final String WEBHOOK_EVENT_TYPE_HEADER = &quot;X-Event-Type&quot;;
+
+    // Content Types
+    public static final String CONTENT_TYPE_JSON = &quot;application/json&quot;;
+    public static final String CONTENT_TYPE_XML = &quot;application/xml&quot;;
+    public static final String CONTENT_TYPE_FORM_URLENCODED = &quot;application/x-www-form-urlencoded&quot;;
+
+    // Authentication
+    public static final String BEARER_PREFIX = &quot;Bearer &quot;;
+    public static final String BASIC_PREFIX = &quot;Basic &quot;;
+    public static final int JWT_EXPIRATION_HOURS = 24;
+    public static final int REFRESH_TOKEN_EXPIRATION_DAYS = 30;
+
+    // Rate Limiting
+    public static final int RATE_LIMIT_REQUESTS_PER_MINUTE = 100;
+    public static final int RATE_LIMIT_REQUESTS_PER_HOUR = 1000;
+    public static final String RATE_LIMIT_KEY_PREFIX = &quot;rate_limit:&quot;;
+
+    // Pagination
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 100;
+    public static final String PAGE_PARAM = &quot;page&quot;;
+    public static final String SIZE_PARAM = &quot;size&quot;;
+    public static final String SORT_PARAM = &quot;sort&quot;;
+
+    // Request Tracking
+    public static final String MDC_CORRELATION_ID = &quot;correlationId&quot;;
+    public static final String MDC_REQUEST_ID = &quot;requestId&quot;;
+    public static final String MDC_USER_ID = &quot;userId&quot;;
+    public static final String MDC_CLIENT_ID = &quot;clientId&quot;;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

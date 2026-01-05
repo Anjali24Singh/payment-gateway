@@ -1,0 +1,1177 @@
+{
+  "info": {
+    "name": "Payment Gateway API - Updated & Tested",
+    "description": "Complete API collection for Payment Gateway with verified working endpoints. Backend automatically handles Correlation-ID and Idempotency-Key generation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "TOKEN",
+      "value": "",
+      "type": "string",
+      "description": "JWT token - automatically set after login"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Get JWT Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('TOKEN', response.access_token);",
+                  "    console.log('✅ JWT Token updated automatically');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@paymentgateway.com\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your_refresh_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/refresh",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "refresh"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/me",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health & Monitoring",
+      "item": [
+        {
+          "name": "Basic Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/health/status",
+              "host": ["{{BASE_URL}}"],
+              "path": ["health", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detailed Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/health/detailed",
+              "host": ["{{BASE_URL}}"],
+              "path": ["health", "detailed"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment Processing",
+      "item": [
+        {
+          "name": "Process Purchase",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"currency\": \"USD\",\n  \"paymentMethod\": {\n    \"type\": \"CREDIT_CARD\",\n    \"cardNumber\": \"4111111111111111\",\n    \"expiryMonth\": \"12\",\n    \"expiryYear\": \"2025\",\n    \"cvv\": \"123\",\n    \"cardholderName\": \"John Doe\"\n  },\n  \"billingAddress\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"address\": \"123 Main St\",\n    \"city\": \"Anytown\",\n    \"state\": \"CA\",\n    \"zipCode\": \"12345\",\n    \"country\": \"US\"\n  },\n  \"description\": \"Test payment transaction\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/process",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "process"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 49.99,\n  \"currency\": \"USD\",\n  \"paymentMethod\": {\n    \"type\": \"CREDIT_CARD\",\n    \"cardNumber\": \"4111111111111111\",\n    \"expiryMonth\": \"12\",\n    \"expiryYear\": \"2025\",\n    \"cvv\": \"123\",\n    \"cardholderName\": \"Jane Doe\"\n  },\n  \"customer\": {\n    \"email\": \"jane@example.com\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"phone\": \"1234567890\"\n  },\n  \"billingAddress\": {\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"address1\": \"123 Test St\",\n    \"city\": \"Test City\",\n    \"state\": \"CA\",\n    \"zipCode\": \"12345\",\n    \"country\": \"US\"\n  },\n  \"description\": \"Test authorization\",\n  \"orderNumber\": \"AUTH-001\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/authorize",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "authorize"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Capture Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"txn_auth_1234567890\",\n  \"amount\": 49.99,\n  \"description\": \"Capture payment\",\n  \"invoiceNumber\": \"INV-001\",\n  \"finalCapture\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/capture",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "capture"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Void Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"txn_auth_1234567890\",\n  \"description\": \"Void payment\",\n  \"referenceNumber\": \"VOID-001\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/void",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "void"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"txn_1234567890\",\n  \"amount\": 25.00,\n  \"description\": \"Customer requested refund\",\n  \"referenceNumber\": \"REF-001\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/refund",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "refund"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Transaction Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/payments/:transactionId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", ":transactionId"],
+              "variable": [
+                {
+                  "key": "transactionId",
+                  "value": "txn_1234567890"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Validate Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"CREDIT_CARD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expiryMonth\": \"12\",\n  \"expiryYear\": \"2025\",\n  \"cvv\": \"123\",\n  \"cardholderName\": \"Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/validate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "validate"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subscription Management",
+      "item": [
+        {
+          "name": "Create Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"cust_123\",\n  \"planId\": \"plan_basic\",\n  \"paymentMethodId\": \"pm_123\",\n  \"trialPeriodDays\": 14,\n  \"metadata\": {\n    \"source\": \"api\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscriptions",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscriptions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscriptions?page=0&size=20&status=ACTIVE",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscriptions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscriptions/:subscriptionId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscriptions", ":subscriptionId"],
+              "variable": [
+                {
+                  "key": "subscriptionId",
+                  "value": "sub_123"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Subscription",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethodId\": \"pm_456\",\n  \"metadata\": {\n    \"updated\": \"true\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscriptions/:subscriptionId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscriptions", ":subscriptionId"],
+              "variable": [
+                {
+                  "key": "subscriptionId",
+                  "value": "sub_123"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancellationReason\": \"Customer requested cancellation\",\n  \"cancelAtPeriodEnd\": false\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscriptions/:subscriptionId/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscriptions", ":subscriptionId", "cancel"],
+              "variable": [
+                {
+                  "key": "subscriptionId",
+                  "value": "sub_123"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subscription Plans",
+      "item": [
+        {
+          "name": "Create Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planCode\": \"PREMIUM\",\n  \"name\": \"Premium Plan\",\n  \"price\": 29.99,\n  \"currency\": \"USD\",\n  \"intervalUnit\": \"MONTH\",\n  \"intervalCount\": 1,\n  \"trialPeriodDays\": 7\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Plan by Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans/:planCode",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans", ":planCode"],
+              "variable": [
+                {
+                  "key": "planCode",
+                  "value": "PREMIUM"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Plan",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans/:planCode/activate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans", ":planCode", "activate"],
+              "variable": [
+                {
+                  "key": "planCode",
+                  "value": "PREMIUM"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Plan",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans/:planCode/deactivate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans", ":planCode", "deactivate"],
+              "variable": [
+                {
+                  "key": "planCode",
+                  "value": "PREMIUM"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/subscription-plans/active",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "subscription-plans", "active"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ARB Subscriptions",
+      "item": [
+        {
+          "name": "Create ARB Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"CUST_PORTAL_002\",\n  \"planCode\": \"BASIC\",\n  \"paymentMethodId\": \"token_2f07dba6\",\n  \"description\": \"ARB subscription for portal testing\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/arb-subscriptions",
+              "host": ["{{BASE_URL}}"],
+              "path": ["arb-subscriptions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List ARB Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/arb-subscriptions",
+              "host": ["{{BASE_URL}}"],
+              "path": ["arb-subscriptions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get ARB Subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/arb-subscriptions/:arbSubscriptionId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["arb-subscriptions", ":arbSubscriptionId"],
+              "variable": [
+                {
+                  "key": "arbSubscriptionId",
+                  "value": "9660362"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel ARB Subscription",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/arb-subscriptions/:arbSubscriptionId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["arb-subscriptions", ":arbSubscriptionId"],
+              "variable": [
+                {
+                  "key": "arbSubscriptionId",
+                  "value": "9660362"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customer Profiles (CIM)",
+      "item": [
+        {
+          "name": "Create Customer Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"CUST_PORTAL_002\",\n  \"email\": \"portal2@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"description\": \"Test customer with proper name\",\n  \"billingAddressLine1\": \"123 Test St\",\n  \"billingCity\": \"Test City\",\n  \"billingState\": \"CA\",\n  \"billingPostalCode\": \"12345\",\n  \"billingCountry\": \"US\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"updated@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Updated\",\n  \"description\": \"Updated customer profile\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer Profile",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Payment Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardNumber\": \"4111111111111111\",\n  \"expiryMonth\": \"12\",\n  \"expiryYear\": \"2025\",\n  \"cvv\": \"123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"address\": \"123 Test St\",\n  \"city\": \"Test City\",\n  \"state\": \"CA\",\n  \"zip\": \"12345\",\n  \"country\": \"US\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId/payment-profiles",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId", "payment-profiles"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId/payment-profiles/:paymentProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId", "payment-profiles", ":paymentProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                },
+                {
+                  "key": "paymentProfileId",
+                  "value": "536643153"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expiryMonth\": \"12\",\n  \"expiryYear\": \"2026\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Updated\",\n  \"address\": \"456 Updated St\",\n  \"city\": \"Updated City\",\n  \"state\": \"NY\",\n  \"zip\": \"54321\",\n  \"country\": \"US\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId/payment-profiles/:paymentProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId", "payment-profiles", ":paymentProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                },
+                {
+                  "key": "paymentProfileId",
+                  "value": "536643153"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Payment Profile",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId/payment-profiles/:paymentProfileId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId", "payment-profiles", ":paymentProfileId"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                },
+                {
+                  "key": "paymentProfileId",
+                  "value": "536643153"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Validate Payment Profile",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/profiles/:customerProfileId/payment-profiles/:paymentProfileId/validate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "customers", "profiles", ":customerProfileId", "payment-profiles", ":paymentProfileId", "validate"],
+              "variable": [
+                {
+                  "key": "customerProfileId",
+                  "value": "524486659"
+                },
+                {
+                  "key": "paymentProfileId",
+                  "value": "536643153"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Reporting",
+      "item": [
+        {
+          "name": "Dashboard Metrics",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2025-01-01T00:00:00Z\",\n  \"endDate\": \"2025-12-31T23:59:59Z\",\n  \"includeRealTime\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/analytics/dashboard",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transaction Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2025-01-01T00:00:00Z\",\n  \"endDate\": \"2025-12-31T23:59:59Z\",\n  \"exportFormat\": \"JSON\",\n  \"includeDetails\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/analytics/reports/transactions",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "analytics", "reports", "transactions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revenue Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/analytics/revenue?startDate=2025-01-01T00:00:00Z&endDate=2025-12-31T23:59:59Z&includeComparison=true",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "analytics", "revenue"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2025-01-01T00:00:00Z"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-12-31T23:59:59Z"
+                },
+                {
+                  "key": "includeComparison",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Quick Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/analytics/dashboard/quick?period=30d",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "analytics", "dashboard", "quick"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30d"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Failed Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/analytics/failed-payments?startDate=2025-01-01T00:00:00Z&endDate=2025-12-31T23:59:59Z",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "analytics", "failed-payments"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2025-01-01T00:00:00Z"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-12-31T23:59:59Z"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sandbox & Testing",
+      "item": [
+        {
+          "name": "Sandbox Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sandbox/info",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sandbox", "info"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sandbox/test-cards",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sandbox", "test-cards"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Test Data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sandbox/generate-test-data?count=5&transactionType=PURCHASE",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sandbox", "generate-test-data"],
+              "query": [
+                {
+                  "key": "count",
+                  "value": "5"
+                },
+                {
+                  "key": "transactionType",
+                  "value": "PURCHASE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Sandbox",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sandbox/reset",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sandbox", "reset"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documentation",
+      "item": [
+        {
+          "name": "Integration Guide",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/docs/integration-guide",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "docs", "integration-guide"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Testing Scenarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/docs/testing-scenarios",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "docs", "testing-scenarios"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "API Changelog",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/docs/changelog",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "docs", "changelog"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Webhook Health",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/webhooks/health",
+              "host": ["{{BASE_URL}}"],
+              "path": ["webhooks", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Webhook",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test\": \"data\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/webhooks/test",
+              "host": ["{{BASE_URL}}"],
+              "path": ["webhooks", "test"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize.Net Webhook",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-ANET-Signature",
+                "value": "sha512=GENERATED_SIGNATURE_HERE",
+                "description": "HMAC-SHA512 signature for webhook verification"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "test-api-key-12345",
+                "description": "API key for webhook authentication"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"net.authorize.payment.authcapture.created\",\n  \"eventDate\": \"2024-01-15T10:30:00Z\",\n  \"webhookId\": \"12345678-1234-1234-1234-123456789012\",\n  \"payload\": {\n    \"responseCode\": 1,\n    \"authCode\": \"ABC123\",\n    \"avsResultCode\": \"Y\",\n    \"cvvResultCode\": \"P\",\n    \"cavvResultCode\": \"\",\n    \"transId\": \"40012345678\",\n    \"refTransID\": \"\",\n    \"transHash\": \"sample_hash\",\n    \"testRequest\": \"0\",\n    \"accountNumber\": \"XXXX1111\",\n    \"entryMode\": \"Keyed\",\n    \"accountType\": \"Visa\",\n    \"message\": \"This transaction has been approved.\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/webhooks/authorize-net",
+              "host": ["{{BASE_URL}}"],
+              "path": ["webhooks", "authorize-net"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-generate correlation ID and idempotency key",
+          "pm.collectionVariables.set('CORRELATION_ID', pm.variables.replaceIn('{{$guid}}'));",
+          "pm.collectionVariables.set('IDEMPOTENCY_KEY', pm.variables.replaceIn('{{$timestamp}}-{{$randomInt}}'));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-extract token from login response",
+          "if (pm.info.requestName === 'Login' && pm.response.code === 200) {",
+          "    const responseJson = pm.response.json();",
+          "    if (responseJson.accessToken) {",
+          "        pm.collectionVariables.set('TOKEN', responseJson.accessToken);",
+          "        console.log('Token automatically set from login response');",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+}

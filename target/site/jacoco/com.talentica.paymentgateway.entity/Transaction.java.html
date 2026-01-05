@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Transaction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">Transaction.java</span></div><h1>Transaction.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import com.talentica.paymentgateway.validation.ValidAmount;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Entity representing a payment transaction.
+ * Transactions capture all payment processing details including Authorize.Net responses.
+ */
+@Entity
+@Table(name = &quot;transactions&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;transactionId&quot;),
+           @UniqueConstraint(columnNames = &quot;idempotencyKey&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_transactions_order_id&quot;, columnList = &quot;order_id&quot;),
+           @Index(name = &quot;idx_transactions_customer_id&quot;, columnList = &quot;customer_id&quot;),
+           @Index(name = &quot;idx_transactions_transaction_id&quot;, columnList = &quot;transactionId&quot;),
+           @Index(name = &quot;idx_transactions_authnet_id&quot;, columnList = &quot;authnetTransactionId&quot;),
+           @Index(name = &quot;idx_transactions_parent_id&quot;, columnList = &quot;parent_transaction_id&quot;),
+           @Index(name = &quot;idx_transactions_idempotency_key&quot;, columnList = &quot;idempotencyKey&quot;),
+           @Index(name = &quot;idx_transactions_correlation_id&quot;, columnList = &quot;correlationId&quot;),
+           @Index(name = &quot;idx_transactions_status&quot;, columnList = &quot;status&quot;),
+           @Index(name = &quot;idx_transactions_type&quot;, columnList = &quot;transactionType&quot;),
+           @Index(name = &quot;idx_transactions_created_at&quot;, columnList = &quot;createdAt&quot;)
+       })
+public class Transaction extends BaseEntity {
+
+    @NotBlank(message = &quot;Transaction ID is required&quot;)
+    @Size(max = 100, message = &quot;Transaction ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;transaction_id&quot;, nullable = false, unique = true, length = 100)
+    private String transactionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;order_id&quot;)
+    private Order order;
+
+    @NotNull(message = &quot;Customer is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;customer_id&quot;, nullable = false)
+    private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;payment_method_id&quot;)
+    private PaymentMethod paymentMethod;
+
+    @NotNull(message = &quot;Transaction type is required&quot;)
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = &quot;transaction_type&quot;, nullable = false)
+    private TransactionType transactionType;
+
+    @NotNull(message = &quot;Amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.01&quot;, message = &quot;Amount must be greater than zero&quot;)
+    @Column(name = &quot;amount&quot;, nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+<span class="fc" id="L72">    @Size(max = 3, message = &quot;Currency must be 3 characters&quot;)</span>
+    @Column(name = &quot;currency&quot;, length = 3)
+    private String currency = &quot;USD&quot;;
+
+<span class="fc" id="L76">    @Enumerated(EnumType.STRING)</span>
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = &quot;status&quot;, columnDefinition = &quot;payment_status&quot;)
+    private PaymentStatus status = PaymentStatus.PENDING;
+
+    // Authorize.Net specific fields
+    @Size(max = 100, message = &quot;Authorize.Net transaction ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;authnet_transaction_id&quot;, length = 100)
+    private String authnetTransactionId;
+
+    @Size(max = 20, message = &quot;Authorize.Net auth code must not exceed 20 characters&quot;)
+    @Column(name = &quot;authnet_auth_code&quot;, length = 20)
+    private String authnetAuthCode;
+
+    @Size(max = 10, message = &quot;Authorize.Net AVS result must not exceed 10 characters&quot;)
+    @Column(name = &quot;authnet_avs_result&quot;, length = 10)
+    private String authnetAvsResult;
+
+    @Size(max = 10, message = &quot;Authorize.Net CVV result must not exceed 10 characters&quot;)
+    @Column(name = &quot;authnet_cvv_result&quot;, length = 10)
+    private String authnetCvvResult;
+
+    @Size(max = 10, message = &quot;Authorize.Net response code must not exceed 10 characters&quot;)
+    @Column(name = &quot;authnet_response_code&quot;, length = 10)
+    private String authnetResponseCode;
+
+    @Size(max = 255, message = &quot;Authorize.Net response reason must not exceed 255 characters&quot;)
+    @Column(name = &quot;authnet_response_reason&quot;, length = 255)
+    private String authnetResponseReason;
+
+    // Parent transaction for captures, voids, refunds
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;parent_transaction_id&quot;)
+    private Transaction parentTransaction;
+
+    // Request and response data as JSON
+<span class="fc" id="L112">    @Convert(converter = MapToJsonConverter.class)</span>
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;request_data&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; requestData = new HashMap&lt;&gt;();
+
+<span class="fc" id="L117">    @Convert(converter = MapToJsonConverter.class)</span>
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;response_data&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; responseData = new HashMap&lt;&gt;();
+
+    // Idempotency key for preventing duplicate transactions
+    @Size(max = 255, message = &quot;Idempotency key must not exceed 255 characters&quot;)
+    @Column(name = &quot;idempotency_key&quot;, unique = true, length = 255)
+    private String idempotencyKey;
+
+    // Correlation ID for tracing
+    @Size(max = 100, message = &quot;Correlation ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;correlation_id&quot;, length = 100)
+    private String correlationId;
+
+    @Column(name = &quot;processed_at&quot;)
+    private ZonedDateTime processedAt;
+
+    // Relationships
+<span class="fc" id="L136">    @OneToMany(mappedBy = &quot;parentTransaction&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Transaction&gt; childTransactions = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public Transaction() {
+<span class="fc" id="L141">        super();</span>
+<span class="fc" id="L142">    }</span>
+
+    public Transaction(String transactionId, Customer customer, TransactionType transactionType, BigDecimal amount) {
+<span class="fc" id="L145">        this();</span>
+<span class="fc" id="L146">        this.transactionId = transactionId;</span>
+<span class="fc" id="L147">        this.customer = customer;</span>
+<span class="fc" id="L148">        this.transactionType = transactionType;</span>
+<span class="fc" id="L149">        this.amount = amount;</span>
+<span class="fc" id="L150">    }</span>
+
+    // Getters and Setters
+    public String getTransactionId() {
+<span class="fc" id="L154">        return transactionId;</span>
+    }
+
+    public void setTransactionId(String transactionId) {
+<span class="fc" id="L158">        this.transactionId = transactionId;</span>
+<span class="fc" id="L159">    }</span>
+
+    public Order getOrder() {
+<span class="fc" id="L162">        return order;</span>
+    }
+
+    public void setOrder(Order order) {
+<span class="fc" id="L166">        this.order = order;</span>
+<span class="fc" id="L167">    }</span>
+
+    public Customer getCustomer() {
+<span class="fc" id="L170">        return customer;</span>
+    }
+
+    public void setCustomer(Customer customer) {
+<span class="fc" id="L174">        this.customer = customer;</span>
+<span class="fc" id="L175">    }</span>
+
+    public PaymentMethod getPaymentMethod() {
+<span class="fc" id="L178">        return paymentMethod;</span>
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+<span class="fc" id="L182">        this.paymentMethod = paymentMethod;</span>
+<span class="fc" id="L183">    }</span>
+
+    public TransactionType getTransactionType() {
+<span class="fc" id="L186">        return transactionType;</span>
+    }
+
+    public void setTransactionType(TransactionType transactionType) {
+<span class="fc" id="L190">        this.transactionType = transactionType;</span>
+<span class="fc" id="L191">    }</span>
+
+    public BigDecimal getAmount() {
+<span class="fc" id="L194">        return amount;</span>
+    }
+
+    public void setAmount(BigDecimal amount) {
+<span class="fc" id="L198">        this.amount = amount;</span>
+<span class="fc" id="L199">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L202">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L206">        this.currency = currency;</span>
+<span class="fc" id="L207">    }</span>
+
+    public PaymentStatus getStatus() {
+<span class="fc" id="L210">        return status;</span>
+    }
+
+    public void setStatus(PaymentStatus status) {
+<span class="fc" id="L214">        this.status = status;</span>
+<span class="fc" id="L215">    }</span>
+
+    public String getAuthnetTransactionId() {
+<span class="fc" id="L218">        return authnetTransactionId;</span>
+    }
+
+    public void setAuthnetTransactionId(String authnetTransactionId) {
+<span class="fc" id="L222">        this.authnetTransactionId = authnetTransactionId;</span>
+<span class="fc" id="L223">    }</span>
+
+    public String getAuthnetAuthCode() {
+<span class="fc" id="L226">        return authnetAuthCode;</span>
+    }
+
+    public void setAuthnetAuthCode(String authnetAuthCode) {
+<span class="fc" id="L230">        this.authnetAuthCode = authnetAuthCode;</span>
+<span class="fc" id="L231">    }</span>
+
+    public String getAuthnetAvsResult() {
+<span class="fc" id="L234">        return authnetAvsResult;</span>
+    }
+
+    public void setAuthnetAvsResult(String authnetAvsResult) {
+<span class="fc" id="L238">        this.authnetAvsResult = authnetAvsResult;</span>
+<span class="fc" id="L239">    }</span>
+
+    public String getAuthnetCvvResult() {
+<span class="fc" id="L242">        return authnetCvvResult;</span>
+    }
+
+    public void setAuthnetCvvResult(String authnetCvvResult) {
+<span class="fc" id="L246">        this.authnetCvvResult = authnetCvvResult;</span>
+<span class="fc" id="L247">    }</span>
+
+    public String getAuthnetResponseCode() {
+<span class="fc" id="L250">        return authnetResponseCode;</span>
+    }
+
+    public void setAuthnetResponseCode(String authnetResponseCode) {
+<span class="fc" id="L254">        this.authnetResponseCode = authnetResponseCode;</span>
+<span class="fc" id="L255">    }</span>
+
+    public String getAuthnetResponseReason() {
+<span class="fc" id="L258">        return authnetResponseReason;</span>
+    }
+
+    public void setAuthnetResponseReason(String authnetResponseReason) {
+<span class="fc" id="L262">        this.authnetResponseReason = authnetResponseReason;</span>
+<span class="fc" id="L263">    }</span>
+
+    public Transaction getParentTransaction() {
+<span class="fc" id="L266">        return parentTransaction;</span>
+    }
+
+    public void setParentTransaction(Transaction parentTransaction) {
+<span class="fc" id="L270">        this.parentTransaction = parentTransaction;</span>
+<span class="fc" id="L271">    }</span>
+
+    public Map&lt;String, Object&gt; getRequestData() {
+<span class="fc" id="L274">        return requestData;</span>
+    }
+
+    public void setRequestData(Map&lt;String, Object&gt; requestData) {
+<span class="fc" id="L278">        this.requestData = requestData;</span>
+<span class="fc" id="L279">    }</span>
+
+    public Map&lt;String, Object&gt; getResponseData() {
+<span class="fc" id="L282">        return responseData;</span>
+    }
+
+    public void setResponseData(Map&lt;String, Object&gt; responseData) {
+<span class="fc" id="L286">        this.responseData = responseData;</span>
+<span class="fc" id="L287">    }</span>
+
+    public String getIdempotencyKey() {
+<span class="fc" id="L290">        return idempotencyKey;</span>
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+<span class="fc" id="L294">        this.idempotencyKey = idempotencyKey;</span>
+<span class="fc" id="L295">    }</span>
+
+    public String getCorrelationId() {
+<span class="fc" id="L298">        return correlationId;</span>
+    }
+
+    public void setCorrelationId(String correlationId) {
+<span class="fc" id="L302">        this.correlationId = correlationId;</span>
+<span class="fc" id="L303">    }</span>
+
+    public ZonedDateTime getProcessedAt() {
+<span class="fc" id="L306">        return processedAt;</span>
+    }
+
+    public void setProcessedAt(ZonedDateTime processedAt) {
+<span class="fc" id="L310">        this.processedAt = processedAt;</span>
+<span class="fc" id="L311">    }</span>
+
+    public List&lt;Transaction&gt; getChildTransactions() {
+<span class="fc" id="L314">        return childTransactions;</span>
+    }
+
+    public void setChildTransactions(List&lt;Transaction&gt; childTransactions) {
+<span class="fc" id="L318">        this.childTransactions = childTransactions;</span>
+<span class="fc" id="L319">    }</span>
+
+    // Utility methods
+    public boolean isSuccessful() {
+<span class="fc bfc" id="L323" title="All 6 branches covered.">        return status == PaymentStatus.AUTHORIZED || </span>
+               status == PaymentStatus.CAPTURED || 
+               status == PaymentStatus.SETTLED;
+    }
+
+    public boolean isFailed() {
+<span class="fc bfc" id="L329" title="All 6 branches covered.">        return status == PaymentStatus.FAILED || </span>
+               status == PaymentStatus.VOIDED || 
+               status == PaymentStatus.CANCELLED;
+    }
+
+    public boolean canBeVoided() {
+<span class="fc bfc" id="L335" title="All 6 branches covered.">        return status == PaymentStatus.AUTHORIZED &amp;&amp; </span>
+               (transactionType == TransactionType.AUTHORIZE || transactionType == TransactionType.PURCHASE);
+    }
+
+    public boolean canBeCaptured() {
+<span class="fc bfc" id="L340" title="All 4 branches covered.">        return status == PaymentStatus.AUTHORIZED &amp;&amp; transactionType == TransactionType.AUTHORIZE;</span>
+    }
+
+    public boolean canBeRefunded() {
+<span class="fc bfc" id="L344" title="All 6 branches covered.">        return status == PaymentStatus.SETTLED &amp;&amp; </span>
+               (transactionType == TransactionType.PURCHASE || transactionType == TransactionType.CAPTURE);
+    }
+
+    public void addChildTransaction(Transaction childTransaction) {
+<span class="fc" id="L349">        childTransactions.add(childTransaction);</span>
+<span class="fc" id="L350">        childTransaction.setParentTransaction(this);</span>
+<span class="fc" id="L351">    }</span>
+
+    public void removeChildTransaction(Transaction childTransaction) {
+<span class="fc" id="L354">        childTransactions.remove(childTransaction);</span>
+<span class="fc" id="L355">        childTransaction.setParentTransaction(null);</span>
+<span class="fc" id="L356">    }</span>
+
+    public BigDecimal getRefundedAmount() {
+<span class="fc" id="L359">        return childTransactions.stream()</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                .filter(t -&gt; t.getTransactionType() == TransactionType.REFUND || </span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                           t.getTransactionType() == TransactionType.PARTIAL_REFUND)</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                .filter(t -&gt; t.getStatus() == PaymentStatus.SETTLED)</span>
+<span class="fc" id="L363">                .map(Transaction::getAmount)</span>
+<span class="fc" id="L364">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+    }
+
+    public BigDecimal getAvailableRefundAmount() {
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (!canBeRefunded()) {</span>
+<span class="fc" id="L369">            return BigDecimal.ZERO;</span>
+        }
+<span class="fc" id="L371">        return amount.subtract(getRefundedAmount());</span>
+    }
+
+    public void markAsProcessed() {
+<span class="fc" id="L375">        this.processedAt = ZonedDateTime.now();</span>
+<span class="fc" id="L376">    }</span>
+
+    public void addRequestData(String key, Object value) {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (requestData == null) {</span>
+<span class="fc" id="L380">            requestData = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L382">        requestData.put(key, value);</span>
+<span class="fc" id="L383">    }</span>
+
+    public void addResponseData(String key, Object value) {
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (responseData == null) {</span>
+<span class="fc" id="L387">            responseData = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L389">        responseData.put(key, value);</span>
+<span class="fc" id="L390">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

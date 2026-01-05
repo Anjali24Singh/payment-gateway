@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AddressRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">AddressRequest.java</span></div><h1>AddressRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.*;
+
+/**
+ * Address request DTO for billing and shipping information.
+ * Used in payment processing for address verification and fraud prevention.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Address information for billing or shipping&quot;)
+public class AddressRequest {
+
+    @Size(max = 100, message = &quot;First name must not exceed 100 characters&quot;)
+    @Schema(description = &quot;First name&quot;, example = &quot;John&quot;)
+    @JsonProperty(&quot;firstName&quot;)
+    private String firstName;
+
+    @Size(max = 100, message = &quot;Last name must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Last name&quot;, example = &quot;Doe&quot;)
+    @JsonProperty(&quot;lastName&quot;)
+    private String lastName;
+
+    @Size(max = 100, message = &quot;Company name must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Company name&quot;, example = &quot;Acme Corporation&quot;)
+    @JsonProperty(&quot;company&quot;)
+    private String company;
+
+    @Size(max = 60, message = &quot;Address line 1 must not exceed 60 characters&quot;)
+    @Schema(description = &quot;Address line 1&quot;, example = &quot;123 Main Street&quot;)
+    @JsonProperty(&quot;address1&quot;)
+    private String address1;
+
+    @Size(max = 60, message = &quot;Address line 2 must not exceed 60 characters&quot;)
+    @Schema(description = &quot;Address line 2&quot;, example = &quot;Apt 4B&quot;)
+    @JsonProperty(&quot;address2&quot;)
+    private String address2;
+
+    @Size(max = 40, message = &quot;City must not exceed 40 characters&quot;)
+    @Schema(description = &quot;City&quot;, example = &quot;New York&quot;)
+    @JsonProperty(&quot;city&quot;)
+    private String city;
+
+    @Size(max = 40, message = &quot;State must not exceed 40 characters&quot;)
+    @Schema(description = &quot;State or province&quot;, example = &quot;NY&quot;)
+    @JsonProperty(&quot;state&quot;)
+    private String state;
+
+    @Size(max = 20, message = &quot;ZIP code must not exceed 20 characters&quot;)
+    @Pattern(regexp = &quot;^[A-Za-z0-9\\s-]{3,20}$&quot;, 
+             message = &quot;ZIP code must be 3-20 characters and contain only letters, numbers, spaces, and hyphens&quot;)
+    @Schema(description = &quot;ZIP or postal code&quot;, example = &quot;10001&quot;)
+    @JsonProperty(&quot;zipCode&quot;)
+    private String zipCode;
+
+    @Size(max = 60, message = &quot;Country must not exceed 60 characters&quot;)
+    @Schema(description = &quot;Country&quot;, example = &quot;United States&quot;)
+    @JsonProperty(&quot;country&quot;)
+    private String country;
+
+    @Pattern(regexp = &quot;^[\\+]?[0-9\\s\\-\\(\\)]{10,20}$&quot;, 
+             message = &quot;Phone number must be 10-20 characters and contain only numbers, spaces, hyphens, parentheses, and plus sign&quot;)
+    @Schema(description = &quot;Phone number&quot;, example = &quot;+1-555-123-4567&quot;)
+    @JsonProperty(&quot;phoneNumber&quot;)
+    private String phoneNumber;
+
+    @Email(message = &quot;Email must be a valid email address&quot;)
+    @Size(max = 255, message = &quot;Email must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Email address&quot;, example = &quot;john.doe@example.com&quot;)
+    @JsonProperty(&quot;email&quot;)
+    private String email;
+
+    // Default constructor
+<span class="fc" id="L77">    public AddressRequest() {</span>
+<span class="fc" id="L78">    }</span>
+
+    // Constructor with required fields
+    public AddressRequest(String firstName, String lastName, String address1, 
+<span class="nc" id="L82">                         String city, String state, String zipCode, String country) {</span>
+<span class="nc" id="L83">        this.firstName = firstName;</span>
+<span class="nc" id="L84">        this.lastName = lastName;</span>
+<span class="nc" id="L85">        this.address1 = address1;</span>
+<span class="nc" id="L86">        this.city = city;</span>
+<span class="nc" id="L87">        this.state = state;</span>
+<span class="nc" id="L88">        this.zipCode = zipCode;</span>
+<span class="nc" id="L89">        this.country = country;</span>
+<span class="nc" id="L90">    }</span>
+
+    // Getters and Setters
+    public String getFirstName() {
+<span class="fc" id="L94">        return firstName;</span>
+    }
+
+    public void setFirstName(String firstName) {
+<span class="fc" id="L98">        this.firstName = firstName;</span>
+<span class="fc" id="L99">    }</span>
+
+    public String getLastName() {
+<span class="fc" id="L102">        return lastName;</span>
+    }
+
+    public void setLastName(String lastName) {
+<span class="fc" id="L106">        this.lastName = lastName;</span>
+<span class="fc" id="L107">    }</span>
+
+    public String getCompany() {
+<span class="fc" id="L110">        return company;</span>
+    }
+
+    public void setCompany(String company) {
+<span class="fc" id="L114">        this.company = company;</span>
+<span class="fc" id="L115">    }</span>
+
+    public String getAddress1() {
+<span class="fc" id="L118">        return address1;</span>
+    }
+
+    public void setAddress1(String address1) {
+<span class="fc" id="L122">        this.address1 = address1;</span>
+<span class="fc" id="L123">    }</span>
+
+    public String getAddress2() {
+<span class="fc" id="L126">        return address2;</span>
+    }
+
+    public void setAddress2(String address2) {
+<span class="fc" id="L130">        this.address2 = address2;</span>
+<span class="fc" id="L131">    }</span>
+
+    public String getCity() {
+<span class="fc" id="L134">        return city;</span>
+    }
+
+    public void setCity(String city) {
+<span class="fc" id="L138">        this.city = city;</span>
+<span class="fc" id="L139">    }</span>
+
+    public String getState() {
+<span class="fc" id="L142">        return state;</span>
+    }
+
+    public void setState(String state) {
+<span class="fc" id="L146">        this.state = state;</span>
+<span class="fc" id="L147">    }</span>
+
+    public String getZipCode() {
+<span class="fc" id="L150">        return zipCode;</span>
+    }
+
+    public void setZipCode(String zipCode) {
+<span class="fc" id="L154">        this.zipCode = zipCode;</span>
+<span class="fc" id="L155">    }</span>
+
+    public String getCountry() {
+<span class="fc" id="L158">        return country;</span>
+    }
+
+    public void setCountry(String country) {
+<span class="fc" id="L162">        this.country = country;</span>
+<span class="fc" id="L163">    }</span>
+
+    public String getPhoneNumber() {
+<span class="fc" id="L166">        return phoneNumber;</span>
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+<span class="fc" id="L170">        this.phoneNumber = phoneNumber;</span>
+<span class="fc" id="L171">    }</span>
+
+    public String getEmail() {
+<span class="fc" id="L174">        return email;</span>
+    }
+
+    public void setEmail(String email) {
+<span class="fc" id="L178">        this.email = email;</span>
+<span class="fc" id="L179">    }</span>
+
+    /**
+     * Returns the full name by combining first and last name.
+     */
+    public String getFullName() {
+<span class="pc bpc" id="L185" title="3 of 4 branches missed.">        if (firstName == null &amp;&amp; lastName == null) {</span>
+<span class="nc" id="L186">            return null;</span>
+        }
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (firstName == null) {</span>
+<span class="nc" id="L189">            return lastName;</span>
+        }
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (lastName == null) {</span>
+<span class="nc" id="L192">            return firstName;</span>
+        }
+<span class="fc" id="L194">        return firstName + &quot; &quot; + lastName;</span>
+    }
+
+    /**
+     * Returns the full address as a single string.
+     */
+    public String getFullAddress() {
+<span class="fc" id="L201">        StringBuilder address = new StringBuilder();</span>
+        
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">        if (address1 != null &amp;&amp; !address1.trim().isEmpty()) {</span>
+<span class="fc" id="L204">            address.append(address1);</span>
+        }
+        
+<span class="pc bpc" id="L207" title="3 of 4 branches missed.">        if (address2 != null &amp;&amp; !address2.trim().isEmpty()) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            if (address.length() &gt; 0) {</span>
+<span class="nc" id="L209">                address.append(&quot;, &quot;);</span>
+            }
+<span class="nc" id="L211">            address.append(address2);</span>
+        }
+        
+<span class="pc bpc" id="L214" title="2 of 4 branches missed.">        if (city != null &amp;&amp; !city.trim().isEmpty()) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (address.length() &gt; 0) {</span>
+<span class="fc" id="L216">                address.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L218">            address.append(city);</span>
+        }
+        
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (state != null &amp;&amp; !state.trim().isEmpty()) {</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (address.length() &gt; 0) {</span>
+<span class="fc" id="L223">                address.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L225">            address.append(state);</span>
+        }
+        
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">        if (zipCode != null &amp;&amp; !zipCode.trim().isEmpty()) {</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (address.length() &gt; 0) {</span>
+<span class="fc" id="L230">                address.append(&quot; &quot;);</span>
+            }
+<span class="fc" id="L232">            address.append(zipCode);</span>
+        }
+        
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">        if (country != null &amp;&amp; !country.trim().isEmpty()) {</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            if (address.length() &gt; 0) {</span>
+<span class="fc" id="L237">                address.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L239">            address.append(country);</span>
+        }
+        
+<span class="fc" id="L242">        return address.toString();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L247">        return &quot;AddressRequest{&quot; +</span>
+                &quot;firstName='&quot; + firstName + '\'' +
+                &quot;, lastName='&quot; + lastName + '\'' +
+                &quot;, company='&quot; + company + '\'' +
+                &quot;, address1='&quot; + address1 + '\'' +
+                &quot;, address2='&quot; + address2 + '\'' +
+                &quot;, city='&quot; + city + '\'' +
+                &quot;, state='&quot; + state + '\'' +
+                &quot;, zipCode='&quot; + zipCode + '\'' +
+                &quot;, country='&quot; + country + '\'' +
+                &quot;, phoneNumber='&quot; + phoneNumber + '\'' +
+                &quot;, email='&quot; + email + '\'' +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

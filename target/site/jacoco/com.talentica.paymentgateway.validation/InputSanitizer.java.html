@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InputSanitizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.validation</a> &gt; <span class="el_source">InputSanitizer.java</span></div><h1>InputSanitizer.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.validation;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.regex.Pattern;
+
+/**
+ * Input Sanitizer for cleaning and validating user input.
+ * Provides methods to sanitize various types of input data.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Component
+<span class="fc" id="L16">public class InputSanitizer {</span>
+
+    // Common regex patterns for validation
+<span class="fc" id="L19">    private static final Pattern EMAIL_PATTERN = Pattern.compile(</span>
+            &quot;^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$&quot;
+    );
+    
+<span class="fc" id="L23">    private static final Pattern PHONE_PATTERN = Pattern.compile(</span>
+            &quot;^[+]?[1-9]\\d{1,14}$&quot;
+    );
+    
+<span class="fc" id="L27">    private static final Pattern ALPHANUMERIC_PATTERN = Pattern.compile(</span>
+            &quot;^[A-Za-z0-9]+$&quot;
+    );
+    
+<span class="fc" id="L31">    private static final Pattern SAFE_STRING_PATTERN = Pattern.compile(</span>
+            &quot;^[A-Za-z0-9\\s\\-_.@]+$&quot;
+    );
+    
+<span class="fc" id="L35">    private static final Pattern AMOUNT_PATTERN = Pattern.compile(</span>
+            &quot;^\\d+(\\.\\d{1,2})?$&quot;
+    );
+    
+    // Characters to remove from input
+<span class="fc" id="L40">    private static final String[] DANGEROUS_CHARS = {</span>
+            &quot;&lt;&quot;, &quot;&gt;&quot;, &quot;\&quot;&quot;, &quot;'&quot;, &quot;&amp;&quot;, &quot;script&quot;, &quot;javascript:&quot;, &quot;vbscript:&quot;,
+            &quot;onload&quot;, &quot;onerror&quot;, &quot;onclick&quot;, &quot;onmouseover&quot;, &quot;onfocus&quot;, &quot;onblur&quot;
+    };
+
+    /**
+     * Sanitize general text input by removing dangerous characters.
+     * 
+     * @param input Input string
+     * @return Sanitized string
+     */
+    public String sanitizeText(String input) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L53">            return &quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L56">        String sanitized = input.trim();</span>
+        
+        // Remove dangerous characters
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (String dangerousChar : DANGEROUS_CHARS) {</span>
+<span class="fc" id="L60">            sanitized = sanitized.replaceAll(&quot;(?i)&quot; + Pattern.quote(dangerousChar), &quot;&quot;);</span>
+        }
+        
+        // Remove excessive whitespace
+<span class="fc" id="L64">        sanitized = sanitized.replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        
+<span class="fc" id="L66">        return sanitized;</span>
+    }
+
+    /**
+     * Sanitize and validate email address.
+     * 
+     * @param email Email address
+     * @return Sanitized email or null if invalid
+     */
+    public String sanitizeEmail(String email) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!StringUtils.hasText(email)) {</span>
+<span class="fc" id="L77">            return null;</span>
+        }
+        
+<span class="fc" id="L80">        String sanitized = email.trim().toLowerCase();</span>
+        
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (EMAIL_PATTERN.matcher(sanitized).matches()) {</span>
+<span class="fc" id="L83">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L86">        return null;</span>
+    }
+
+    /**
+     * Sanitize and validate phone number.
+     * 
+     * @param phone Phone number
+     * @return Sanitized phone number or null if invalid
+     */
+    public String sanitizePhone(String phone) {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (!StringUtils.hasText(phone)) {</span>
+<span class="nc" id="L97">            return null;</span>
+        }
+        
+        // Remove all non-digit characters except +
+<span class="fc" id="L101">        String sanitized = phone.replaceAll(&quot;[^+\\d]&quot;, &quot;&quot;);</span>
+        
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (PHONE_PATTERN.matcher(sanitized).matches()) {</span>
+<span class="fc" id="L104">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L107">        return null;</span>
+    }
+
+    /**
+     * Sanitize alphanumeric input (IDs, codes, etc.).
+     * 
+     * @param input Input string
+     * @return Sanitized alphanumeric string or null if invalid
+     */
+    public String sanitizeAlphanumeric(String input) {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L118">            return null;</span>
+        }
+        
+<span class="fc" id="L121">        String sanitized = input.trim();</span>
+        
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (ALPHANUMERIC_PATTERN.matcher(sanitized).matches()) {</span>
+<span class="fc" id="L124">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L127">        return null;</span>
+    }
+
+    /**
+     * Sanitize safe string input (names, descriptions with limited special chars).
+     * 
+     * @param input Input string
+     * @return Sanitized string or null if invalid
+     */
+    public String sanitizeSafeString(String input) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L138">            return null;</span>
+        }
+        
+<span class="fc" id="L141">        String sanitized = input.trim();</span>
+        
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (SAFE_STRING_PATTERN.matcher(sanitized).matches()) {</span>
+<span class="fc" id="L144">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L147">        return null;</span>
+    }
+
+    /**
+     * Sanitize and validate monetary amount.
+     * 
+     * @param amount Amount string
+     * @return Sanitized amount or null if invalid
+     */
+    public String sanitizeAmount(String amount) {
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (!StringUtils.hasText(amount)) {</span>
+<span class="nc" id="L158">            return null;</span>
+        }
+        
+<span class="fc" id="L161">        String sanitized = amount.trim();</span>
+        
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (AMOUNT_PATTERN.matcher(sanitized).matches()) {</span>
+<span class="fc" id="L164">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L167">        return null;</span>
+    }
+
+    /**
+     * Sanitize credit card number (remove spaces, dashes).
+     * 
+     * @param cardNumber Credit card number
+     * @return Sanitized card number or null if invalid
+     */
+    public String sanitizeCardNumber(String cardNumber) {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!StringUtils.hasText(cardNumber)) {</span>
+<span class="nc" id="L178">            return null;</span>
+        }
+        
+        // Remove spaces and dashes
+<span class="fc" id="L182">        String sanitized = cardNumber.replaceAll(&quot;[\\s\\-]&quot;, &quot;&quot;);</span>
+        
+        // Check if it's all digits and has valid length
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (sanitized.matches(&quot;^\\d{13,19}$&quot;)) {</span>
+<span class="fc" id="L186">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L189">        return null;</span>
+    }
+
+    /**
+     * Sanitize CVV code.
+     * 
+     * @param cvv CVV code
+     * @return Sanitized CVV or null if invalid
+     */
+    public String sanitizeCvv(String cvv) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (!StringUtils.hasText(cvv)) {</span>
+<span class="nc" id="L200">            return null;</span>
+        }
+        
+<span class="fc" id="L203">        String sanitized = cvv.trim();</span>
+        
+        // CVV should be 3 or 4 digits
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (sanitized.matches(&quot;^\\d{3,4}$&quot;)) {</span>
+<span class="fc" id="L207">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L210">        return null;</span>
+    }
+
+    /**
+     * Sanitize expiry date (MM/YY or MM/YYYY format).
+     * 
+     * @param expiryDate Expiry date
+     * @return Sanitized expiry date or null if invalid
+     */
+    public String sanitizeExpiryDate(String expiryDate) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (!StringUtils.hasText(expiryDate)) {</span>
+<span class="nc" id="L221">            return null;</span>
+        }
+        
+<span class="fc" id="L224">        String sanitized = expiryDate.trim();</span>
+        
+        // Check MM/YY or MM/YYYY format
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (sanitized.matches(&quot;^(0[1-9]|1[0-2])/(\\d{2}|\\d{4})$&quot;)) {</span>
+<span class="fc" id="L228">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L231">        return null;</span>
+    }
+
+    /**
+     * Sanitize URL input.
+     * 
+     * @param url URL string
+     * @return Sanitized URL or null if invalid
+     */
+    public String sanitizeUrl(String url) {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (!StringUtils.hasText(url)) {</span>
+<span class="nc" id="L242">            return null;</span>
+        }
+        
+<span class="fc" id="L245">        String sanitized = url.trim();</span>
+        
+        // Basic URL validation
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (sanitized.matches(&quot;^https?://[\\w\\-.]+(:[\\d]+)?(/[\\w\\-._~:/?#\\[\\]@!$&amp;'()*+,;=]*)?$&quot;)) {</span>
+<span class="fc" id="L249">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L252">        return null;</span>
+    }
+
+    /**
+     * Sanitize IP address.
+     * 
+     * @param ipAddress IP address
+     * @return Sanitized IP address or null if invalid
+     */
+    public String sanitizeIpAddress(String ipAddress) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (!StringUtils.hasText(ipAddress)) {</span>
+<span class="nc" id="L263">            return null;</span>
+        }
+        
+<span class="fc" id="L266">        String sanitized = ipAddress.trim();</span>
+        
+        // IPv4 pattern
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (sanitized.matches(&quot;^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$&quot;)) {</span>
+<span class="fc" id="L270">            return sanitized;</span>
+        }
+        
+        // IPv6 pattern (simplified)
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (sanitized.matches(&quot;^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$&quot;)) {</span>
+<span class="nc" id="L275">            return sanitized;</span>
+        }
+        
+<span class="fc" id="L278">        return null;</span>
+    }
+
+    /**
+     * Check if string contains only safe characters.
+     * 
+     * @param input Input string
+     * @return true if safe
+     */
+    public boolean isSafeInput(String input) {
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L289">            return true;</span>
+        }
+        
+        // Check for dangerous patterns
+<span class="fc" id="L293">        String lowerInput = input.toLowerCase();</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        for (String dangerous : DANGEROUS_CHARS) {</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (lowerInput.contains(dangerous.toLowerCase())) {</span>
+<span class="fc" id="L296">                return false;</span>
+            }
+        }
+        
+<span class="fc" id="L300">        return true;</span>
+    }
+
+    /**
+     * Sanitize and truncate string to maximum length.
+     * 
+     * @param input Input string
+     * @param maxLength Maximum allowed length
+     * @return Sanitized and truncated string
+     */
+    public String sanitizeAndTruncate(String input, int maxLength) {
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L312">            return &quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L315">        String sanitized = sanitizeText(input);</span>
+        
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (sanitized.length() &gt; maxLength) {</span>
+<span class="fc" id="L318">            return sanitized.substring(0, maxLength);</span>
+        }
+        
+<span class="nc" id="L321">        return sanitized;</span>
+    }
+
+    /**
+     * Remove all HTML tags from input.
+     * 
+     * @param input Input string with potential HTML
+     * @return String with HTML tags removed
+     */
+    public String removeHtmlTags(String input) {
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (!StringUtils.hasText(input)) {</span>
+<span class="nc" id="L332">            return &quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L335">        return input.replaceAll(&quot;&lt;[^&gt;]*&gt;&quot;, &quot;&quot;).trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

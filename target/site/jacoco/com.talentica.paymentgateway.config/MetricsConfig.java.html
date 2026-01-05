@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetricsConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config</a> &gt; <span class="el_source">MetricsConfig.java</span></div><h1>MetricsConfig.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.config.MeterFilter;
+import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;
+import org.springframework.boot.info.BuildProperties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Metrics Configuration for Payment Gateway Application.
+ * 
+ * Configures Micrometer metrics with proper tagging, filtering, and custom registrations.
+ * Provides comprehensive metrics for payment operations, system health, and performance monitoring.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Configuration
+<span class="fc" id="L21">public class MetricsConfig {</span>
+
+    /**
+     * Customize meter registry with common tags and filters.
+     * 
+     * @param buildProperties Build properties for version information (optional)
+     * @return Meter registry customizer
+     */
+    @Bean
+    public MeterRegistryCustomizer&lt;MeterRegistry&gt; metricsCommonTags(@Autowired(required = false) BuildProperties buildProperties) {
+<span class="fc" id="L31">        return registry -&gt; {</span>
+            // Get version from build properties or default
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            String version = buildProperties != null ? buildProperties.getVersion() : &quot;1.0.0&quot;;</span>
+            
+            // Add common tags to all metrics
+<span class="fc" id="L36">            registry.config()</span>
+<span class="fc" id="L37">                .commonTags(</span>
+                    &quot;application&quot;, &quot;payment-gateway&quot;,
+                    &quot;version&quot;, version,
+<span class="fc" id="L40">                    &quot;environment&quot;, System.getProperty(&quot;spring.profiles.active&quot;, &quot;unknown&quot;)</span>
+                )
+                // Add meter filters
+<span class="fc" id="L43">                .meterFilter(MeterFilter.ignoreTags(&quot;uri&quot;)) // Remove high cardinality URI tags</span>
+<span class="fc" id="L44">                .meterFilter(MeterFilter.deny(id -&gt; {</span>
+<span class="fc" id="L45">                    String name = id.getName();</span>
+                    // Filter out noisy metrics
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                    return name.startsWith(&quot;jvm.gc.pause&quot;) ||</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                           name.startsWith(&quot;hikaricp.connections.idle&quot;) ||</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                           name.startsWith(&quot;logback.events&quot;);</span>
+                }));
+<span class="fc" id="L51">        };</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

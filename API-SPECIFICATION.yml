@@ -1,0 +1,1646 @@
+openapi: 3.0.3
+info:
+  title: Payment Gateway API - Enterprise Payment Processing
+  description: |
+    # 🚀 Payment Gateway API v1.0
+    
+    **Enterprise-grade payment processing API** with comprehensive Authorize.Net integration, designed for secure, scalable, and compliant financial transactions.
+    
+    ## 🎯 Core Capabilities
+    
+    ### 💳 Payment Processing
+    - **Direct Purchase**: One-step authorization and capture
+    - **Two-Step Processing**: Separate authorization and capture
+    - **Transaction Management**: Void and refund operations
+    - **Payment Method Validation**: Pre-transaction verification
+    
+    ### 📄 Subscription Management
+    - **Recurring Billing**: Automated subscription processing
+    - **Plan Management**: Flexible subscription plans with trials
+    - **Lifecycle Control**: Pause, resume, and cancel subscriptions
+    - **Dunning Management**: Intelligent failed payment handling
+    
+    ### 📊 Analytics & Reporting
+    - **Real-time Dashboards**: Live transaction monitoring
+    - **Business Intelligence**: Revenue and performance analytics
+    - **Compliance Reports**: PCI DSS, GDPR, and SOX reporting
+    - **Data Export**: Comprehensive data export capabilities
+    
+    ### 🔔 Webhook Integration
+    - **Real-time Notifications**: Instant transaction updates
+    - **Event Processing**: Comprehensive event handling
+    - **Retry Logic**: Guaranteed delivery with exponential backoff
+    
+    ## 🔐 Security & Authentication
+    
+    ### Multi-Factor Authentication
+    
+    | **Method** | **Use Case** | **Security Level** |
+    |------------|--------------|-------------------|
+    | **JWT Bearer Token** | User authentication | 🔐 High |
+    | **API Key** | Service-to-service | 🛡️ Enterprise |
+    | **OAuth 2.0** | Third-party integrations | ⚡ Advanced |
+    
+    ### Security Features
+    - 🔒 **TLS 1.3 Encryption**: All communications encrypted
+    - 🛡️ **PCI DSS Compliant**: Level 1 PCI compliance
+    - 🎯 **Rate Limiting**: Intelligent request throttling
+    - 📊 **Fraud Detection**: ML-powered risk assessment
+    - 🔍 **Audit Logging**: Comprehensive security trails
+    
+    ## ⚡ Performance & Reliability
+    
+    ### SLA Commitments
+    - **🎯 Uptime**: 99.9% availability guarantee
+    - **⚡ Response Time**: < 2 seconds (95th percentile)
+    - **📈 Throughput**: 1,000+ TPS capacity
+    - **🔄 Recovery**: < 5 minutes MTTR
+    
+    ### Rate Limiting
+    ```
+    Default Limits:
+    • Standard API: 1,000 requests/hour
+    • Payment API: 10,000 requests/hour  
+    • Webhook API: Unlimited
+    • Burst Capacity: 100 requests/minute
+    ```
+    
+    ## 💡 Getting Started
+    
+    ### Quick Integration Steps
+    1. **🔑 Obtain API Credentials**: Register for sandbox/production access
+    2. **🛡️ Authentication**: Implement JWT or API key authentication
+    3. **💳 Test Payments**: Use sandbox environment for testing
+    4. **🔔 Setup Webhooks**: Configure real-time notifications
+    5. **🚀 Go Live**: Deploy with production credentials
+    
+    ### Idempotency Support
+    All payment operations support idempotency using the `Idempotency-Key` header to prevent duplicate transactions and ensure exactly-once processing.
+    
+    ### Error Handling Strategy
+    - **Standard HTTP Status Codes**: RESTful error responses
+    - **Detailed Error Context**: Comprehensive error descriptions
+    - **Correlation Tracking**: End-to-end request tracing
+    - **Retry Guidance**: Smart retry recommendations
+    
+    ## 📞 Support & Resources
+    
+    - **📧 Technical Support**: [support@talentica.com](mailto:support@talentica.com)
+    - **📚 Developer Docs**: [docs.paymentgateway.com](https://docs.paymentgateway.com)
+    - **🔧 SDK Libraries**: Available for Java, Python, Node.js, PHP
+    - **💬 Community**: [community.paymentgateway.com](https://community.paymentgateway.com)
+    
+  version: 1.0.0
+  contact:
+    name: Payment Gateway Engineering Team
+    email: support@talentica.com
+    url: https://talentica.com/support
+  license:
+    name: MIT License
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://talentica.com/terms
+
+externalDocs:
+  description: Complete API Documentation & Integration Guide
+  url: https://docs.paymentgateway.com
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 🔧 Local Development Server
+    variables:
+      port:
+        default: '8080'
+        description: Local server port
+  - url: https://sandbox-api.paymentgateway.com/api/v1
+    description: 🧪 Sandbox Environment (Testing)
+  - url: https://staging-api.paymentgateway.com/api/v1
+    description: 🚀 Staging Environment (Pre-production)
+  - url: https://api.paymentgateway.com/api/v1
+    description: ⭐ Production Environment
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # 🔐 Authentication & Authorization Endpoints
+  /auth/login:
+    post:
+      tags:
+        - 🔐 Authentication
+      summary: User Login - Obtain JWT Token
+      description: |
+        **Authenticate user credentials and receive JWT tokens**
+        
+        This endpoint validates user credentials (email/username + password) and returns:
+        - **Access Token (JWT)**: Short-lived token for API access (15 minutes)
+        - **Refresh Token**: Long-lived token for obtaining new access tokens (30 days)
+        - **User Profile**: Basic user information and permissions
+        
+        ### Features
+        - 🔒 Secure password validation with bcrypt
+        - 🛡️ Brute force protection (5 failed attempts = 30min lockout)
+        - 📱 Multi-factor authentication support
+        - 🌍 Geographic access control
+        - 📊 Login audit trail with IP tracking
+        
+        ### Rate Limiting
+        - **Standard Users**: 5 attempts per 5 minutes
+        - **After Failure**: Progressive backoff (1min → 5min → 15min → 30min)
+        
+      operationId: authenticateUser
+      security: []
+      requestBody:
+        required: true
+        description: User credentials for authentication
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              email_login:
+                summary: Login with Email
+                value:
+                  email: john.doe@example.com
+                  password: SecurePass123!
+                  rememberMe: true
+                  deviceFingerprint: "device_abc123"
+              username_login:
+                summary: Login with Username
+                value:
+                  username: johndoe
+                  password: SecurePass123!
+                  mfaToken: "123456"
+                  ipAddress: "192.168.1.1"
+      responses:
+        '200':
+          description: ✅ Authentication successful
+          headers:
+            X-Rate-Limit-Remaining:
+              description: Number of requests remaining in current window
+              schema:
+                type: integer
+            X-Rate-Limit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                successful_login:
+                  summary: Successful Login Response
+                  value:
+                    success: true
+                    accessToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    refreshToken: "rt_abc123def456..."
+                    expiresIn: 900
+                    tokenType: "Bearer"
+                    user:
+                      id: "usr_123456"
+                      email: "john.doe@example.com"
+                      firstName: "John"
+                      lastName: "Doe"
+                      roles: ["USER", "PAYMENT_PROCESSOR"]
+                      permissions: ["payments:read", "payments:create"]
+                      lastLoginAt: "2025-01-04T14:30:00Z"
+                      mfaEnabled: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: 🚫 Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_credentials:
+                  summary: Invalid Credentials
+                  value:
+                    success: false
+                    error:
+                      code: "INVALID_CREDENTIALS"
+                      message: "Invalid email or password"
+                      details: "Please check your credentials and try again"
+                      correlationId: "corr_123456"
+                      retryAfter: 60
+                account_locked:
+                  summary: Account Locked
+                  value:
+                    success: false
+                    error:
+                      code: "ACCOUNT_LOCKED"
+                      message: "Account temporarily locked due to multiple failed attempts"
+                      details: "Please try again in 30 minutes or contact support"
+                      lockExpiresAt: "2025-01-04T15:00:00Z"
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags:
+        - 🔐 Authentication
+      summary: Token Refresh - Renew Access Token
+      description: |
+        **Use refresh token to obtain a new JWT access token**
+        
+        When your access token expires (after 15 minutes), use this endpoint with your refresh token to get a new access token without requiring the user to log in again.
+        
+        ### Token Rotation
+        - **New Access Token**: Fresh 15-minute JWT
+        - **New Refresh Token**: Fresh 30-day refresh token (optional)
+        - **Security**: Old refresh token is invalidated after use
+        
+        ### Security Features
+        - 🔄 **Automatic Rotation**: Refresh tokens rotate on each use
+        - 🛡️ **Family Validation**: Detects token reuse attempts
+        - ⏰ **Expiration Tracking**: Automatic cleanup of expired tokens
+        - 📍 **Device Binding**: Tokens tied to device fingerprints
+        
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+            examples:
+              token_refresh:
+                summary: Standard Token Refresh
+                value:
+                  refreshToken: "rt_abc123def456ghi789"
+                  deviceFingerprint: "device_abc123"
+      responses:
+        '200':
+          description: ✅ Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 🚫 Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                expired_token:
+                  summary: Expired Refresh Token
+                  value:
+                    success: false
+                    error:
+                      code: "REFRESH_TOKEN_EXPIRED"
+                      message: "Refresh token has expired"
+                      details: "Please log in again to continue"
+                invalid_token:
+                  summary: Invalid Refresh Token
+                  value:
+                    success: false
+                    error:
+                      code: "INVALID_REFRESH_TOKEN"
+                      message: "Invalid refresh token"
+                      details: "Token may have been revoked or tampered with"
+
+  /auth/logout:
+    post:
+      tags:
+        - 🔐 Authentication
+      summary: User Logout - Revoke Tokens
+      description: |
+        **Securely log out user and revoke all tokens**
+        
+        This endpoint invalidates the user's current session and all associated tokens:
+        - **Access Token**: Immediately invalidated
+        - **Refresh Token**: Permanently revoked
+        - **Session Data**: Cleared from Redis cache
+        - **Audit Log**: Logout event recorded
+        
+      operationId: logoutUser
+      responses:
+        '200':
+          description: ✅ Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Successfully logged out"
+                  loggedOutAt:
+                    type: string
+                    format: date-time
+                    example: "2025-01-04T14:35:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Payment Processing Endpoints
+  /payments/purchase:
+    post:
+      tags:
+        - Payment Processing
+      summary: Process a purchase transaction
+      description: |
+        Process a direct purchase transaction (authorization + capture in one step).
+        This immediately charges the customer's payment method and is suitable for most e-commerce transactions.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseRequest'
+            example:
+              amount: 99.99
+              currency: USD
+              paymentMethod:
+                type: CREDIT_CARD
+                cardNumber: "4111111111111111"
+                expiryMonth: 12
+                expiryYear: 2025
+                cvv: "123"
+                cardholderName: John Doe
+              customer:
+                email: john@example.com
+                firstName: John
+                lastName: Doe
+                phone: "+1-555-123-4567"
+              billingAddress:
+                line1: 123 Main St
+                city: New York
+                state: NY
+                postalCode: "10001"
+                country: US
+              order:
+                orderNumber: ORD-001
+                description: Test purchase
+      responses:
+        '200':
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/PaymentError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/authorize:
+    post:
+      tags:
+        - Payment Processing
+      summary: Authorize a payment
+      description: |
+        Process an authorization-only transaction that reserves funds on the customer's
+        payment method without capturing them. Use capture endpoint to complete the transaction.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeRequest'
+      responses:
+        '200':
+          description: Payment authorized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/PaymentError'
+
+  /payments/capture:
+    post:
+      tags:
+        - Payment Processing
+      summary: Capture an authorized payment
+      description: |
+        Capture funds from a previously authorized transaction. The authorization
+        must be valid and not expired (typically within 30 days).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureRequest'
+      responses:
+        '200':
+          description: Payment captured successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/PaymentError'
+
+  /payments/void:
+    post:
+      tags:
+        - Payment Processing
+      summary: Void an authorized payment
+      description: |
+        Cancel a previously authorized transaction before it's captured.
+        This releases the hold on the customer's payment method.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoidRequest'
+      responses:
+        '200':
+          description: Payment voided successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/PaymentError'
+
+  /payments/refund:
+    post:
+      tags:
+        - Payment Processing
+      summary: Process a refund
+      description: |
+        Process a full or partial refund for a previously captured transaction.
+        Refunds can be processed multiple times up to the original transaction amount.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '200':
+          description: Refund processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/PaymentError'
+
+  /payments/{transactionId}:
+    get:
+      tags:
+        - Payment Processing
+      summary: Get transaction status
+      description: Retrieve the current status and details of a payment transaction.
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          description: Unique transaction identifier
+          schema:
+            type: string
+            example: txn_1234567890
+      responses:
+        '200':
+          description: Transaction details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /payments/validate:
+    post:
+      tags:
+        - Payment Processing
+      summary: Validate payment method
+      description: |
+        Validate a payment method without processing a transaction.
+        Useful for testing card validity and fraud detection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentMethodValidationRequest'
+      responses:
+        '200':
+          description: Payment method validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Subscription Management Endpoints
+  /subscriptions:
+    post:
+      tags:
+        - Subscription Management
+      summary: Create a new subscription
+      description: |
+        Create a new subscription for recurring billing. Supports trial periods,
+        custom billing cycles, and various subscription plans.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '201':
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags:
+        - Subscription Management
+      summary: List subscriptions
+      description: Retrieve a list of subscriptions with filtering and pagination.
+      parameters:
+        - name: customerId
+          in: query
+          description: Filter by customer ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by subscription status
+          schema:
+            $ref: '#/components/schemas/SubscriptionStatus'
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Subscriptions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+
+  /subscriptions/{subscriptionId}:
+    get:
+      tags:
+        - Subscription Management
+      summary: Get subscription details
+      description: Retrieve detailed information about a specific subscription.
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          description: Unique subscription identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Subscription Management
+      summary: Update subscription
+      description: Update subscription details such as payment method or billing address.
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          description: Unique subscription identifier
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubscriptionRequest'
+      responses:
+        '200':
+          description: Subscription updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+
+  /subscriptions/{subscriptionId}/cancel:
+    post:
+      tags:
+        - Subscription Management
+      summary: Cancel subscription
+      description: Cancel a subscription with optional cancellation reason.
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          description: Unique subscription identifier
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelSubscriptionRequest'
+      responses:
+        '200':
+          description: Subscription cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+
+  # Analytics Endpoints
+  /analytics/dashboard:
+    post:
+      tags:
+        - Analytics
+      summary: Get dashboard metrics
+      description: |
+        Retrieve comprehensive dashboard metrics including transaction volumes,
+        revenue data, and performance indicators for a specified time period.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DashboardRequest'
+      responses:
+        '200':
+          description: Dashboard metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /analytics/transactions:
+    post:
+      tags:
+        - Analytics
+      summary: Generate transaction report
+      description: |
+        Generate detailed transaction reports with advanced filtering options,
+        pagination, and export capabilities.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionReportRequest'
+      responses:
+        '200':
+          description: Transaction report generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionReportResponse'
+
+  /analytics/revenue:
+    get:
+      tags:
+        - Analytics
+      summary: Get revenue analytics
+      description: Retrieve revenue analytics including MRR, churn rates, and growth metrics.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          description: Start date for analysis (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          description: End date for analysis (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Revenue analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueMetrics'
+
+  # Webhook Endpoints
+  /webhooks/authorize-net:
+    post:
+      tags:
+        - Webhooks
+      summary: Receive Authorize.Net webhook notifications
+      description: |
+        Endpoint for receiving and processing webhook notifications from Authorize.Net
+        for payment events including successful payments, refunds, voids, and fraud reviews.
+        All webhooks are processed asynchronously with signature verification.
+      security: []
+      parameters:
+        - name: X-ANET-Signature
+          in: header
+          description: Authorize.Net signature for webhook verification
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Webhook received and queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          description: Invalid webhook payload
+        '401':
+          description: Invalid webhook signature
+
+  # Health Check Endpoints
+  /health/status:
+    get:
+      tags:
+        - Health Monitoring
+      summary: Basic health check
+      description: Simple health check endpoint for load balancers and monitoring systems.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Service is unhealthy
+
+  /health/detailed:
+    get:
+      tags:
+        - Health Monitoring
+      summary: Detailed health status
+      description: Comprehensive health check including all dependencies and system components.
+      responses:
+        '200':
+          description: Detailed health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealthStatus'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login endpoint
+    
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for service-to-service communication
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Unique key to prevent duplicate processing of the same request
+      schema:
+        type: string
+        maxLength: 255
+      example: "unique-key-12345"
+    
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      description: Unique identifier for request tracing across systems
+      schema:
+        type: string
+        maxLength: 100
+      example: "corr-123e4567-e89b-12d3-a456-426614174000"
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Username or email address
+          example: john@example.com
+        password:
+          type: string
+          description: User password
+          format: password
+          example: securePassword123
+
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token for obtaining new access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: Refresh token for token renewal
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+          example: 3600
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+
+    # Payment Schemas
+    PurchaseRequest:
+      type: object
+      required:
+        - amount
+        - currency
+        - paymentMethod
+        - customer
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          example: 99.99
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: USD
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethodRequest'
+        customer:
+          $ref: '#/components/schemas/CustomerRequest'
+        billingAddress:
+          $ref: '#/components/schemas/AddressRequest'
+        shippingAddress:
+          $ref: '#/components/schemas/AddressRequest'
+        order:
+          $ref: '#/components/schemas/OrderRequest'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    AuthorizeRequest:
+      allOf:
+        - $ref: '#/components/schemas/PurchaseRequest'
+        - type: object
+          properties:
+            holdDuration:
+              type: integer
+              description: Authorization hold duration in hours
+              minimum: 1
+              maximum: 720
+              example: 72
+
+    CaptureRequest:
+      type: object
+      required:
+        - transactionId
+      properties:
+        transactionId:
+          type: string
+          description: Original authorization transaction ID
+          example: txn_auth_1234567890
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          description: Amount to capture (optional, defaults to full authorized amount)
+
+    VoidRequest:
+      type: object
+      required:
+        - transactionId
+      properties:
+        transactionId:
+          type: string
+          description: Authorization transaction ID to void
+          example: txn_auth_1234567890
+
+    RefundRequest:
+      type: object
+      required:
+        - transactionId
+        - amount
+      properties:
+        transactionId:
+          type: string
+          description: Original transaction ID to refund
+          example: txn_1234567890
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          description: Refund amount
+          example: 49.99
+        reason:
+          type: string
+          description: Reason for refund
+          example: Customer requested refund
+
+    PaymentMethodRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [CREDIT_CARD, DEBIT_CARD, BANK_ACCOUNT]
+          example: CREDIT_CARD
+        cardNumber:
+          type: string
+          description: Credit card number (required for card payments)
+          example: "4111111111111111"
+        expiryMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+          example: 12
+        expiryYear:
+          type: integer
+          minimum: 2025
+          example: 2025
+        cvv:
+          type: string
+          minLength: 3
+          maxLength: 4
+          example: "123"
+        cardholderName:
+          type: string
+          example: John Doe
+        token:
+          type: string
+          description: Payment method token for saved payment methods
+
+    CustomerRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phone:
+          type: string
+          example: "+1-555-123-4567"
+        customerReference:
+          type: string
+          description: External customer reference
+          example: CUST-001
+
+    AddressRequest:
+      type: object
+      properties:
+        line1:
+          type: string
+          example: 123 Main St
+        line2:
+          type: string
+          example: Apt 4B
+        city:
+          type: string
+          example: New York
+        state:
+          type: string
+          example: NY
+        postalCode:
+          type: string
+          example: "10001"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          example: US
+
+    OrderRequest:
+      type: object
+      properties:
+        orderNumber:
+          type: string
+          example: ORD-001
+        description:
+          type: string
+          example: Test purchase
+        taxAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 8.99
+        shippingAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 5.99
+
+    PaymentResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          example: txn_1234567890
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        amount:
+          type: number
+          format: decimal
+          example: 99.99
+        currency:
+          type: string
+          example: USD
+        authorizationCode:
+          type: string
+          example: AUTH123
+        avsResult:
+          type: string
+          description: Address verification result
+          example: Y
+        cvvResult:
+          type: string
+          description: CVV verification result
+          example: M
+        correlationId:
+          type: string
+          example: corr-123e4567-e89b-12d3-a456-426614174000
+        processedAt:
+          type: string
+          format: date-time
+          example: "2025-09-10T14:30:00Z"
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethodResponse'
+
+    PaymentStatus:
+      type: string
+      enum:
+        - PENDING
+        - AUTHORIZED
+        - CAPTURED
+        - SETTLED
+        - VOIDED
+        - REFUNDED
+        - PARTIALLY_REFUNDED
+        - FAILED
+        - CANCELLED
+        - EXPIRED
+
+    PaymentMethodResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: CREDIT_CARD
+        cardLastFour:
+          type: string
+          example: "1111"
+        cardBrand:
+          type: string
+          example: VISA
+        expiryMonth:
+          type: integer
+          example: 12
+        expiryYear:
+          type: integer
+          example: 2025
+
+    # Subscription Schemas
+    CreateSubscriptionRequest:
+      type: object
+      required:
+        - customerId
+        - planId
+        - paymentMethodId
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        paymentMethodId:
+          type: string
+          format: uuid
+        trialPeriodDays:
+          type: integer
+          minimum: 0
+          example: 14
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateSubscriptionRequest:
+      type: object
+      properties:
+        paymentMethodId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CancelSubscriptionRequest:
+      type: object
+      properties:
+        cancellationReason:
+          type: string
+          example: Customer requested cancellation
+        cancelAtPeriodEnd:
+          type: boolean
+          default: false
+          description: Whether to cancel immediately or at period end
+
+    SubscriptionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subscriptionId:
+          type: string
+          example: sub_1234567890
+        customerId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        currentPeriodStart:
+          type: string
+          format: date-time
+        currentPeriodEnd:
+          type: string
+          format: date-time
+        nextBillingDate:
+          type: string
+          format: date-time
+        trialStart:
+          type: string
+          format: date-time
+        trialEnd:
+          type: string
+          format: date-time
+        cancelledAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SubscriptionStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - PAUSED
+        - CANCELLED
+        - EXPIRED
+        - PAST_DUE
+        - PENDING
+
+    SubscriptionListResponse:
+      type: object
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionResponse'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    PaginationInfo:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          example: 150
+        totalPages:
+          type: integer
+          example: 8
+
+    # Analytics Schemas
+    DashboardRequest:
+      type: object
+      required:
+        - startDate
+        - endDate
+      properties:
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        includeComparison:
+          type: boolean
+          default: false
+
+    DashboardMetrics:
+      type: object
+      properties:
+        transactionMetrics:
+          $ref: '#/components/schemas/TransactionMetrics'
+        revenueMetrics:
+          $ref: '#/components/schemas/RevenueMetrics'
+        subscriptionMetrics:
+          $ref: '#/components/schemas/SubscriptionMetrics'
+        performanceMetrics:
+          $ref: '#/components/schemas/PerformanceMetrics'
+
+    TransactionMetrics:
+      type: object
+      properties:
+        totalTransactions:
+          type: integer
+          example: 1250
+        successfulTransactions:
+          type: integer
+          example: 1200
+        failedTransactions:
+          type: integer
+          example: 50
+        successRate:
+          type: number
+          format: decimal
+          example: 96.0
+        averageTransactionValue:
+          type: number
+          format: decimal
+          example: 89.50
+
+    RevenueMetrics:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+          format: decimal
+          example: 125000.00
+        recurringRevenue:
+          type: number
+          format: decimal
+          example: 45000.00
+        refundedAmount:
+          type: number
+          format: decimal
+          example: 2500.00
+        netRevenue:
+          type: number
+          format: decimal
+          example: 122500.00
+
+    # Webhook Schemas
+    WebhookPayload:
+      type: object
+      properties:
+        eventType:
+          type: string
+          example: net.authorize.payment.authorization.created
+        eventDate:
+          type: string
+          format: date-time
+        webhookId:
+          type: string
+          example: webhook_123456
+        payload:
+          type: object
+          additionalProperties: true
+
+    WebhookResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: accepted
+        webhookId:
+          type: string
+          example: webhook_123456
+        correlationId:
+          type: string
+          example: corr-123e4567-e89b-12d3-a456-426614174000
+
+    # Health Check Schemas
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN, OUT_OF_SERVICE, UNKNOWN]
+          example: UP
+        timestamp:
+          type: string
+          format: date-time
+
+    DetailedHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN, OUT_OF_SERVICE, UNKNOWN]
+        components:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              details:
+                type: object
+                additionalProperties: true
+
+    # Error Schemas
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error category
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid payment method
+        details:
+          type: string
+          description: Detailed error information
+        correlationId:
+          type: string
+          description: Request correlation ID for tracing
+          example: corr-123e4567-e89b-12d3-a456-426614174000
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          description: API endpoint path
+          example: /api/v1/payments/purchase
+
+    PaymentErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            paymentError:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Payment processor error code
+                  example: E00027
+                reason:
+                  type: string
+                  description: Payment processor error reason
+                  example: The transaction was unsuccessful
+                avsResult:
+                  type: string
+                  description: Address verification result
+                cvvResult:
+                  type: string
+                  description: CVV verification result
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: VALIDATION_ERROR
+            message: Invalid request parameters
+            details: Amount must be greater than 0
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+            path: /api/v1/payments/purchase
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: AUTHENTICATION_ERROR
+            message: Invalid or expired token
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: AUTHORIZATION_ERROR
+            message: Insufficient permissions to access this resource
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: NOT_FOUND
+            message: Transaction not found
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+
+    PaymentError:
+      description: Payment processing error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentErrorResponse'
+          example:
+            error: PAYMENT_ERROR
+            message: Payment processing failed
+            details: Credit card declined
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+            paymentError:
+              code: E00027
+              reason: The transaction was unsuccessful
+              avsResult: N
+              cvvResult: N
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: RATE_LIMIT_EXCEEDED
+            message: Too many requests
+            details: Rate limit of 1000 requests per hour exceeded
+            correlationId: corr-123e4567-e89b-12d3-a456-426614174000
+            timestamp: "2025-09-10T14:30:00Z"
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per hour
+          schema:
+            type: integer
+            example: 1000
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+            example: 0
+        X-RateLimit-Reset:
+          description: Time when rate limit resets
+          schema:
+            type: integer
+            example: 1631234567
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: Payment Processing
+    description: Core payment processing operations
+  - name: Subscription Management
+    description: Recurring billing and subscription lifecycle
+  - name: Analytics
+    description: Business intelligence and reporting
+  - name: Webhooks
+    description: Real-time event notifications
+  - name: Health Monitoring
+    description: System health and status monitoring

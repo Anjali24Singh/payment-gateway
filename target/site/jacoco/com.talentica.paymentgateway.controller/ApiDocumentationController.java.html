@@ -1,0 +1,715 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiDocumentationController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">ApiDocumentationController.java</span></div><h1>ApiDocumentationController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.common.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+/**
+ * API Documentation controller providing examples, guides, and best practices.
+ * Helps developers understand how to integrate with the Payment Gateway API.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/docs&quot;)
+@Tag(name = &quot;API Documentation&quot;, description = &quot;API guides, examples, and best practices&quot;)
+<span class="fc" id="L22">public class ApiDocumentationController {</span>
+
+    /**
+     * Get API integration guide with examples.
+     */
+    @GetMapping(&quot;/integration-guide&quot;)
+    @Operation(
+        summary = &quot;Get API integration guide&quot;,
+        description = &quot;Returns comprehensive integration guide with code examples and best practices&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Integration guide retrieved successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;IntegrationGuide&gt;&gt; getIntegrationGuide() {
+<span class="fc" id="L36">        IntegrationGuide guide = new IntegrationGuide(</span>
+            &quot;Payment Gateway API Integration Guide&quot;,
+            &quot;1.0.0&quot;,
+<span class="fc" id="L39">            getQuickStart(),</span>
+<span class="fc" id="L40">            getAuthenticationGuide(),</span>
+<span class="fc" id="L41">            getPaymentExamples(),</span>
+<span class="fc" id="L42">            getBestPractices(),</span>
+<span class="fc" id="L43">            getErrorHandling(),</span>
+<span class="fc" id="L44">            getWebhookGuide()</span>
+        );
+
+<span class="fc" id="L47">        return ResponseEntity.ok(ApiResponse.success(guide));</span>
+    }
+
+    /**
+     * Get code examples for different programming languages.
+     */
+    @GetMapping(&quot;/examples/{language}&quot;)
+    @Operation(
+        summary = &quot;Get code examples&quot;,
+        description = &quot;Returns code examples for specific programming language&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Code examples retrieved successfully&quot;),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;404&quot;, description = &quot;Language examples not found&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;Map&lt;String, Object&gt;&gt;&gt; getCodeExamples(
+            @PathVariable String language) {
+        
+<span class="fc" id="L65">        Map&lt;String, Object&gt; examples = getCodeExamplesByLanguage(language);</span>
+        
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (examples.isEmpty()) {</span>
+<span class="fc" id="L68">            return ResponseEntity.notFound().build();</span>
+        }
+
+<span class="fc" id="L71">        return ResponseEntity.ok(ApiResponse.success(examples));</span>
+    }
+
+    /**
+     * Get API testing scenarios and test cases.
+     */
+    @GetMapping(&quot;/testing-scenarios&quot;)
+    @Operation(
+        summary = &quot;Get testing scenarios&quot;,
+        description = &quot;Returns comprehensive testing scenarios and test cases for API validation&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Testing scenarios retrieved successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;TestingScenario&gt;&gt;&gt; getTestingScenarios() {
+<span class="fc" id="L86">        List&lt;TestingScenario&gt; scenarios = Arrays.asList(</span>
+            new TestingScenario(
+                &quot;successful_payment&quot;,
+                &quot;Successful Payment Processing&quot;,
+                &quot;Test successful payment with valid card details&quot;,
+<span class="fc" id="L91">                getSuccessfulPaymentSteps(),</span>
+<span class="fc" id="L92">                Map.of(&quot;card_number&quot;, &quot;4111111111111111&quot;, &quot;expected_status&quot;, &quot;COMPLETED&quot;)</span>
+            ),
+            new TestingScenario(
+                &quot;declined_payment&quot;,
+                &quot;Payment Decline Handling&quot;,
+                &quot;Test payment decline scenarios and error handling&quot;,
+<span class="fc" id="L98">                getDeclinedPaymentSteps(),</span>
+<span class="fc" id="L99">                Map.of(&quot;card_number&quot;, &quot;4000000000000002&quot;, &quot;expected_status&quot;, &quot;FAILED&quot;)</span>
+            ),
+            new TestingScenario(
+                &quot;authentication&quot;,
+                &quot;Authentication Testing&quot;,
+                &quot;Test API authentication with valid and invalid credentials&quot;,
+<span class="fc" id="L105">                getAuthenticationSteps(),</span>
+<span class="fc" id="L106">                Map.of(&quot;endpoint&quot;, &quot;/api/v1/auth/login&quot;, &quot;method&quot;, &quot;POST&quot;)</span>
+            ),
+            new TestingScenario(
+                &quot;refund_processing&quot;,
+                &quot;Refund Processing&quot;,
+                &quot;Test full and partial refund scenarios&quot;,
+<span class="fc" id="L112">                getRefundSteps(),</span>
+<span class="fc" id="L113">                Map.of(&quot;original_transaction_required&quot;, true, &quot;refund_types&quot;, Arrays.asList(&quot;FULL&quot;, &quot;PARTIAL&quot;))</span>
+            )
+        );
+
+<span class="fc" id="L117">        return ResponseEntity.ok(ApiResponse.success(scenarios));</span>
+    }
+
+    /**
+     * Get API changelog and version history.
+     */
+    @GetMapping(&quot;/changelog&quot;)
+    @Operation(
+        summary = &quot;Get API changelog&quot;,
+        description = &quot;Returns API version history and changelog information&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Changelog retrieved successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;ChangelogEntry&gt;&gt;&gt; getChangelog() {
+<span class="fc" id="L132">        List&lt;ChangelogEntry&gt; changelog = Arrays.asList(</span>
+            new ChangelogEntry(
+                &quot;v1.0.0&quot;,
+                &quot;2025-09-10&quot;,
+                &quot;Initial release&quot;,
+<span class="fc" id="L137">                Arrays.asList(</span>
+                    &quot;Core payment processing (purchase, authorize, capture, void, refund)&quot;,
+                    &quot;JWT-based authentication&quot;,
+                    &quot;Subscription management&quot;,
+                    &quot;Webhook support&quot;,
+                    &quot;OpenAPI documentation&quot;,
+                    &quot;Sandbox environment&quot;
+                ),
+<span class="fc" id="L145">                Collections.emptyList(),</span>
+<span class="fc" id="L146">                Collections.emptyList()</span>
+            )
+        );
+
+<span class="fc" id="L150">        return ResponseEntity.ok(ApiResponse.success(changelog));</span>
+    }
+
+    // Helper methods for building guide content
+
+    private QuickStart getQuickStart() {
+<span class="fc" id="L156">        List&lt;String&gt; steps = Arrays.asList(</span>
+            &quot;1. Register for a sandbox account at https://sandbox.talentica.com&quot;,
+            &quot;2. Obtain your API credentials (API key and secret)&quot;,
+            &quot;3. Authenticate using POST /api/v1/auth/login&quot;,
+            &quot;4. Include the Bearer token in all subsequent requests&quot;,
+            &quot;5. Test payment processing using POST /api/v1/payments/purchase&quot;,
+            &quot;6. Integrate webhooks for real-time notifications&quot;,
+            &quot;7. Test thoroughly in sandbox before going live&quot;
+        );
+
+<span class="fc" id="L166">        String exampleAuth = &quot;&quot;&quot;</span>
+            {
+              &quot;email&quot;: &quot;admin@paymentgateway.com&quot;,
+              &quot;password&quot;: &quot;Admin123!&quot;
+            }
+            &quot;&quot;&quot;;
+
+<span class="fc" id="L173">        String examplePayment = &quot;&quot;&quot;</span>
+            {
+              &quot;amount&quot;: 100.00,
+              &quot;currency&quot;: &quot;USD&quot;,
+              &quot;payment_method&quot;: {
+                &quot;type&quot;: &quot;CREDIT_CARD&quot;,
+                &quot;card_number&quot;: &quot;4111111111111111&quot;,
+                &quot;expiry_month&quot;: &quot;12&quot;,
+                &quot;expiry_year&quot;: &quot;2028&quot;,
+                &quot;cvv&quot;: &quot;123&quot;,
+                &quot;cardholder_name&quot;: &quot;John Doe&quot;
+              },
+              &quot;customer&quot;: {
+                &quot;email&quot;: &quot;customer@example.com&quot;,
+                &quot;first_name&quot;: &quot;John&quot;,
+                &quot;last_name&quot;: &quot;Doe&quot;
+              },
+              &quot;merchant_reference&quot;: &quot;ORDER-12345&quot;
+            }
+            &quot;&quot;&quot;;
+
+<span class="fc" id="L194">        return new QuickStart(steps, exampleAuth, examplePayment);</span>
+    }
+
+    private AuthenticationGuide getAuthenticationGuide() {
+<span class="fc" id="L198">        return new AuthenticationGuide(</span>
+            &quot;JWT Bearer Token Authentication&quot;,
+<span class="fc" id="L200">            Arrays.asList(</span>
+                &quot;Obtain access token via POST /api/v1/auth/login&quot;,
+                &quot;Include token in Authorization header: Bearer &lt;token&gt;&quot;,
+                &quot;Token expires after 24 hours - use refresh token to renew&quot;,
+                &quot;Use HTTPS in production for secure token transmission&quot;
+            ),
+<span class="fc" id="L206">            Map.of(</span>
+                &quot;login_endpoint&quot;, &quot;/api/v1/auth/login&quot;,
+                &quot;refresh_endpoint&quot;, &quot;/api/v1/auth/refresh&quot;,
+                &quot;token_header&quot;, &quot;Authorization: Bearer &lt;access_token&gt;&quot;
+            )
+        );
+    }
+
+    private List&lt;PaymentExample&gt; getPaymentExamples() {
+<span class="fc" id="L215">        return Arrays.asList(</span>
+            new PaymentExample(
+                &quot;purchase&quot;,
+                &quot;Direct Purchase&quot;,
+                &quot;Process a direct purchase (auth + capture)&quot;,
+                &quot;POST /api/v1/payments/purchase&quot;,
+                &quot;&quot;&quot;
+                {
+                  &quot;amount&quot;: 100.00,
+                  &quot;currency&quot;: &quot;USD&quot;,
+                  &quot;payment_method&quot;: {
+                    &quot;type&quot;: &quot;CREDIT_CARD&quot;,
+                    &quot;card_number&quot;: &quot;4111111111111111&quot;,
+                    &quot;expiry_month&quot;: &quot;12&quot;,
+                    &quot;expiry_year&quot;: &quot;2028&quot;,
+                    &quot;cvv&quot;: &quot;123&quot;
+                  }
+                }
+                &quot;&quot;&quot;
+            ),
+            new PaymentExample(
+                &quot;authorize&quot;,
+                &quot;Authorization Only&quot;,
+                &quot;Authorize payment without capturing funds&quot;,
+                &quot;POST /api/v1/payments/authorize&quot;,
+                &quot;&quot;&quot;
+                {
+                  &quot;amount&quot;: 150.00,
+                  &quot;currency&quot;: &quot;USD&quot;,
+                  &quot;payment_method&quot;: {
+                    &quot;type&quot;: &quot;CREDIT_CARD&quot;,
+                    &quot;card_number&quot;: &quot;4111111111111111&quot;,
+                    &quot;expiry_month&quot;: &quot;12&quot;,
+                    &quot;expiry_year&quot;: &quot;2028&quot;,
+                    &quot;cvv&quot;: &quot;123&quot;
+                  }
+                }
+                &quot;&quot;&quot;
+            )
+        );
+    }
+
+    private List&lt;String&gt; getBestPractices() {
+<span class="fc" id="L258">        return Arrays.asList(</span>
+            &quot;Always use HTTPS for API communications&quot;,
+            &quot;Store API credentials securely and rotate them regularly&quot;,
+            &quot;Implement idempotency using unique request IDs&quot;,
+            &quot;Use correlation IDs for request tracking and debugging&quot;,
+            &quot;Implement proper error handling and retry logic&quot;,
+            &quot;Validate input data on both client and server side&quot;,
+            &quot;Use webhooks for real-time payment status updates&quot;,
+            &quot;Implement rate limiting and request throttling&quot;,
+            &quot;Log all API interactions for audit and debugging&quot;,
+            &quot;Test thoroughly in sandbox before production deployment&quot;
+        );
+    }
+
+    private ErrorHandlingGuide getErrorHandling() {
+<span class="fc" id="L273">        return new ErrorHandlingGuide(</span>
+            &quot;Standard HTTP status codes with detailed error responses&quot;,
+<span class="fc" id="L275">            Map.of(</span>
+                &quot;400&quot;, &quot;Bad Request - Invalid request format or parameters&quot;,
+                &quot;401&quot;, &quot;Unauthorized - Invalid or missing authentication&quot;,
+                &quot;403&quot;, &quot;Forbidden - Insufficient permissions&quot;,
+                &quot;404&quot;, &quot;Not Found - Resource not found&quot;,
+                &quot;422&quot;, &quot;Unprocessable Entity - Payment processing failed&quot;,
+                &quot;429&quot;, &quot;Too Many Requests - Rate limit exceeded&quot;,
+                &quot;500&quot;, &quot;Internal Server Error - Unexpected system error&quot;
+            ),
+            &quot;&quot;&quot;
+            {
+              &quot;status&quot;: 400,
+              &quot;error_code&quot;: &quot;VALIDATION_ERROR&quot;,
+              &quot;message&quot;: &quot;Request validation failed&quot;,
+              &quot;correlation_id&quot;: &quot;corr-12345678&quot;,
+              &quot;timestamp&quot;: &quot;2025-09-10T10:30:00&quot;,
+              &quot;validation_errors&quot;: [
+                {
+                  &quot;field&quot;: &quot;amount&quot;,
+                  &quot;code&quot;: &quot;INVALID_VALUE&quot;,
+                  &quot;message&quot;: &quot;Amount must be greater than 0&quot;
+                }
+              ]
+            }
+            &quot;&quot;&quot;
+        );
+    }
+
+    private WebhookGuide getWebhookGuide() {
+<span class="fc" id="L304">        return new WebhookGuide(</span>
+            &quot;Configure webhook endpoints to receive real-time payment notifications&quot;,
+<span class="fc" id="L306">            Arrays.asList(</span>
+                &quot;payment.completed&quot;,
+                &quot;payment.failed&quot;,
+                &quot;payment.refunded&quot;,
+                &quot;subscription.created&quot;,
+                &quot;subscription.cancelled&quot;
+            ),
+            &quot;&quot;&quot;
+            {
+              &quot;event_type&quot;: &quot;payment.completed&quot;,
+              &quot;event_id&quot;: &quot;evt_123456789&quot;,
+              &quot;timestamp&quot;: &quot;2025-09-10T10:30:00Z&quot;,
+              &quot;data&quot;: {
+                &quot;transaction_id&quot;: &quot;txn_987654321&quot;,
+                &quot;amount&quot;: 100.00,
+                &quot;currency&quot;: &quot;USD&quot;,
+                &quot;status&quot;: &quot;COMPLETED&quot;
+              }
+            }
+            &quot;&quot;&quot;
+        );
+    }
+
+    private Map&lt;String, Object&gt; getCodeExamplesByLanguage(String language) {
+<span class="fc" id="L330">        Map&lt;String, Object&gt; examples = new HashMap&lt;&gt;();</span>
+        
+<span class="fc bfc" id="L332" title="All 5 branches covered.">        switch (language.toLowerCase()) {</span>
+            case &quot;javascript&quot;:
+<span class="fc" id="L334">                examples.put(&quot;authentication&quot;, getJavaScriptAuthExample());</span>
+<span class="fc" id="L335">                examples.put(&quot;payment&quot;, getJavaScriptPaymentExample());</span>
+<span class="fc" id="L336">                break;</span>
+            case &quot;python&quot;:
+<span class="fc" id="L338">                examples.put(&quot;authentication&quot;, getPythonAuthExample());</span>
+<span class="fc" id="L339">                examples.put(&quot;payment&quot;, getPythonPaymentExample());</span>
+<span class="fc" id="L340">                break;</span>
+            case &quot;java&quot;:
+<span class="fc" id="L342">                examples.put(&quot;authentication&quot;, getJavaAuthExample());</span>
+<span class="fc" id="L343">                examples.put(&quot;payment&quot;, getJavaPaymentExample());</span>
+<span class="fc" id="L344">                break;</span>
+            case &quot;curl&quot;:
+<span class="fc" id="L346">                examples.put(&quot;authentication&quot;, getCurlAuthExample());</span>
+<span class="fc" id="L347">                examples.put(&quot;payment&quot;, getCurlPaymentExample());</span>
+                break;
+        }
+        
+<span class="fc" id="L351">        return examples;</span>
+    }
+
+    // Test scenario step definitions
+    private List&lt;String&gt; getSuccessfulPaymentSteps() {
+<span class="fc" id="L356">        return Arrays.asList(</span>
+            &quot;1. Authenticate using valid credentials&quot;,
+            &quot;2. Send POST request to /api/v1/payments/purchase&quot;,
+            &quot;3. Use test card number 4111111111111111&quot;,
+            &quot;4. Verify response status is 200&quot;,
+            &quot;5. Verify transaction status is COMPLETED&quot;,
+            &quot;6. Check that transaction ID is returned&quot;
+        );
+    }
+
+    private List&lt;String&gt; getDeclinedPaymentSteps() {
+<span class="fc" id="L367">        return Arrays.asList(</span>
+            &quot;1. Authenticate using valid credentials&quot;,
+            &quot;2. Send POST request to /api/v1/payments/purchase&quot;,
+            &quot;3. Use test card number 4000000000000002&quot;,
+            &quot;4. Verify response status is 422&quot;,
+            &quot;5. Verify error code indicates payment decline&quot;,
+            &quot;6. Check error message for decline reason&quot;
+        );
+    }
+
+    private List&lt;String&gt; getAuthenticationSteps() {
+<span class="fc" id="L378">        return Arrays.asList(</span>
+            &quot;1. Send POST request to /api/v1/auth/login with valid credentials&quot;,
+            &quot;2. Verify response contains access_token and refresh_token&quot;,
+            &quot;3. Test API call with valid token in Authorization header&quot;,
+            &quot;4. Test API call with invalid token - should return 401&quot;,
+            &quot;5. Test token refresh using refresh_token&quot;,
+            &quot;6. Verify refreshed token works for API calls&quot;
+        );
+    }
+
+    private List&lt;String&gt; getRefundSteps() {
+<span class="fc" id="L389">        return Arrays.asList(</span>
+            &quot;1. Create a successful payment transaction&quot;,
+            &quot;2. Send POST request to /api/v1/payments/refund&quot;,
+            &quot;3. Reference original transaction ID&quot;,
+            &quot;4. Test full refund (no amount specified)&quot;,
+            &quot;5. Test partial refund (specify amount)&quot;,
+            &quot;6. Verify refund status and amount&quot;
+        );
+    }
+
+    // Code examples for different languages
+    private String getJavaScriptAuthExample() {
+<span class="fc" id="L401">        return &quot;&quot;&quot;</span>
+            const response = await fetch('https://api.talentica.com/v1/auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                email: 'admin@paymentgateway.com',
+                password: 'Admin123!'
+              })
+            });
+            
+            const data = await response.json();
+            const token = data.access_token;
+            &quot;&quot;&quot;;
+    }
+
+    private String getJavaScriptPaymentExample() {
+<span class="fc" id="L419">        return &quot;&quot;&quot;</span>
+            const response = await fetch('https://api.talentica.com/v1/payments/purchase', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                amount: 100.00,
+                currency: 'USD',
+                payment_method: {
+                  type: 'CREDIT_CARD',
+                  card_number: '4111111111111111',
+                  expiry_month: '12',
+                  expiry_year: '2028',
+                  cvv: '123'
+                }
+              })
+            });
+            &quot;&quot;&quot;;
+    }
+
+    private String getPythonAuthExample() {
+<span class="fc" id="L442">        return &quot;&quot;&quot;</span>
+            import requests
+            
+            response = requests.post('https://api.talentica.com/v1/auth/login', 
+                json={
+                    'email': 'admin@paymentgateway.com',
+                    'password': 'Admin123!'
+                })
+            
+            token = response.json()['access_token']
+            &quot;&quot;&quot;;
+    }
+
+    private String getPythonPaymentExample() {
+<span class="fc" id="L456">        return &quot;&quot;&quot;</span>
+            headers = {'Authorization': f'Bearer {token}'}
+            
+            response = requests.post('https://api.talentica.com/v1/payments/purchase',
+                headers=headers,
+                json={
+                    'amount': 100.00,
+                    'currency': 'USD',
+                    'payment_method': {
+                        'type': 'CREDIT_CARD',
+                        'card_number': '4111111111111111',
+                        'expiry_month': '12',
+                        'expiry_year': '2028',
+                        'cvv': '123'
+                    }
+                })
+            &quot;&quot;&quot;;
+    }
+
+    private String getJavaAuthExample() {
+<span class="fc" id="L476">        return &quot;&quot;&quot;</span>
+            // Using Spring RestTemplate
+            RestTemplate restTemplate = new RestTemplate();
+            
+            AuthRequest authRequest = new AuthRequest(&quot;admin@paymentgateway.com&quot;, &quot;Admin123!&quot;);
+            ResponseEntity&lt;AuthResponse&gt; response = restTemplate.postForEntity(
+                &quot;https://api.talentica.com/v1/auth/login&quot;, 
+                authRequest, 
+                AuthResponse.class
+            );
+            
+            String token = response.getBody().getAccessToken();
+            &quot;&quot;&quot;;
+    }
+
+    private String getJavaPaymentExample() {
+<span class="fc" id="L492">        return &quot;&quot;&quot;</span>
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            
+            PaymentRequest paymentRequest = new PaymentRequest();
+            paymentRequest.setAmount(new BigDecimal(&quot;100.00&quot;));
+            paymentRequest.setCurrency(&quot;USD&quot;);
+            
+            HttpEntity&lt;PaymentRequest&gt; entity = new HttpEntity&lt;&gt;(paymentRequest, headers);
+            ResponseEntity&lt;PaymentResponse&gt; response = restTemplate.postForEntity(
+                &quot;https://api.talentica.com/v1/payments/purchase&quot;,
+                entity,
+                PaymentResponse.class
+            );
+            &quot;&quot;&quot;;
+    }
+
+    private String getCurlAuthExample() {
+<span class="fc" id="L510">        return &quot;&quot;&quot;</span>
+            curl -X POST https://api.talentica.com/v1/auth/login \\
+              -H &quot;Content-Type: application/json&quot; \\
+              -d '{
+                &quot;email&quot;: &quot;admin@paymentgateway.com&quot;,
+                &quot;password&quot;: &quot;Admin123!&quot;
+              }'
+            &quot;&quot;&quot;;
+    }
+
+    private String getCurlPaymentExample() {
+<span class="fc" id="L521">        return &quot;&quot;&quot;</span>
+            curl -X POST https://api.talentica.com/v1/payments/purchase \\
+              -H &quot;Content-Type: application/json&quot; \\
+              -H &quot;Authorization: Bearer YOUR_TOKEN_HERE&quot; \\
+              -d '{
+                &quot;amount&quot;: 100.00,
+                &quot;currency&quot;: &quot;USD&quot;,
+                &quot;payment_method&quot;: {
+                  &quot;type&quot;: &quot;CREDIT_CARD&quot;,
+                  &quot;card_number&quot;: &quot;4111111111111111&quot;,
+                  &quot;expiry_month&quot;: &quot;12&quot;,
+                  &quot;expiry_year&quot;: &quot;2028&quot;,
+                  &quot;cvv&quot;: &quot;123&quot;
+                }
+              }'
+            &quot;&quot;&quot;;
+    }
+
+    // Data classes for response structures
+    public static class IntegrationGuide {
+        private String title;
+        private String version;
+        private QuickStart quickStart;
+        private AuthenticationGuide authentication;
+        private List&lt;PaymentExample&gt; paymentExamples;
+        private List&lt;String&gt; bestPractices;
+        private ErrorHandlingGuide errorHandling;
+        private WebhookGuide webhooks;
+
+        public IntegrationGuide(String title, String version, QuickStart quickStart, 
+                               AuthenticationGuide authentication, List&lt;PaymentExample&gt; paymentExamples,
+                               List&lt;String&gt; bestPractices, ErrorHandlingGuide errorHandling, 
+<span class="fc" id="L553">                               WebhookGuide webhooks) {</span>
+<span class="fc" id="L554">            this.title = title;</span>
+<span class="fc" id="L555">            this.version = version;</span>
+<span class="fc" id="L556">            this.quickStart = quickStart;</span>
+<span class="fc" id="L557">            this.authentication = authentication;</span>
+<span class="fc" id="L558">            this.paymentExamples = paymentExamples;</span>
+<span class="fc" id="L559">            this.bestPractices = bestPractices;</span>
+<span class="fc" id="L560">            this.errorHandling = errorHandling;</span>
+<span class="fc" id="L561">            this.webhooks = webhooks;</span>
+<span class="fc" id="L562">        }</span>
+
+        // Getters
+<span class="fc" id="L565">        public String getTitle() { return title; }</span>
+<span class="fc" id="L566">        public String getVersion() { return version; }</span>
+<span class="fc" id="L567">        public QuickStart getQuickStart() { return quickStart; }</span>
+<span class="fc" id="L568">        public AuthenticationGuide getAuthentication() { return authentication; }</span>
+<span class="fc" id="L569">        public List&lt;PaymentExample&gt; getPaymentExamples() { return paymentExamples; }</span>
+<span class="fc" id="L570">        public List&lt;String&gt; getBestPractices() { return bestPractices; }</span>
+<span class="fc" id="L571">        public ErrorHandlingGuide getErrorHandling() { return errorHandling; }</span>
+<span class="fc" id="L572">        public WebhookGuide getWebhooks() { return webhooks; }</span>
+    }
+
+    public static class QuickStart {
+        private List&lt;String&gt; steps;
+        private String authenticationExample;
+        private String paymentExample;
+
+<span class="fc" id="L580">        public QuickStart(List&lt;String&gt; steps, String authenticationExample, String paymentExample) {</span>
+<span class="fc" id="L581">            this.steps = steps;</span>
+<span class="fc" id="L582">            this.authenticationExample = authenticationExample;</span>
+<span class="fc" id="L583">            this.paymentExample = paymentExample;</span>
+<span class="fc" id="L584">        }</span>
+
+        // Getters
+<span class="fc" id="L587">        public List&lt;String&gt; getSteps() { return steps; }</span>
+<span class="fc" id="L588">        public String getAuthenticationExample() { return authenticationExample; }</span>
+<span class="fc" id="L589">        public String getPaymentExample() { return paymentExample; }</span>
+    }
+
+    public static class AuthenticationGuide {
+        private String type;
+        private List&lt;String&gt; instructions;
+        private Map&lt;String, String&gt; endpoints;
+
+<span class="fc" id="L597">        public AuthenticationGuide(String type, List&lt;String&gt; instructions, Map&lt;String, String&gt; endpoints) {</span>
+<span class="fc" id="L598">            this.type = type;</span>
+<span class="fc" id="L599">            this.instructions = instructions;</span>
+<span class="fc" id="L600">            this.endpoints = endpoints;</span>
+<span class="fc" id="L601">        }</span>
+
+        // Getters
+<span class="fc" id="L604">        public String getType() { return type; }</span>
+<span class="fc" id="L605">        public List&lt;String&gt; getInstructions() { return instructions; }</span>
+<span class="fc" id="L606">        public Map&lt;String, String&gt; getEndpoints() { return endpoints; }</span>
+    }
+
+    public static class PaymentExample {
+        private String type;
+        private String title;
+        private String description;
+        private String endpoint;
+        private String example;
+
+<span class="fc" id="L616">        public PaymentExample(String type, String title, String description, String endpoint, String example) {</span>
+<span class="fc" id="L617">            this.type = type;</span>
+<span class="fc" id="L618">            this.title = title;</span>
+<span class="fc" id="L619">            this.description = description;</span>
+<span class="fc" id="L620">            this.endpoint = endpoint;</span>
+<span class="fc" id="L621">            this.example = example;</span>
+<span class="fc" id="L622">        }</span>
+
+        // Getters
+<span class="fc" id="L625">        public String getType() { return type; }</span>
+<span class="fc" id="L626">        public String getTitle() { return title; }</span>
+<span class="fc" id="L627">        public String getDescription() { return description; }</span>
+<span class="fc" id="L628">        public String getEndpoint() { return endpoint; }</span>
+<span class="fc" id="L629">        public String getExample() { return example; }</span>
+    }
+
+    public static class ErrorHandlingGuide {
+        private String description;
+        private Map&lt;String, String&gt; statusCodes;
+        private String errorResponseExample;
+
+<span class="fc" id="L637">        public ErrorHandlingGuide(String description, Map&lt;String, String&gt; statusCodes, String errorResponseExample) {</span>
+<span class="fc" id="L638">            this.description = description;</span>
+<span class="fc" id="L639">            this.statusCodes = statusCodes;</span>
+<span class="fc" id="L640">            this.errorResponseExample = errorResponseExample;</span>
+<span class="fc" id="L641">        }</span>
+
+        // Getters
+<span class="fc" id="L644">        public String getDescription() { return description; }</span>
+<span class="fc" id="L645">        public Map&lt;String, String&gt; getStatusCodes() { return statusCodes; }</span>
+<span class="fc" id="L646">        public String getErrorResponseExample() { return errorResponseExample; }</span>
+    }
+
+    public static class WebhookGuide {
+        private String description;
+        private List&lt;String&gt; eventTypes;
+        private String examplePayload;
+
+<span class="fc" id="L654">        public WebhookGuide(String description, List&lt;String&gt; eventTypes, String examplePayload) {</span>
+<span class="fc" id="L655">            this.description = description;</span>
+<span class="fc" id="L656">            this.eventTypes = eventTypes;</span>
+<span class="fc" id="L657">            this.examplePayload = examplePayload;</span>
+<span class="fc" id="L658">        }</span>
+
+        // Getters
+<span class="fc" id="L661">        public String getDescription() { return description; }</span>
+<span class="fc" id="L662">        public List&lt;String&gt; getEventTypes() { return eventTypes; }</span>
+<span class="fc" id="L663">        public String getExamplePayload() { return examplePayload; }</span>
+    }
+
+    public static class TestingScenario {
+        private String id;
+        private String title;
+        private String description;
+        private List&lt;String&gt; steps;
+        private Map&lt;String, Object&gt; testData;
+
+<span class="fc" id="L673">        public TestingScenario(String id, String title, String description, List&lt;String&gt; steps, Map&lt;String, Object&gt; testData) {</span>
+<span class="fc" id="L674">            this.id = id;</span>
+<span class="fc" id="L675">            this.title = title;</span>
+<span class="fc" id="L676">            this.description = description;</span>
+<span class="fc" id="L677">            this.steps = steps;</span>
+<span class="fc" id="L678">            this.testData = testData;</span>
+<span class="fc" id="L679">        }</span>
+
+        // Getters
+<span class="fc" id="L682">        public String getId() { return id; }</span>
+<span class="fc" id="L683">        public String getTitle() { return title; }</span>
+<span class="fc" id="L684">        public String getDescription() { return description; }</span>
+<span class="fc" id="L685">        public List&lt;String&gt; getSteps() { return steps; }</span>
+<span class="fc" id="L686">        public Map&lt;String, Object&gt; getTestData() { return testData; }</span>
+    }
+
+    public static class ChangelogEntry {
+        private String version;
+        private String date;
+        private String description;
+        private List&lt;String&gt; added;
+        private List&lt;String&gt; changed;
+        private List&lt;String&gt; removed;
+
+<span class="fc" id="L697">        public ChangelogEntry(String version, String date, String description, List&lt;String&gt; added, List&lt;String&gt; changed, List&lt;String&gt; removed) {</span>
+<span class="fc" id="L698">            this.version = version;</span>
+<span class="fc" id="L699">            this.date = date;</span>
+<span class="fc" id="L700">            this.description = description;</span>
+<span class="fc" id="L701">            this.added = added;</span>
+<span class="fc" id="L702">            this.changed = changed;</span>
+<span class="fc" id="L703">            this.removed = removed;</span>
+<span class="fc" id="L704">        }</span>
+
+        // Getters
+<span class="fc" id="L707">        public String getVersion() { return version; }</span>
+<span class="fc" id="L708">        public String getDate() { return date; }</span>
+<span class="fc" id="L709">        public String getDescription() { return description; }</span>
+<span class="fc" id="L710">        public List&lt;String&gt; getAdded() { return added; }</span>
+<span class="fc" id="L711">        public List&lt;String&gt; getChanged() { return changed; }</span>
+<span class="fc" id="L712">        public List&lt;String&gt; getRemoved() { return removed; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Order.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">Order.java</span></div><h1>Order.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import com.talentica.paymentgateway.validation.ValidAmount;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Entity representing an order that can contain multiple line items and associated transactions.
+ * Orders track the complete purchase lifecycle and financial details.
+ */
+@Entity
+@Table(name = &quot;orders&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;orderNumber&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_orders_customer_id&quot;, columnList = &quot;customer_id&quot;),
+           @Index(name = &quot;idx_orders_user_id&quot;, columnList = &quot;user_id&quot;),
+           @Index(name = &quot;idx_orders_number&quot;, columnList = &quot;orderNumber&quot;),
+           @Index(name = &quot;idx_orders_status&quot;, columnList = &quot;status&quot;),
+           @Index(name = &quot;idx_orders_payment_status&quot;, columnList = &quot;paymentStatus&quot;),
+           @Index(name = &quot;idx_orders_created_at&quot;, columnList = &quot;createdAt&quot;)
+       })
+public class Order extends BaseEntity {
+
+    @NotBlank(message = &quot;Order number is required&quot;)
+    @Size(max = 100, message = &quot;Order number must not exceed 100 characters&quot;)
+    @Column(name = &quot;order_number&quot;, nullable = false, unique = true, length = 100)
+    private String orderNumber;
+
+    @NotNull(message = &quot;Customer is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;customer_id&quot;, nullable = false)
+    private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;user_id&quot;)
+    private User user;
+
+<span class="fc" id="L49">    @Size(max = 3, message = &quot;Currency must be 3 characters&quot;)</span>
+    @Column(name = &quot;currency&quot;, length = 3)
+    private String currency = &quot;USD&quot;;
+
+    @NotNull(message = &quot;Subtotal amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.0&quot;, inclusive = true, message = &quot;Subtotal amount must be non-negative&quot;)
+    @Column(name = &quot;subtotal_amount&quot;, nullable = false, precision = 12, scale = 2)
+    private BigDecimal subtotalAmount;
+
+<span class="fc" id="L59">    @ValidAmount</span>
+    @DecimalMin(value = &quot;0.0&quot;, inclusive = true, message = &quot;Tax amount must be non-negative&quot;)
+    @Column(name = &quot;tax_amount&quot;, precision = 12, scale = 2)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+
+<span class="fc" id="L64">    @ValidAmount</span>
+    @DecimalMin(value = &quot;0.0&quot;, inclusive = true, message = &quot;Shipping amount must be non-negative&quot;)
+    @Column(name = &quot;shipping_amount&quot;, precision = 12, scale = 2)
+    private BigDecimal shippingAmount = BigDecimal.ZERO;
+
+<span class="fc" id="L69">    @ValidAmount</span>
+    @DecimalMin(value = &quot;0.0&quot;, inclusive = true, message = &quot;Discount amount must be non-negative&quot;)
+    @Column(name = &quot;discount_amount&quot;, precision = 12, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @NotNull(message = &quot;Total amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.0&quot;, inclusive = true, message = &quot;Total amount must be non-negative&quot;)
+    @Column(name = &quot;total_amount&quot;, nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalAmount;
+
+<span class="fc" id="L80">    @Size(max = 50, message = &quot;Status must not exceed 50 characters&quot;)</span>
+    @Column(name = &quot;status&quot;, length = 50)
+    private String status = &quot;PENDING&quot;;
+
+<span class="fc" id="L84">    @Enumerated(EnumType.STRING)</span>
+    @Column(name = &quot;payment_status&quot;)
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Column(name = &quot;description&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String description;
+
+    @Column(name = &quot;notes&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String notes;
+
+<span class="fc" id="L94">    @Convert(converter = MapToJsonConverter.class)</span>
+    @Column(name = &quot;metadata&quot;, columnDefinition = &quot;JSONB&quot;)
+    private Map&lt;String, Object&gt; metadata = new HashMap&lt;&gt;();
+
+    // Relationships
+<span class="fc" id="L99">    @OneToMany(mappedBy = &quot;order&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Transaction&gt; transactions = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public Order() {
+<span class="fc" id="L104">        super();</span>
+<span class="fc" id="L105">    }</span>
+
+    public Order(String orderNumber, Customer customer, BigDecimal subtotalAmount) {
+<span class="fc" id="L108">        this();</span>
+<span class="fc" id="L109">        this.orderNumber = orderNumber;</span>
+<span class="fc" id="L110">        this.customer = customer;</span>
+<span class="fc" id="L111">        this.subtotalAmount = subtotalAmount;</span>
+<span class="fc" id="L112">        calculateTotalAmount();</span>
+<span class="fc" id="L113">    }</span>
+
+    // Getters and Setters
+    public String getOrderNumber() {
+<span class="fc" id="L117">        return orderNumber;</span>
+    }
+
+    public void setOrderNumber(String orderNumber) {
+<span class="fc" id="L121">        this.orderNumber = orderNumber;</span>
+<span class="fc" id="L122">    }</span>
+
+    public Customer getCustomer() {
+<span class="fc" id="L125">        return customer;</span>
+    }
+
+    public void setCustomer(Customer customer) {
+<span class="fc" id="L129">        this.customer = customer;</span>
+<span class="fc" id="L130">    }</span>
+
+    public User getUser() {
+<span class="fc" id="L133">        return user;</span>
+    }
+
+    public void setUser(User user) {
+<span class="fc" id="L137">        this.user = user;</span>
+<span class="fc" id="L138">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L141">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L145">        this.currency = currency;</span>
+<span class="fc" id="L146">    }</span>
+
+    public BigDecimal getSubtotalAmount() {
+<span class="fc" id="L149">        return subtotalAmount;</span>
+    }
+
+    public void setSubtotalAmount(BigDecimal subtotalAmount) {
+<span class="fc" id="L153">        this.subtotalAmount = subtotalAmount;</span>
+<span class="fc" id="L154">        calculateTotalAmount();</span>
+<span class="fc" id="L155">    }</span>
+
+    public BigDecimal getTaxAmount() {
+<span class="fc" id="L158">        return taxAmount;</span>
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+<span class="fc" id="L162">        this.taxAmount = taxAmount;</span>
+<span class="fc" id="L163">        calculateTotalAmount();</span>
+<span class="fc" id="L164">    }</span>
+
+    public BigDecimal getShippingAmount() {
+<span class="fc" id="L167">        return shippingAmount;</span>
+    }
+
+    public void setShippingAmount(BigDecimal shippingAmount) {
+<span class="fc" id="L171">        this.shippingAmount = shippingAmount;</span>
+<span class="fc" id="L172">        calculateTotalAmount();</span>
+<span class="fc" id="L173">    }</span>
+
+    public BigDecimal getDiscountAmount() {
+<span class="fc" id="L176">        return discountAmount;</span>
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+<span class="fc" id="L180">        this.discountAmount = discountAmount;</span>
+<span class="fc" id="L181">        calculateTotalAmount();</span>
+<span class="fc" id="L182">    }</span>
+
+    public BigDecimal getTotalAmount() {
+<span class="fc" id="L185">        return totalAmount;</span>
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+<span class="fc" id="L189">        this.totalAmount = totalAmount;</span>
+<span class="fc" id="L190">    }</span>
+
+    public String getStatus() {
+<span class="fc" id="L193">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="fc" id="L197">        this.status = status;</span>
+<span class="fc" id="L198">    }</span>
+
+    public PaymentStatus getPaymentStatus() {
+<span class="fc" id="L201">        return paymentStatus;</span>
+    }
+
+    public void setPaymentStatus(PaymentStatus paymentStatus) {
+<span class="fc" id="L205">        this.paymentStatus = paymentStatus;</span>
+<span class="fc" id="L206">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L209">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L213">        this.description = description;</span>
+<span class="fc" id="L214">    }</span>
+
+    public String getNotes() {
+<span class="fc" id="L217">        return notes;</span>
+    }
+
+    public void setNotes(String notes) {
+<span class="fc" id="L221">        this.notes = notes;</span>
+<span class="fc" id="L222">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L225">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L229">        this.metadata = metadata;</span>
+<span class="fc" id="L230">    }</span>
+
+    public List&lt;Transaction&gt; getTransactions() {
+<span class="fc" id="L233">        return transactions;</span>
+    }
+
+    public void setTransactions(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L237">        this.transactions = transactions;</span>
+<span class="fc" id="L238">    }</span>
+
+    // Utility methods
+    private void calculateTotalAmount() {
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (subtotalAmount != null) {</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            BigDecimal tax = taxAmount != null ? taxAmount : BigDecimal.ZERO;</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            BigDecimal shipping = shippingAmount != null ? shippingAmount : BigDecimal.ZERO;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            BigDecimal discount = discountAmount != null ? discountAmount : BigDecimal.ZERO;</span>
+            
+<span class="fc" id="L247">            this.totalAmount = subtotalAmount.add(tax).add(shipping).subtract(discount);</span>
+        }
+<span class="fc" id="L249">    }</span>
+
+    public void addTransaction(Transaction transaction) {
+<span class="fc" id="L252">        transactions.add(transaction);</span>
+<span class="fc" id="L253">        transaction.setOrder(this);</span>
+<span class="fc" id="L254">    }</span>
+
+    public void removeTransaction(Transaction transaction) {
+<span class="fc" id="L257">        transactions.remove(transaction);</span>
+<span class="fc" id="L258">        transaction.setOrder(null);</span>
+<span class="fc" id="L259">    }</span>
+
+    public BigDecimal getPaidAmount() {
+<span class="fc" id="L262">        return transactions.stream()</span>
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">                .filter(t -&gt; t.getStatus() == PaymentStatus.CAPTURED || t.getStatus() == PaymentStatus.SETTLED)</span>
+<span class="fc bfc" id="L264" title="All 4 branches covered.">                .filter(t -&gt; t.getTransactionType() == TransactionType.PURCHASE || t.getTransactionType() == TransactionType.CAPTURE)</span>
+<span class="fc" id="L265">                .map(Transaction::getAmount)</span>
+<span class="fc" id="L266">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+    }
+
+    public BigDecimal getRefundedAmount() {
+<span class="fc" id="L270">        return transactions.stream()</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                .filter(t -&gt; t.getStatus() == PaymentStatus.SETTLED)</span>
+<span class="pc bpc" id="L272" title="1 of 4 branches missed.">                .filter(t -&gt; t.getTransactionType() == TransactionType.REFUND || t.getTransactionType() == TransactionType.PARTIAL_REFUND)</span>
+<span class="fc" id="L273">                .map(Transaction::getAmount)</span>
+<span class="fc" id="L274">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+    }
+
+    public BigDecimal getOutstandingAmount() {
+<span class="fc" id="L278">        return totalAmount.subtract(getPaidAmount()).add(getRefundedAmount());</span>
+    }
+
+    public boolean isFullyPaid() {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        return getOutstandingAmount().compareTo(BigDecimal.ZERO) &lt;= 0;</span>
+    }
+
+    public boolean isPartiallyPaid() {
+<span class="fc" id="L286">        BigDecimal paidAmount = getPaidAmount();</span>
+<span class="pc bpc" id="L287" title="2 of 4 branches missed.">        return paidAmount.compareTo(BigDecimal.ZERO) &gt; 0 &amp;&amp; paidAmount.compareTo(totalAmount) &lt; 0;</span>
+    }
+
+    public void addMetadata(String key, Object value) {
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (metadata == null) {</span>
+<span class="nc" id="L292">            metadata = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L294">        metadata.put(key, value);</span>
+<span class="fc" id="L295">    }</span>
+
+    public Object getMetadata(String key) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        return metadata != null ? metadata.get(key) : null;</span>
+    }
+}
+
+/**
+ * JPA Converter for Map to JSON conversion
+ */
+@Converter
+<span class="fc" id="L306">class MapToJsonConverter implements AttributeConverter&lt;Map&lt;String, Object&gt;, String&gt; {</span>
+    
+<span class="fc" id="L308">    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = </span>
+            new com.fasterxml.jackson.databind.ObjectMapper()
+<span class="fc" id="L310">            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());</span>
+
+    @Override
+    public String convertToDatabaseColumn(Map&lt;String, Object&gt; attribute) {
+<span class="nc bnc" id="L314" title="All 4 branches missed.">        if (attribute == null || attribute.isEmpty()) {</span>
+<span class="nc" id="L315">            return &quot;{}&quot;;</span>
+        }
+        try {
+<span class="nc" id="L318">            return objectMapper.writeValueAsString(attribute);</span>
+<span class="nc" id="L319">        } catch (Exception e) {</span>
+<span class="nc" id="L320">            throw new RuntimeException(&quot;Error converting map to JSON&quot;, e);</span>
+        }
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public Map&lt;String, Object&gt; convertToEntityAttribute(String dbData) {
+<span class="nc bnc" id="L327" title="All 4 branches missed.">        if (dbData == null || dbData.trim().isEmpty()) {</span>
+<span class="nc" id="L328">            return new HashMap&lt;&gt;();</span>
+        }
+        try {
+<span class="nc" id="L331">            return objectMapper.readValue(dbData, Map.class);</span>
+<span class="nc" id="L332">        } catch (Exception e) {</span>
+<span class="nc" id="L333">            throw new RuntimeException(&quot;Error converting JSON to map&quot;, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

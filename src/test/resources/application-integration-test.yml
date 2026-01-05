@@ -1,0 +1,92 @@
+# Integration Test Configuration
+
+server:
+  port: 0 # Use random port for tests
+
+spring:
+  # Database configuration (will be overridden by TestContainers)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payment_gateway_test
+    username: test_user
+    password: test_password
+    driver-class-name: org.postgresql.Driver
+    
+  # JPA Configuration for Integration Tests
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    
+  # Flyway disabled for integration tests
+  flyway:
+    enabled: false
+    
+  # Redis Configuration (will be overridden by TestContainers)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutes
+
+# Logging Configuration for Integration Tests
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.testcontainers: INFO
+    org.springframework.test: INFO
+
+# Application Configuration for Integration Tests
+app:
+  # Authorize.Net Configuration (Mock)
+  authorize-net:
+    environment: SANDBOX
+    api-login-id: test-api-login-id
+    transaction-key: test-transaction-key
+    base-url: http://localhost:8080/mock/authorize-net
+    
+  # JWT Configuration
+  jwt:
+    secret: integration-test-jwt-secret-key-for-testing-only
+    expiration: 3600000 # 1 hour
+    refresh-expiration: 7200000 # 2 hours
+    
+  # Rate Limiting (Disabled for tests)
+  rate-limit:
+    enabled: false
+    default-limit: 999999
+    burst-limit: 999999
+    
+  # Test Features
+  test:
+    mock-payments: true
+    detailed-errors: true
+    fast-startup: true
+
+# Management Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config</a> &gt; <span class="el_source">SecurityConfig.java</span></div><h1>SecurityConfig.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config;
+
+import com.talentica.paymentgateway.security.ApiKeyAuthenticationFilter;
+import com.talentica.paymentgateway.security.CorrelationIdFilter;
+import com.talentica.paymentgateway.security.JwtAuthenticationFilter;
+import com.talentica.paymentgateway.security.RateLimitFilter;
+import com.talentica.paymentgateway.security.RequestResponseLoggingFilter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.http.HttpStatus;
+
+/**
+ * Comprehensive Security Configuration for Payment Gateway Application.
+ * Implements JWT authentication, API key validation, rate limiting, and security headers.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
+    private final CorrelationIdFilter correlationIdFilter;
+    private final RequestResponseLoggingFilter requestResponseLoggingFilter;
+    private final CorsConfigurationSource corsConfigurationSource;
+
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+            RateLimitFilter rateLimitFilter,
+            CorrelationIdFilter correlationIdFilter,
+            RequestResponseLoggingFilter requestResponseLoggingFilter,
+<span class="fc" id="L48">            CorsConfigurationSource corsConfigurationSource) {</span>
+<span class="fc" id="L49">        this.jwtAuthenticationFilter = jwtAuthenticationFilter;</span>
+<span class="fc" id="L50">        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;</span>
+<span class="fc" id="L51">        this.rateLimitFilter = rateLimitFilter;</span>
+<span class="fc" id="L52">        this.correlationIdFilter = correlationIdFilter;</span>
+<span class="fc" id="L53">        this.requestResponseLoggingFilter = requestResponseLoggingFilter;</span>
+<span class="fc" id="L54">        this.corsConfigurationSource = corsConfigurationSource;</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Main security filter chain configuration.
+     * 
+     * @param http HttpSecurity configuration
+     * @return Configured SecurityFilterChain
+     * @throws Exception if configuration fails
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+<span class="fc" id="L66">        http</span>
+            // Disable CSRF for stateless API
+<span class="fc" id="L68">            .csrf(AbstractHttpConfigurer::disable)</span>
+            
+            // Configure CORS
+<span class="fc" id="L71">            .cors(cors -&gt; cors.configurationSource(corsConfigurationSource))</span>
+            
+            // Configure session management (stateless for JWT)
+<span class="fc" id="L74">            .sessionManagement(session -&gt; session</span>
+<span class="fc" id="L75">                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)</span>
+            )
+            
+            // Configure authorization rules
+<span class="fc" id="L79">            .authorizeHttpRequests(authz -&gt; authz</span>
+                // Public endpoints - no authentication required
+<span class="fc" id="L81">                .requestMatchers(</span>
+                    &quot;/health/**&quot;,
+                    &quot;/auth/login&quot;,
+                    &quot;/auth/register&quot;,
+                    &quot;/auth/refresh&quot;,
+                    &quot;/test/**&quot;,  // Add test endpoints
+                    &quot;/actuator/**&quot;,  // All actuator endpoints
+                    &quot;/h2-console/**&quot;,  // H2 database console
+                    &quot;/swagger-ui/**&quot;,
+                    &quot;/api-docs/**&quot;, 
+                    &quot;/v3/api-docs/**&quot;
+<span class="fc" id="L92">                ).permitAll()</span>
+                
+                // Webhook endpoints - API key authentication only
+<span class="fc" id="L95">                .requestMatchers(&quot;/webhooks/**&quot;).hasRole(&quot;API_CLIENT&quot;)</span>
+                
+                // Admin endpoints - admin role required
+<span class="fc" id="L98">                .requestMatchers(&quot;/admin/**&quot;).hasRole(&quot;ADMIN&quot;)</span>
+                
+                // Management endpoints - authenticated users
+<span class="fc" id="L101">                .requestMatchers(&quot;/management/**&quot;).hasAnyRole(&quot;ADMIN&quot;, &quot;MANAGER&quot;)</span>
+                
+                // Payment endpoints - authenticated users
+<span class="fc" id="L104">                .requestMatchers(&quot;/payments/**&quot;).hasAnyRole(&quot;USER&quot;, &quot;ADMIN&quot;, &quot;MANAGER&quot;)</span>
+                
+                // All other endpoints require authentication
+<span class="fc" id="L107">                .anyRequest().authenticated()</span>
+            )
+            
+            // Configure security headers
+<span class="fc" id="L111">            .headers(headers -&gt; headers</span>
+                // Frame options - allow frames for H2 console
+<span class="fc" id="L113">                .frameOptions(frameOptions -&gt; frameOptions.sameOrigin())</span>
+                
+                // Content type options
+<span class="fc" id="L116">                .contentTypeOptions(contentTypeOptions -&gt; {})</span>
+                
+                // XSS protection
+<span class="fc" id="L119">                .httpStrictTransportSecurity(hstsConfig -&gt; hstsConfig</span>
+<span class="fc" id="L120">                    .maxAgeInSeconds(31536000)</span>
+<span class="fc" id="L121">                    .includeSubDomains(true)</span>
+                )
+                
+                // Referrer policy
+<span class="fc" id="L125">                .referrerPolicy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)</span>
+            )
+            
+            // Additional security headers
+<span class="fc" id="L129">            .headers(headers -&gt; headers</span>
+<span class="fc" id="L130">                .addHeaderWriter((request, response) -&gt; {</span>
+<span class="fc" id="L131">                    response.setHeader(&quot;Permissions-Policy&quot;, </span>
+                        &quot;geolocation=(), microphone=(), camera=(), payment=()&quot;);
+                    
+                    // More permissive CSP for Swagger UI
+<span class="fc" id="L135">                    String path = request.getRequestURI();</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">                    if (path.contains(&quot;/swagger-ui&quot;) || path.contains(&quot;/api-docs&quot;)) {</span>
+<span class="nc" id="L137">                        response.setHeader(&quot;Content-Security-Policy&quot;,</span>
+                            &quot;default-src 'self'; &quot; +
+                            &quot;script-src 'self' 'unsafe-inline' 'unsafe-eval'; &quot; +
+                            &quot;style-src 'self' 'unsafe-inline'; &quot; +
+                            &quot;img-src 'self' data: https:; &quot; +
+                            &quot;font-src 'self'; &quot; +
+                            &quot;connect-src 'self'; &quot; +
+                            &quot;frame-ancestors 'none'&quot;);
+                    } else {
+<span class="fc" id="L146">                        response.setHeader(&quot;Content-Security-Policy&quot;,</span>
+                            &quot;default-src 'self'; &quot; +
+                            &quot;script-src 'self' 'unsafe-inline'; &quot; +
+                            &quot;style-src 'self' 'unsafe-inline'; &quot; +
+                            &quot;img-src 'self' data: https:; &quot; +
+                            &quot;font-src 'self'; &quot; +
+                            &quot;connect-src 'self'; &quot; +
+                            &quot;frame-ancestors 'none'&quot;);
+                    }
+<span class="fc" id="L155">                })</span>
+            )
+            
+            // Configure exception handling
+<span class="fc" id="L159">            .exceptionHandling(exceptions -&gt; exceptions</span>
+<span class="fc" id="L160">                .authenticationEntryPoint((request, response, authException) -&gt; {</span>
+<span class="fc" id="L161">                    response.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L162">                    response.setStatus(HttpStatus.UNAUTHORIZED.value());</span>
+<span class="fc" id="L163">                    response.getWriter().write(&quot;{\&quot;error\&quot;:\&quot;Unauthorized\&quot;,\&quot;message\&quot;:\&quot;&quot; + authException.getMessage() + &quot;\&quot;}&quot;);</span>
+<span class="fc" id="L164">                })</span>
+<span class="fc" id="L165">                .accessDeniedHandler((request, response, accessDeniedException) -&gt; {</span>
+<span class="nc" id="L166">                    response.setContentType(&quot;application/json&quot;);</span>
+<span class="nc" id="L167">                    response.setStatus(HttpStatus.FORBIDDEN.value());</span>
+<span class="nc" id="L168">                    response.getWriter().write(&quot;{\&quot;error\&quot;:\&quot;Access Denied\&quot;,\&quot;message\&quot;:\&quot;&quot; + accessDeniedException.getMessage() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L169">                })</span>
+            )
+            
+            // Add custom filters in correct order
+<span class="fc" id="L173">            .addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class)</span>
+<span class="fc" id="L174">            .addFilterAfter(requestResponseLoggingFilter, CorrelationIdFilter.class)</span>
+<span class="fc" id="L175">            .addFilterAfter(rateLimitFilter, RequestResponseLoggingFilter.class)</span>
+<span class="fc" id="L176">            .addFilterAfter(jwtAuthenticationFilter, RateLimitFilter.class)</span>
+<span class="fc" id="L177">            .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class);</span>
+
+<span class="fc" id="L179">        return http.build();</span>
+    }
+
+    /**
+     * Password encoder bean for secure password hashing.
+     * 
+     * @return BCrypt password encoder
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+<span class="fc" id="L189">        return new BCryptPasswordEncoder(12);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

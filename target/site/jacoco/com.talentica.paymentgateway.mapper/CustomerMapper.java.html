@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.mapper</a> &gt; <span class="el_source">CustomerMapper.java</span></div><h1>CustomerMapper.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.mapper;
+
+import com.talentica.paymentgateway.dto.customer.CustomerProfileRequest;
+import com.talentica.paymentgateway.dto.customer.CustomerProfileResponse;
+import com.talentica.paymentgateway.entity.Customer;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.factory.Mappers;
+
+/**
+ * MapStruct mapper for Customer entity to DTO conversions.
+ * Handles mapping between Customer domain entities and data transfer objects.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Mapper(componentModel = &quot;spring&quot;)
+public interface CustomerMapper {
+
+<span class="nc" id="L21">    CustomerMapper INSTANCE = Mappers.getMapper(CustomerMapper.class);</span>
+
+    /**
+     * Map Customer entity to CustomerProfileResponse DTO.
+     */
+    @Mapping(source = &quot;authorizeNetCustomerProfileId&quot;, target = &quot;customerProfileId&quot;)
+    @Mapping(source = &quot;customerReference&quot;, target = &quot;merchantCustomerId&quot;)
+    @Mapping(source = &quot;email&quot;, target = &quot;email&quot;)
+    @Mapping(source = &quot;company&quot;, target = &quot;description&quot;)
+    @Mapping(source = &quot;createdAt&quot;, target = &quot;createdAt&quot;)
+    @Mapping(source = &quot;updatedAt&quot;, target = &quot;updatedAt&quot;)
+    @Mapping(target = &quot;paymentProfiles&quot;, ignore = true)
+    @Mapping(target = &quot;shippingAddresses&quot;, ignore = true)
+    CustomerProfileResponse toCustomerProfileResponse(Customer customer);
+
+    /**
+     * Map CustomerProfileRequest DTO to Customer entity.
+     */
+    @Mapping(target = &quot;id&quot;, ignore = true)
+    @Mapping(target = &quot;customerId&quot;, ignore = true)
+    @Mapping(target = &quot;user&quot;, ignore = true)
+    @Mapping(target = &quot;createdAt&quot;, ignore = true)
+    @Mapping(target = &quot;updatedAt&quot;, ignore = true)
+    @Mapping(target = &quot;authorizeNetCustomerProfileId&quot;, ignore = true)
+    @Mapping(target = &quot;paymentMethods&quot;, ignore = true)
+    @Mapping(target = &quot;transactions&quot;, ignore = true)
+    @Mapping(target = &quot;subscriptions&quot;, ignore = true)
+    @Mapping(target = &quot;orders&quot;, ignore = true)
+    Customer toCustomer(CustomerProfileRequest request);
+
+    /**
+     * Update existing Customer entity from CustomerProfileRequest.
+     */
+    @Mapping(target = &quot;id&quot;, ignore = true)
+    @Mapping(target = &quot;customerId&quot;, ignore = true)
+    @Mapping(target = &quot;user&quot;, ignore = true)
+    @Mapping(target = &quot;createdAt&quot;, ignore = true)
+    @Mapping(target = &quot;updatedAt&quot;, ignore = true)
+    @Mapping(target = &quot;authorizeNetCustomerProfileId&quot;, ignore = true)
+    @Mapping(target = &quot;paymentMethods&quot;, ignore = true)
+    @Mapping(target = &quot;transactions&quot;, ignore = true)
+    @Mapping(target = &quot;subscriptions&quot;, ignore = true)
+    @Mapping(target = &quot;orders&quot;, ignore = true)
+    void updateCustomerFromRequest(CustomerProfileRequest request, @MappingTarget Customer customer);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

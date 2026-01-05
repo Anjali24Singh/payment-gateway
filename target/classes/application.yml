@@ -1,0 +1,241 @@
+# Payment Gateway Application Configuration
+# Default configuration that applies to all profiles
+
+spring:
+  application:
+    name: payment-gateway
+  profiles:
+    active: no-docker
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+  
+  # Flyway Configuration
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    locations: classpath:db/migration
+    baseline-version: 0
+    baseline-description: Initial baseline
+    out-of-order: false
+    clean-disabled: true
+    
+  # Jackson Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutes
+      
+  # Session Configuration
+  session:
+    store-type: redis
+    timeout: 1800 # 30 minutes
+    
+  # Async Configuration
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 20
+        queue-capacity: 100
+        keep-alive: 60s
+      thread-name-prefix: payment-gateway-async-
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+    include-exception: false
+
+# Management/Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,configprops,loggers,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: always
+      group:
+        liveness:
+          include: livenessState,diskSpace
+        readiness:
+          include: readinessState,db,redis,ping
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+    loggers:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: payment-gateway
+      environment: ${spring.profiles.active:unknown}
+    export:
+      prometheus:
+        enabled: true
+        step: 30s
+        descriptions: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        payment.processing.duration: true
+        database.query.duration: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        payment.processing.duration: 0.5, 0.95, 0.99
+      slo:
+        http.server.requests: 100ms,500ms,1s,2s,5s
+        payment.processing.duration: 1s,5s,10s,30s
+    web:
+      server:
+        auto-time-requests: true
+        request:
+          autotime:
+            enabled: true
+            percentiles: 0.5, 0.95, 0.99
+            percentiles-histogram: true
+  tracing:
+    sampling:
+      probability: 1.0
+    enabled: true
+  observations:
+    key-values:
+      application: payment-gateway
+      environment: ${spring.profiles.active:unknown}
+
+# Logging Configuration
+logging:
+  level:
+    com.talentica.paymentgateway: INFO
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
+# Application Specific Configuration
+app:
+  name: Payment Gateway Integration Platform
+  version: 1.0.0
+  description: Comprehensive payment processing solution with Authorize.Net integration
+  
+  # Database Configuration
+  database:
+    max-connections: 20
+    min-connections: 5
+    connection-timeout: 20000
+    idle-timeout: 300000
+    max-lifetime: 1800000
+    enable-metrics: true
+    pool-name: PaymentGatewayCP
+  
+  # JWT Configuration
+  jwt:
+    secret: ${JWT_SECRET:payment-gateway-secret-key-change-in-production}
+    expiration: 86400000 # 24 hours in milliseconds
+    refresh-expiration: 604800000 # 7 days in milliseconds
+    
+  # Rate Limiting Configuration
+  rate-limit:
+    enabled: true
+    default-limit: 1000 # requests per hour
+    burst-limit: 100 # burst capacity
+    
+  # Correlation ID Configuration
+  correlation:
+    header-name: X-Correlation-ID
+    mdc-key: correlationId
+    
+  # Webhook Configuration
+  webhook:
+    retry:
+      max-attempts: 5
+      initial-delay-minutes: 1
+      max-delay-minutes: 1440 # 24 hours
+      multiplier: 2.0
+      jitter-enabled: true
+      timeout-seconds: 30
+    duplicate-detection:
+      enabled: true
+      window-minutes: 60
+    processing:
+      timeout-seconds: 30
+    cleanup:
+      enabled: true
+      delivered-retention-days: 7
+      failed-retention-days: 30
+    signature:
+      enabled: true
+      algorithm: HMAC_SHA256
+      secret: ${WEBHOOK_SIGNATURE_SECRET:webhook-secret-change-in-production}
+    timeout: 30000 # 30 seconds
+    
+  # Payment Configuration
+  payment:
+    timeout: 30000 # 30 seconds
+    retry:
+      max-attempts: 3
+      delay: 1000 # 1 second
+
+# OpenAPI Documentation Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    url: /api/v1/api-docs
+    config-url: /api/v1/api-docs/swagger-config
+    disable-swagger-default-url: true
+    try-it-out-enabled: true
+  info:
+    title: Payment Gateway API
+    description: Comprehensive payment processing API with Authorize.Net integration
+    version: 1.0.0
+    contact:
+      name: Payment Gateway Team
+      email: support@talentica.com
+  servers:
+    - url: http://localhost:8080/api/v1
+      description: Local Development Server

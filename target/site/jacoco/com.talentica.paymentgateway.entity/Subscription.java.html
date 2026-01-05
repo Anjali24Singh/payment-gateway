@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Subscription.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">Subscription.java</span></div><h1>Subscription.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import com.talentica.paymentgateway.util.SubscriptionStatusConverter;
+
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Entity representing an active subscription for a customer.
+ * Subscriptions track the complete billing lifecycle including trials, renewals, and cancellations.
+ */
+@Entity
+@Table(name = &quot;subscriptions&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;subscriptionId&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_subscriptions_customer_id&quot;, columnList = &quot;customer_id&quot;),
+           @Index(name = &quot;idx_subscriptions_plan_id&quot;, columnList = &quot;plan_id&quot;),
+           @Index(name = &quot;idx_subscriptions_subscription_id&quot;, columnList = &quot;subscriptionId&quot;),
+           @Index(name = &quot;idx_subscriptions_status&quot;, columnList = &quot;status&quot;),
+           @Index(name = &quot;idx_subscriptions_next_billing&quot;, columnList = &quot;nextBillingDate&quot;)
+       })
+public class Subscription extends BaseEntity {
+
+    @NotBlank(message = &quot;Subscription ID is required&quot;)
+    @Size(max = 100, message = &quot;Subscription ID must not exceed 100 characters&quot;)
+    @Column(name = &quot;subscription_id&quot;, nullable = false, unique = true, length = 100)
+    private String subscriptionId;
+
+    @NotNull(message = &quot;Customer is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;customer_id&quot;, nullable = false)
+    private Customer customer;
+
+    @NotNull(message = &quot;Plan is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;plan_id&quot;, nullable = false)
+    private SubscriptionPlan plan;
+
+    @NotNull(message = &quot;Payment method is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;payment_method_id&quot;, nullable = false)
+    private PaymentMethod paymentMethod;
+
+<span class="fc" id="L55">    @Convert(converter = SubscriptionStatusConverter.class)</span>
+    @Column(name = &quot;status&quot;)
+    private SubscriptionStatus status = SubscriptionStatus.PENDING;
+
+    @Column(name = &quot;current_period_start&quot;)
+    private ZonedDateTime currentPeriodStart;
+
+    @Column(name = &quot;current_period_end&quot;)
+    private ZonedDateTime currentPeriodEnd;
+
+    @Column(name = &quot;trial_start&quot;)
+    private ZonedDateTime trialStart;
+
+    @Column(name = &quot;trial_end&quot;)
+    private ZonedDateTime trialEnd;
+
+    @Column(name = &quot;next_billing_date&quot;)
+    private ZonedDateTime nextBillingDate;
+
+    @Column(name = &quot;billing_cycle_anchor&quot;)
+    private ZonedDateTime billingCycleAnchor;
+
+    @Column(name = &quot;cancelled_at&quot;)
+    private ZonedDateTime cancelledAt;
+
+    @Column(name = &quot;cancellation_reason&quot;, columnDefinition = &quot;TEXT&quot;)
+    private String cancellationReason;
+
+<span class="fc" id="L83">    @JdbcTypeCode(SqlTypes.JSON)</span>
+    @Column(name = &quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata = new HashMap&lt;&gt;();
+
+    // Relationships
+<span class="fc" id="L88">    @OneToMany(mappedBy = &quot;subscription&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;SubscriptionInvoice&gt; invoices = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public Subscription() {
+<span class="fc" id="L93">        super();</span>
+<span class="fc" id="L94">    }</span>
+
+    public Subscription(String subscriptionId, Customer customer, SubscriptionPlan plan, PaymentMethod paymentMethod) {
+<span class="fc" id="L97">        this();</span>
+<span class="fc" id="L98">        this.subscriptionId = subscriptionId;</span>
+<span class="fc" id="L99">        this.customer = customer;</span>
+<span class="fc" id="L100">        this.plan = plan;</span>
+<span class="fc" id="L101">        this.paymentMethod = paymentMethod;</span>
+<span class="fc" id="L102">    }</span>
+
+    // Getters and Setters
+    public String getSubscriptionId() {
+<span class="fc" id="L106">        return subscriptionId;</span>
+    }
+
+    public void setSubscriptionId(String subscriptionId) {
+<span class="fc" id="L110">        this.subscriptionId = subscriptionId;</span>
+<span class="fc" id="L111">    }</span>
+
+    public Customer getCustomer() {
+<span class="fc" id="L114">        return customer;</span>
+    }
+
+    public void setCustomer(Customer customer) {
+<span class="fc" id="L118">        this.customer = customer;</span>
+<span class="fc" id="L119">    }</span>
+
+    public SubscriptionPlan getPlan() {
+<span class="fc" id="L122">        return plan;</span>
+    }
+
+    public void setPlan(SubscriptionPlan plan) {
+<span class="fc" id="L126">        this.plan = plan;</span>
+<span class="fc" id="L127">    }</span>
+
+    public PaymentMethod getPaymentMethod() {
+<span class="fc" id="L130">        return paymentMethod;</span>
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+<span class="fc" id="L134">        this.paymentMethod = paymentMethod;</span>
+<span class="fc" id="L135">    }</span>
+
+    public SubscriptionStatus getStatus() {
+<span class="fc" id="L138">        return status;</span>
+    }
+
+    public void setStatus(SubscriptionStatus status) {
+<span class="fc" id="L142">        this.status = status;</span>
+<span class="fc" id="L143">    }</span>
+
+    public ZonedDateTime getCurrentPeriodStart() {
+<span class="fc" id="L146">        return currentPeriodStart;</span>
+    }
+
+    public void setCurrentPeriodStart(ZonedDateTime currentPeriodStart) {
+<span class="fc" id="L150">        this.currentPeriodStart = currentPeriodStart;</span>
+<span class="fc" id="L151">    }</span>
+
+    public ZonedDateTime getCurrentPeriodEnd() {
+<span class="fc" id="L154">        return currentPeriodEnd;</span>
+    }
+
+    public void setCurrentPeriodEnd(ZonedDateTime currentPeriodEnd) {
+<span class="fc" id="L158">        this.currentPeriodEnd = currentPeriodEnd;</span>
+<span class="fc" id="L159">    }</span>
+
+    public ZonedDateTime getTrialStart() {
+<span class="fc" id="L162">        return trialStart;</span>
+    }
+
+    public void setTrialStart(ZonedDateTime trialStart) {
+<span class="fc" id="L166">        this.trialStart = trialStart;</span>
+<span class="fc" id="L167">    }</span>
+
+    public ZonedDateTime getTrialEnd() {
+<span class="fc" id="L170">        return trialEnd;</span>
+    }
+
+    public void setTrialEnd(ZonedDateTime trialEnd) {
+<span class="fc" id="L174">        this.trialEnd = trialEnd;</span>
+<span class="fc" id="L175">    }</span>
+
+    public ZonedDateTime getNextBillingDate() {
+<span class="fc" id="L178">        return nextBillingDate;</span>
+    }
+
+    public void setNextBillingDate(ZonedDateTime nextBillingDate) {
+<span class="fc" id="L182">        this.nextBillingDate = nextBillingDate;</span>
+<span class="fc" id="L183">    }</span>
+
+    public ZonedDateTime getBillingCycleAnchor() {
+<span class="fc" id="L186">        return billingCycleAnchor;</span>
+    }
+
+    public void setBillingCycleAnchor(ZonedDateTime billingCycleAnchor) {
+<span class="fc" id="L190">        this.billingCycleAnchor = billingCycleAnchor;</span>
+<span class="fc" id="L191">    }</span>
+
+    public ZonedDateTime getCancelledAt() {
+<span class="fc" id="L194">        return cancelledAt;</span>
+    }
+
+    public void setCancelledAt(ZonedDateTime cancelledAt) {
+<span class="fc" id="L198">        this.cancelledAt = cancelledAt;</span>
+<span class="fc" id="L199">    }</span>
+
+    public String getCancellationReason() {
+<span class="fc" id="L202">        return cancellationReason;</span>
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+<span class="fc" id="L206">        this.cancellationReason = cancellationReason;</span>
+<span class="fc" id="L207">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L210">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L214">        this.metadata = metadata;</span>
+<span class="fc" id="L215">    }</span>
+
+    public List&lt;SubscriptionInvoice&gt; getInvoices() {
+<span class="fc" id="L218">        return invoices;</span>
+    }
+
+    public void setInvoices(List&lt;SubscriptionInvoice&gt; invoices) {
+<span class="fc" id="L222">        this.invoices = invoices;</span>
+<span class="fc" id="L223">    }</span>
+
+    // Utility methods
+    public boolean isActive() {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        return status == SubscriptionStatus.ACTIVE;</span>
+    }
+
+    public boolean isCancelled() {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        return status == SubscriptionStatus.CANCELLED;</span>
+    }
+
+    public boolean isInTrial() {
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        if (trialStart == null || trialEnd == null) {</span>
+<span class="fc" id="L236">            return false;</span>
+        }
+<span class="fc" id="L238">        ZonedDateTime now = ZonedDateTime.now();</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">        return !now.isBefore(trialStart) &amp;&amp; now.isBefore(trialEnd);</span>
+    }
+
+    public boolean hasTrialExpired() {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (trialEnd == null) {</span>
+<span class="fc" id="L244">            return false;</span>
+        }
+<span class="fc" id="L246">        return ZonedDateTime.now().isAfter(trialEnd);</span>
+    }
+
+    public boolean isDue() {
+<span class="nc bnc" id="L250" title="All 4 branches missed.">        return nextBillingDate != null &amp;&amp; ZonedDateTime.now().isAfter(nextBillingDate);</span>
+    }
+
+    public boolean isPastDue() {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        return status == SubscriptionStatus.PAST_DUE;</span>
+    }
+
+    public void activate() {
+<span class="fc" id="L258">        this.status = SubscriptionStatus.ACTIVE;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (currentPeriodStart == null) {</span>
+<span class="fc" id="L260">            this.currentPeriodStart = ZonedDateTime.now();</span>
+        }
+<span class="fc" id="L262">        calculateNextBillingCycle();</span>
+<span class="fc" id="L263">    }</span>
+
+    public void pause() {
+<span class="fc" id="L266">        this.status = SubscriptionStatus.PAUSED;</span>
+<span class="fc" id="L267">    }</span>
+
+    public void cancel(String reason) {
+<span class="fc" id="L270">        this.status = SubscriptionStatus.CANCELLED;</span>
+<span class="fc" id="L271">        this.cancelledAt = ZonedDateTime.now();</span>
+<span class="fc" id="L272">        this.cancellationReason = reason;</span>
+<span class="fc" id="L273">        this.nextBillingDate = null;</span>
+<span class="fc" id="L274">    }</span>
+
+    public void expire() {
+<span class="nc" id="L277">        this.status = SubscriptionStatus.EXPIRED;</span>
+<span class="nc" id="L278">        this.nextBillingDate = null;</span>
+<span class="nc" id="L279">    }</span>
+
+    public void markAsPastDue() {
+<span class="fc" id="L282">        this.status = SubscriptionStatus.PAST_DUE;</span>
+<span class="fc" id="L283">    }</span>
+
+    public void calculateNextBillingCycle() {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (plan == null) {</span>
+<span class="nc" id="L287">            return;</span>
+        }
+
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        ZonedDateTime startDate = currentPeriodStart != null ? currentPeriodStart : ZonedDateTime.now();</span>
+        
+        // Calculate next period based on plan interval
+<span class="pc bpc" id="L293" title="4 of 5 branches missed.">        switch (plan.getIntervalUnit().toUpperCase()) {</span>
+            case &quot;DAY&quot;:
+<span class="nc" id="L295">                this.currentPeriodEnd = startDate.plusDays(plan.getIntervalCount());</span>
+<span class="nc" id="L296">                break;</span>
+            case &quot;WEEK&quot;:
+<span class="nc" id="L298">                this.currentPeriodEnd = startDate.plusWeeks(plan.getIntervalCount());</span>
+<span class="nc" id="L299">                break;</span>
+            case &quot;MONTH&quot;:
+<span class="fc" id="L301">                this.currentPeriodEnd = startDate.plusMonths(plan.getIntervalCount());</span>
+<span class="fc" id="L302">                break;</span>
+            case &quot;YEAR&quot;:
+<span class="nc" id="L304">                this.currentPeriodEnd = startDate.plusYears(plan.getIntervalCount());</span>
+<span class="nc" id="L305">                break;</span>
+            default:
+<span class="nc" id="L307">                this.currentPeriodEnd = startDate.plusMonths(1); // Default to monthly</span>
+        }
+
+<span class="fc" id="L310">        this.nextBillingDate = this.currentPeriodEnd;</span>
+<span class="fc" id="L311">    }</span>
+
+    public void startTrial() {
+<span class="pc bpc" id="L314" title="3 of 6 branches missed.">        if (plan != null &amp;&amp; plan.getTrialPeriodDays() != null &amp;&amp; plan.getTrialPeriodDays() &gt; 0) {</span>
+<span class="fc" id="L315">            this.trialStart = ZonedDateTime.now();</span>
+<span class="fc" id="L316">            this.trialEnd = this.trialStart.plusDays(plan.getTrialPeriodDays());</span>
+<span class="fc" id="L317">            this.nextBillingDate = this.trialEnd;</span>
+        }
+<span class="fc" id="L319">    }</span>
+
+    public void advanceBillingCycle() {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (currentPeriodEnd != null) {</span>
+<span class="fc" id="L323">            this.currentPeriodStart = currentPeriodEnd;</span>
+<span class="fc" id="L324">            calculateNextBillingCycle();</span>
+        }
+<span class="fc" id="L326">    }</span>
+
+    public void addInvoice(SubscriptionInvoice invoice) {
+<span class="fc" id="L329">        invoices.add(invoice);</span>
+<span class="fc" id="L330">        invoice.setSubscription(this);</span>
+<span class="fc" id="L331">    }</span>
+
+    public void removeInvoice(SubscriptionInvoice invoice) {
+<span class="fc" id="L334">        invoices.remove(invoice);</span>
+<span class="fc" id="L335">        invoice.setSubscription(null);</span>
+<span class="fc" id="L336">    }</span>
+
+    public SubscriptionInvoice getLatestInvoice() {
+<span class="fc" id="L339">        return invoices.stream()</span>
+<span class="fc" id="L340">                .max((i1, i2) -&gt; i1.getCreatedAt().compareTo(i2.getCreatedAt()))</span>
+<span class="fc" id="L341">                .orElse(null);</span>
+    }
+
+    public List&lt;SubscriptionInvoice&gt; getUnpaidInvoices() {
+<span class="fc" id="L345">        return invoices.stream()</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                .filter(i -&gt; !&quot;PAID&quot;.equals(i.getStatus()))</span>
+<span class="fc" id="L347">                .toList();</span>
+    }
+
+    public int getDaysUntilNextBilling() {
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (nextBillingDate == null) {</span>
+<span class="fc" id="L352">            return -1;</span>
+        }
+<span class="fc" id="L354">        return (int) java.time.temporal.ChronoUnit.DAYS.between(ZonedDateTime.now(), nextBillingDate);</span>
+    }
+
+    public void addMetadata(String key, Object value) {
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (metadata == null) {</span>
+<span class="nc" id="L359">            metadata = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L361">        metadata.put(key, value);</span>
+<span class="fc" id="L362">    }</span>
+
+    public Object getMetadata(String key) {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        return metadata != null ? metadata.get(key) : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

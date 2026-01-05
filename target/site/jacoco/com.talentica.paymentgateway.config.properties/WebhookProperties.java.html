@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.config.properties</a> &gt; <span class="el_source">WebhookProperties.java</span></div><h1>WebhookProperties.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.config.properties;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * Type-safe configuration properties for webhook processing.
+ * Replaces @Value annotations with validated configuration beans.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="pc bpc" id="L17" title="41 of 46 branches missed.">@Data</span>
+@Validated
+@Configuration
+@ConfigurationProperties(prefix = &quot;app.webhook&quot;)
+public class WebhookProperties {
+
+    /**
+     * Webhook signature verification settings.
+     */
+<span class="fc" id="L26">    @NotNull</span>
+<span class="fc" id="L27">    private Signature signature = new Signature();</span>
+
+    /**
+     * Webhook duplicate detection settings.
+     */
+<span class="fc" id="L32">    @NotNull</span>
+<span class="fc" id="L33">    private DuplicateDetection duplicateDetection = new DuplicateDetection();</span>
+
+    /**
+     * Webhook processing settings.
+     */
+<span class="fc" id="L38">    @NotNull</span>
+<span class="fc" id="L39">    private Processing processing = new Processing();</span>
+
+    /**
+     * Webhook retry settings.
+     */
+<span class="fc" id="L44">    @NotNull</span>
+<span class="fc" id="L45">    private Retry retry = new Retry();</span>
+
+    /**
+     * Webhook cleanup settings.
+     */
+<span class="fc" id="L50">    @NotNull</span>
+<span class="fc" id="L51">    private Cleanup cleanup = new Cleanup();</span>
+
+    /**
+     * Signature verification configuration.
+     */
+<span class="pc bpc" id="L56" title="23 of 26 branches missed.">    @Data</span>
+    public static class Signature {
+        /**
+         * Signature secret key for HMAC verification.
+         */
+<span class="fc" id="L61">        private String secret;</span>
+
+        /**
+         * Signature algorithm (HMAC_SHA256, HMAC_SHA512).
+         */
+<span class="fc" id="L66">        private String algorithm = &quot;HMAC_SHA256&quot;;</span>
+
+        /**
+         * Enable/disable signature verification.
+         */
+<span class="fc" id="L71">        private boolean enabled = true;</span>
+    }
+
+    /**
+     * Duplicate detection configuration.
+     */
+<span class="pc bpc" id="L77" title="11 of 12 branches missed.">    @Data</span>
+    public static class DuplicateDetection {
+        /**
+         * Enable/disable duplicate webhook detection.
+         */
+<span class="fc" id="L82">        private boolean enabled = true;</span>
+
+        /**
+         * Time window in minutes for duplicate detection.
+         */
+<span class="fc" id="L87">        @Min(1)</span>
+<span class="fc" id="L88">        private int windowMinutes = 60;</span>
+    }
+
+    /**
+     * Processing configuration.
+     */
+<span class="pc bnc" id="L94" title="All 8 branches missed.">    @Data</span>
+    public static class Processing {
+        /**
+         * Webhook processing timeout in seconds.
+         */
+<span class="fc" id="L99">        @Min(1)</span>
+<span class="fc" id="L100">        private int timeoutSeconds = 30;</span>
+    }
+
+    /**
+     * Retry configuration.
+     */
+<span class="pc bpc" id="L106" title="19 of 20 branches missed.">    @Data</span>
+    public static class Retry {
+        /**
+         * Maximum number of retry attempts.
+         */
+<span class="fc" id="L111">        @Min(0)</span>
+<span class="fc" id="L112">        private int maxAttempts = 5;</span>
+
+        /**
+         * Initial delay before first retry (in minutes).
+         */
+<span class="fc" id="L117">        @Min(1)</span>
+<span class="fc" id="L118">        private int initialDelayMinutes = 1;</span>
+
+        /**
+         * Maximum delay between retries (in minutes).
+         */
+<span class="fc" id="L123">        @Min(1)</span>
+<span class="fc" id="L124">        private int maxDelayMinutes = 1440; // 24 hours</span>
+
+        /**
+         * Backoff multiplier for exponential retry.
+         */
+<span class="fc" id="L129">        @Min(1)</span>
+<span class="fc" id="L130">        private double multiplier = 2.0;</span>
+
+        /**
+         * Enable jitter in retry delays.
+         */
+<span class="fc" id="L135">        private boolean jitterEnabled = true;</span>
+
+        /**
+         * Retry request timeout in seconds.
+         */
+<span class="fc" id="L140">        @Min(1)</span>
+<span class="fc" id="L141">        private int timeoutSeconds = 30;</span>
+    }
+
+    /**
+     * Cleanup configuration.
+     */
+<span class="pc bpc" id="L147" title="13 of 14 branches missed.">    @Data</span>
+    public static class Cleanup {
+        /**
+         * Enable/disable automatic cleanup of old webhooks.
+         */
+<span class="fc" id="L152">        private boolean enabled = true;</span>
+
+        /**
+         * Retention period for delivered webhooks (in days).
+         */
+<span class="fc" id="L157">        @Min(1)</span>
+<span class="fc" id="L158">        private int deliveredRetentionDays = 7;</span>
+
+        /**
+         * Retention period for failed webhooks (in days).
+         */
+<span class="fc" id="L163">        @Min(1)</span>
+<span class="fc" id="L164">        private int failedRetentionDays = 30;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimitFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.security</a> &gt; <span class="el_source">RateLimitFilter.java</span></div><h1>RateLimitFilter.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.talentica.paymentgateway.service.RateLimitService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Rate Limiting Filter to control request rates per client.
+ * Applies rate limits based on IP address, user ID, or API key.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L32">@Slf4j</span>
+@Component
+public class RateLimitFilter extends OncePerRequestFilter {
+    
+    private static final String X_RATE_LIMIT_LIMIT = &quot;X-RateLimit-Limit&quot;;
+    private static final String X_RATE_LIMIT_REMAINING = &quot;X-RateLimit-Remaining&quot;;
+    private static final String X_RATE_LIMIT_RESET = &quot;X-RateLimit-Reset&quot;;
+    private static final String X_FORWARDED_FOR = &quot;X-Forwarded-For&quot;;
+    private static final String X_REAL_IP = &quot;X-Real-IP&quot;;
+    
+    private final RateLimitService rateLimitService;
+    private final ObjectMapper objectMapper;
+
+<span class="fc" id="L45">    public RateLimitFilter(RateLimitService rateLimitService, ObjectMapper objectMapper) {</span>
+<span class="fc" id="L46">        this.rateLimitService = rateLimitService;</span>
+<span class="fc" id="L47">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
+        
+        try {
+            // Skip rate limiting for excluded endpoints
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (shouldSkipRateLimit(request)) {</span>
+<span class="nc" id="L60">                filterChain.doFilter(request, response);</span>
+<span class="nc" id="L61">                return;</span>
+            }
+
+            // Determine rate limit identifier
+<span class="fc" id="L65">            String identifier = getRateLimitIdentifier(request);</span>
+            
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            if (!StringUtils.hasText(identifier)) {</span>
+<span class="nc" id="L68">                log.debug(&quot;No rate limit identifier found, using IP address&quot;);</span>
+<span class="nc" id="L69">                identifier = getClientIpAddress(request);</span>
+            }
+
+            // Check rate limit
+<span class="fc" id="L73">            RateLimitService.RateLimitResult result = rateLimitService.isAllowed(identifier);</span>
+            
+            // Add rate limit headers
+<span class="fc" id="L76">            addRateLimitHeaders(response, result);</span>
+            
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (!result.isAllowed()) {</span>
+                // Rate limit exceeded
+<span class="fc" id="L80">                handleRateLimitExceeded(request, response, identifier);</span>
+<span class="fc" id="L81">                return;</span>
+            }
+
+            // Request allowed, continue with filter chain
+<span class="fc" id="L85">            filterChain.doFilter(request, response);</span>
+            
+<span class="fc" id="L87">        } catch (Exception e) {</span>
+<span class="fc" id="L88">            log.error(&quot;Error in rate limit filter: {}&quot;, e.getMessage(), e);</span>
+            // Continue with request if rate limiting fails
+<span class="fc" id="L90">            filterChain.doFilter(request, response);</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Determine rate limit identifier based on authentication type.
+     * 
+     * @param request HTTP request
+     * @return Rate limit identifier
+     */
+    private String getRateLimitIdentifier(HttpServletRequest request) {
+<span class="fc" id="L101">        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();</span>
+        
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (authentication != null &amp;&amp; authentication.isAuthenticated()) {</span>
+<span class="fc" id="L104">            String username = authentication.getName();</span>
+<span class="fc" id="L105">            Object credentials = authentication.getCredentials();</span>
+            
+            // If credentials contain API key, use it for rate limiting
+<span class="fc bfc" id="L108" title="All 4 branches covered.">            if (credentials instanceof String apiKey &amp;&amp; apiKey.startsWith(&quot;pgw_&quot;)) {</span>
+<span class="fc" id="L109">                return &quot;api:&quot; + apiKey;</span>
+            }
+            
+            // Use authenticated username
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">            if (StringUtils.hasText(username) &amp;&amp; !&quot;anonymousUser&quot;.equals(username)) {</span>
+<span class="fc" id="L114">                return &quot;user:&quot; + username;</span>
+            }
+        }
+        
+        // Fall back to IP address
+<span class="fc" id="L119">        return &quot;ip:&quot; + getClientIpAddress(request);</span>
+    }
+
+    /**
+     * Get client IP address from request.
+     * 
+     * @param request HTTP request
+     * @return Client IP address
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        // Check X-Forwarded-For header first (common in load balancer setups)
+<span class="fc" id="L130">        String xForwardedFor = request.getHeader(X_FORWARDED_FOR);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (StringUtils.hasText(xForwardedFor)) {</span>
+            // Take the first IP in the chain
+<span class="fc" id="L133">            String[] ips = xForwardedFor.split(&quot;,&quot;);</span>
+<span class="fc" id="L134">            return ips[0].trim();</span>
+        }
+        
+        // Check X-Real-IP header
+<span class="fc" id="L138">        String xRealIp = request.getHeader(X_REAL_IP);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (StringUtils.hasText(xRealIp)) {</span>
+<span class="nc" id="L140">            return xRealIp.trim();</span>
+        }
+        
+        // Fall back to remote address
+<span class="fc" id="L144">        return request.getRemoteAddr();</span>
+    }
+
+    /**
+     * Add rate limit headers to response.
+     * 
+     * @param response HTTP response
+     * @param result Rate limit result
+     */
+    private void addRateLimitHeaders(HttpServletResponse response, RateLimitService.RateLimitResult result) {
+<span class="fc" id="L154">        response.addHeader(X_RATE_LIMIT_LIMIT, String.valueOf(result.getLimit()));</span>
+<span class="fc" id="L155">        response.addHeader(X_RATE_LIMIT_REMAINING, String.valueOf(result.getRemaining()));</span>
+<span class="fc" id="L156">        response.addHeader(X_RATE_LIMIT_RESET, String.valueOf(result.getResetTimeSeconds()));</span>
+<span class="fc" id="L157">    }</span>
+
+    /**
+     * Handle rate limit exceeded scenario.
+     * 
+     * @param request HTTP request
+     * @param response HTTP response
+     * @param identifier Rate limit identifier
+     * @throws IOException if writing response fails
+     */
+    private void handleRateLimitExceeded(
+            HttpServletRequest request, 
+            HttpServletResponse response, 
+            String identifier
+    ) throws IOException {
+        
+<span class="fc" id="L173">        log.warn(&quot;Rate limit exceeded for identifier: {} on endpoint: {}&quot;, </span>
+<span class="fc" id="L174">                   identifier, request.getRequestURI());</span>
+        
+<span class="fc" id="L176">        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());</span>
+<span class="fc" id="L177">        response.setContentType(MediaType.APPLICATION_JSON_VALUE);</span>
+        
+<span class="fc" id="L179">        Map&lt;String, Object&gt; errorResponse = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L180">        errorResponse.put(&quot;error&quot;, &quot;rate_limit_exceeded&quot;);</span>
+<span class="fc" id="L181">        errorResponse.put(&quot;message&quot;, &quot;Rate limit exceeded. Please try again later.&quot;);</span>
+<span class="fc" id="L182">        errorResponse.put(&quot;status&quot;, HttpStatus.TOO_MANY_REQUESTS.value());</span>
+<span class="fc" id="L183">        errorResponse.put(&quot;timestamp&quot;, System.currentTimeMillis());</span>
+<span class="fc" id="L184">        errorResponse.put(&quot;path&quot;, request.getRequestURI());</span>
+        
+        // Add retry after header
+<span class="fc" id="L187">        RateLimitService.RateLimitResult status = rateLimitService.isAllowed(identifier);</span>
+<span class="fc" id="L188">        long retryAfter = Math.max(1, status.getResetTimeSeconds() - (System.currentTimeMillis() / 1000));</span>
+<span class="fc" id="L189">        response.addHeader(&quot;Retry-After&quot;, String.valueOf(retryAfter));</span>
+        
+<span class="fc" id="L191">        objectMapper.writeValue(response.getOutputStream(), errorResponse);</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Check if rate limiting should be skipped for this request.
+     * 
+     * @param request HTTP request
+     * @return true if should skip rate limiting
+     */
+    private boolean shouldSkipRateLimit(HttpServletRequest request) {
+<span class="fc" id="L201">        String requestURI = request.getRequestURI();</span>
+        
+        // List of endpoints to exclude from rate limiting
+<span class="fc" id="L204">        List&lt;String&gt; excludedEndpoints = Arrays.asList(</span>
+                &quot;/api/v1/health&quot;,
+                &quot;/api/v1/actuator/health&quot;,
+                &quot;/api/v1/actuator/prometheus&quot;,
+                &quot;/api/v1/swagger-ui&quot;,
+                &quot;/api/v1/api-docs&quot;
+        );
+        
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return excludedEndpoints.stream().anyMatch(requestURI::startsWith) ||</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">               requestURI.startsWith(&quot;/actuator/&quot;) ||</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">               requestURI.startsWith(&quot;/swagger-ui/&quot;) ||</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">               requestURI.startsWith(&quot;/api-docs/&quot;);</span>
+    }
+
+    /**
+     * Check if filter should not be applied to this request.
+     * 
+     * @param request HTTP request
+     * @return true if filter should be skipped
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        // Apply rate limiting to most endpoints
+<span class="fc" id="L227">        return shouldSkipRateLimit(request);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

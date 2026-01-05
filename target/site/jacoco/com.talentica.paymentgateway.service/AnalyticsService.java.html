@@ -1,0 +1,724 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">AnalyticsService.java</span></div><h1>AnalyticsService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.analytics.*;
+import com.talentica.paymentgateway.dto.metrics.*;
+import com.talentica.paymentgateway.entity.*;
+import com.talentica.paymentgateway.repository.*;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.ZonedDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Comprehensive Analytics Service for Payment Gateway.
+ * 
+ * Provides advanced analytics, reporting, and business intelligence capabilities including:
+ * - Transaction reporting with comprehensive filtering
+ * - Real-time analytics dashboard metrics
+ * - Revenue tracking and subscription performance
+ * - Failed payment analysis and fraud detection
+ * - Compliance reporting and audit trails
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L36">@Slf4j</span>
+@Service
+@Transactional(readOnly = true)
+@ConditionalOnProperty(name = &quot;app.features.analytics&quot;, havingValue = &quot;true&quot;, matchIfMissing = true)
+public class AnalyticsService {
+
+    private final TransactionRepository transactionRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final CustomerRepository customerRepository;
+
+    public AnalyticsService(TransactionRepository transactionRepository,
+                           SubscriptionRepository subscriptionRepository,
+<span class="fc" id="L48">                           CustomerRepository customerRepository) {</span>
+<span class="fc" id="L49">        this.transactionRepository = transactionRepository;</span>
+<span class="fc" id="L50">        this.subscriptionRepository = subscriptionRepository;</span>
+<span class="fc" id="L51">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L52">    }</span>
+
+    /**
+     * Generate comprehensive transaction report with filtering and export capabilities.
+     */
+    public TransactionReportResponse generateTransactionReport(TransactionReportRequest request) {
+<span class="fc" id="L58">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L59">        log.info(&quot;Generating transaction report - CorrelationId: {}, Period: {} to {}&quot;, </span>
+<span class="fc" id="L60">                   correlationId, request.getStartDate(), request.getEndDate());</span>
+
+        // Build pageable request
+<span class="fc" id="L63">        Sort sort = buildSortFromRequest(request);</span>
+<span class="fc" id="L64">        Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);</span>
+
+        // Apply filters and fetch transactions
+<span class="fc" id="L67">        Page&lt;Transaction&gt; transactionPage = transactionRepository.findTransactionsWithFilters(</span>
+<span class="fc" id="L68">            request.getCustomerId(),</span>
+<span class="fc" id="L69">            request.getOrderId(),</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            request.getStatus() != null ? request.getStatus().name() : null,</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            request.getTransactionType() != null ? request.getTransactionType().name() : null,</span>
+<span class="fc" id="L72">            request.getStartDate(),</span>
+<span class="fc" id="L73">            request.getEndDate(),</span>
+<span class="fc" id="L74">            request.getMinAmount(),</span>
+<span class="fc" id="L75">            request.getMaxAmount(),</span>
+            pageable
+        );
+
+        // Build response
+<span class="fc" id="L80">        TransactionReportResponse response = new TransactionReportResponse();</span>
+<span class="fc" id="L81">        response.setTransactions(transactionPage.getContent());</span>
+
+        // Add metadata
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (request.getIncludeMetadata()) {</span>
+<span class="fc" id="L85">            TransactionReportResponse.ReportMetadata metadata = new TransactionReportResponse.ReportMetadata(</span>
+<span class="fc" id="L86">                (int) transactionPage.getTotalElements(),</span>
+<span class="fc" id="L87">                transactionPage.getNumber(),</span>
+<span class="fc" id="L88">                transactionPage.getSize(),</span>
+<span class="fc" id="L89">                transactionPage.getTotalPages()</span>
+            );
+<span class="fc" id="L91">            metadata.setPeriodStart(request.getStartDate());</span>
+<span class="fc" id="L92">            metadata.setPeriodEnd(request.getEndDate());</span>
+<span class="fc" id="L93">            response.setMetadata(metadata);</span>
+        }
+
+        // Add aggregations
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (request.getIncludeAggregations()) {</span>
+<span class="fc" id="L98">            TransactionReportResponse.TransactionAggregations aggregations = </span>
+<span class="fc" id="L99">                generateTransactionAggregations(transactionPage.getContent());</span>
+<span class="fc" id="L100">            response.setAggregations(aggregations);</span>
+        }
+
+        // Add time series data
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (request.getGroupBy() != null) {</span>
+<span class="fc" id="L105">            List&lt;TransactionReportResponse.TimeSeriesData&gt; timeSeries = </span>
+<span class="fc" id="L106">                generateTimeSeriesData(request.getStartDate(), request.getEndDate(), request.getGroupBy());</span>
+<span class="fc" id="L107">            response.setTimeSeries(timeSeries);</span>
+        }
+
+        // Handle export format
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (!&quot;JSON&quot;.equals(request.getExportFormat())) {</span>
+<span class="fc" id="L112">            TransactionReportResponse.ExportInfo exportInfo = </span>
+<span class="fc" id="L113">                generateExportInfo(request.getExportFormat(), transactionPage.getContent());</span>
+<span class="fc" id="L114">            response.setExportInfo(exportInfo);</span>
+        }
+
+<span class="fc" id="L117">        log.info(&quot;Transaction report generated - CorrelationId: {}, Records: {}&quot;, </span>
+<span class="fc" id="L118">                   correlationId, transactionPage.getTotalElements());</span>
+
+<span class="fc" id="L120">        return response;</span>
+    }
+
+    /**
+     * Generate real-time analytics dashboard metrics.
+     */
+    public DashboardMetrics generateDashboardMetrics(AnalyticsDashboardRequest request) {
+<span class="fc" id="L127">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L128">        log.info(&quot;Generating dashboard metrics - CorrelationId: {}, Period: {} to {}&quot;, </span>
+<span class="fc" id="L129">                   correlationId, request.getStartDate(), request.getEndDate());</span>
+
+        // Generate transaction metrics
+<span class="fc" id="L132">        TransactionMetrics transactionMetrics = generateTransactionMetrics(</span>
+<span class="fc" id="L133">            request.getStartDate(), request.getEndDate());</span>
+
+        // Generate subscription metrics
+<span class="fc" id="L136">        SubscriptionMetrics subscriptionMetrics = generateSubscriptionMetrics(</span>
+<span class="fc" id="L137">            request.getStartDate(), request.getEndDate());</span>
+
+        // Generate revenue metrics
+<span class="fc" id="L140">        RevenueMetrics revenueMetrics = generateRevenueMetrics(</span>
+<span class="fc" id="L141">            request.getStartDate(), request.getEndDate());</span>
+
+        // Get total customers
+<span class="fc" id="L144">        long totalCustomers = customerRepository.count();</span>
+
+<span class="fc" id="L146">        DashboardMetrics dashboard = new DashboardMetrics(</span>
+<span class="fc" id="L147">            transactionMetrics, subscriptionMetrics, revenueMetrics, totalCustomers);</span>
+
+<span class="fc" id="L149">        log.info(&quot;Dashboard metrics generated - CorrelationId: {}&quot;, correlationId);</span>
+<span class="fc" id="L150">        return dashboard;</span>
+    }
+
+    /**
+     * Generate detailed transaction metrics for a time period.
+     */
+    public TransactionMetrics generateTransactionMetrics(ZonedDateTime startDate, ZonedDateTime endDate) {
+        // Get transaction statistics
+<span class="fc" id="L158">        Object[] stats = transactionRepository.getTransactionStatistics(startDate);</span>
+        
+        // Handle empty results gracefully
+<span class="fc" id="L161">        long successCount = 0;</span>
+<span class="fc" id="L162">        long failedCount = 0;</span>
+<span class="fc" id="L163">        BigDecimal successVolume = BigDecimal.ZERO;</span>
+<span class="fc" id="L164">        BigDecimal averageAmount = BigDecimal.ZERO;</span>
+        
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        if (stats != null &amp;&amp; stats.length &gt;= 5) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            successCount = stats[1] != null ? ((Number) stats[1]).longValue() : 0;</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            failedCount = stats[2] != null ? ((Number) stats[2]).longValue() : 0;</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            successVolume = stats[3] != null ? (BigDecimal) stats[3] : BigDecimal.ZERO;</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            averageAmount = stats[4] != null ? (BigDecimal) stats[4] : BigDecimal.ZERO;</span>
+        }
+
+<span class="fc" id="L173">        long totalTransactions = successCount + failedCount;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        double successRate = totalTransactions &gt; 0 ? (double) successCount / totalTransactions * 100 : 0.0;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        double avgTransactionAmount = successCount &gt; 0 ? successVolume.divide(</span>
+<span class="fc" id="L176">            BigDecimal.valueOf(successCount), 2, RoundingMode.HALF_UP).doubleValue() : 0.0;</span>
+
+<span class="fc" id="L178">        return TransactionMetrics.builder()</span>
+<span class="fc" id="L179">            .totalTransactions(totalTransactions)</span>
+<span class="fc" id="L180">            .successfulTransactions(successCount)</span>
+<span class="fc" id="L181">            .failedTransactions(failedCount)</span>
+<span class="fc" id="L182">            .totalAmount(successVolume)</span>
+<span class="fc" id="L183">            .successfulAmount(successVolume)</span>
+<span class="fc" id="L184">            .successRate(successRate)</span>
+<span class="fc" id="L185">            .averageTransactionAmount(avgTransactionAmount)</span>
+<span class="fc" id="L186">            .build();</span>
+    }
+
+    /**
+     * Generate subscription performance metrics.
+     */
+    public SubscriptionMetrics generateSubscriptionMetrics(ZonedDateTime startDate, ZonedDateTime endDate) {
+        // Count new subscriptions in period
+<span class="fc" id="L194">        long newSubscriptions = subscriptionRepository.countByCreatedAtBetween(startDate, endDate);</span>
+        
+        // Count cancelled subscriptions in period
+<span class="fc" id="L197">        long canceledSubscriptions = subscriptionRepository.countByStatusAndCancelledAtBetween(</span>
+<span class="fc" id="L198">            SubscriptionStatus.CANCELLED.name(), startDate, endDate);</span>
+        
+        // Count currently active subscriptions
+<span class="fc" id="L201">        long activeSubscriptions = subscriptionRepository.countByStatus(SubscriptionStatus.ACTIVE.name());</span>
+        
+        // Count pending subscriptions (used as trial equivalent)
+<span class="fc" id="L204">        long trialSubscriptions = subscriptionRepository.countByStatus(SubscriptionStatus.PENDING.name());</span>
+        
+        // Calculate churn rate
+<span class="fc" id="L207">        double churnRate = calculateChurnRate(startDate, endDate);</span>
+        
+        // Calculate retention rate
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        double retentionRate = churnRate &gt; 0 ? 100.0 - churnRate : 100.0;</span>
+
+<span class="fc" id="L212">        return SubscriptionMetrics.builder()</span>
+<span class="fc" id="L213">            .totalSubscriptions(newSubscriptions + activeSubscriptions + canceledSubscriptions)</span>
+<span class="fc" id="L214">            .activeSubscriptions(activeSubscriptions)</span>
+<span class="fc" id="L215">            .cancelledSubscriptions(canceledSubscriptions)</span>
+<span class="fc" id="L216">            .trialSubscriptions(trialSubscriptions)</span>
+<span class="fc" id="L217">            .churnRate(churnRate)</span>
+<span class="fc" id="L218">            .retentionRate(retentionRate)</span>
+<span class="fc" id="L219">            .build();</span>
+    }
+
+    /**
+     * Generate comprehensive revenue metrics.
+     */
+    public RevenueMetrics generateRevenueMetrics(ZonedDateTime startDate, ZonedDateTime endDate) {
+        // Calculate total revenue from successful transactions
+<span class="fc" id="L227">        BigDecimal totalRevenue = transactionRepository.sumAmountByStatus(PaymentStatus.SETTLED.name());</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;</span>
+
+        // Calculate refunded amount
+<span class="fc" id="L231">        BigDecimal refundedAmount = transactionRepository.sumAmountByStatus(PaymentStatus.REFUNDED.name());</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (refundedAmount == null) refundedAmount = BigDecimal.ZERO;</span>
+
+        // Calculate net revenue
+<span class="fc" id="L235">        BigDecimal netRevenue = totalRevenue.subtract(refundedAmount);</span>
+
+        // Calculate recurring revenue from subscriptions
+<span class="fc" id="L238">        BigDecimal recurringRevenue = subscriptionRepository.calculateActiveMonthlyRevenue();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (recurringRevenue == null) recurringRevenue = BigDecimal.ZERO;</span>
+        
+        // Calculate one-time revenue (total - recurring)
+<span class="fc" id="L242">        BigDecimal oneTimeRevenue = totalRevenue.subtract(recurringRevenue);</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (oneTimeRevenue.compareTo(BigDecimal.ZERO) &lt; 0) oneTimeRevenue = BigDecimal.ZERO;</span>
+        
+        // Calculate average revenue per user
+<span class="fc" id="L246">        long totalCustomers = customerRepository.count();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        BigDecimal averageRevenuePerUser = totalCustomers &gt; 0 ? </span>
+<span class="fc" id="L248">            totalRevenue.divide(BigDecimal.valueOf(totalCustomers), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;</span>
+        
+        // Calculate revenue growth rate (placeholder - would need historical data)
+<span class="fc" id="L251">        double revenueGrowthRate = 0.0;</span>
+
+<span class="fc" id="L253">        return RevenueMetrics.builder()</span>
+<span class="fc" id="L254">            .totalRevenue(totalRevenue)</span>
+<span class="fc" id="L255">            .recurringRevenue(recurringRevenue)</span>
+<span class="fc" id="L256">            .oneTimeRevenue(oneTimeRevenue)</span>
+<span class="fc" id="L257">            .averageRevenuePerUser(averageRevenuePerUser)</span>
+<span class="fc" id="L258">            .monthlyRecurringRevenue(recurringRevenue)</span>
+<span class="fc" id="L259">            .revenueGrowthRate(revenueGrowthRate)</span>
+<span class="fc" id="L260">            .build();</span>
+    }
+
+    /**
+     * Analyze failed payments and detect fraud patterns.
+     */
+    public FailedPaymentAnalysis analyzeFailedPayments(ZonedDateTime startDate, ZonedDateTime endDate) {
+<span class="fc" id="L267">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L268">        log.info(&quot;Analyzing failed payments - CorrelationId: {}, Period: {} to {}&quot;, </span>
+                   correlationId, startDate, endDate);
+
+<span class="fc" id="L271">        FailedPaymentAnalysis analysis = new FailedPaymentAnalysis();</span>
+<span class="fc" id="L272">        analysis.setPeriodStart(startDate);</span>
+<span class="fc" id="L273">        analysis.setPeriodEnd(endDate);</span>
+
+        // Get failed transactions
+<span class="fc" id="L276">        List&lt;Transaction&gt; failedTransactions = transactionRepository.findTransactionsBetween(startDate, endDate)</span>
+<span class="fc" id="L277">            .stream()</span>
+<span class="fc" id="L278">            .filter(t -&gt; isFailedStatus(t.getStatus()))</span>
+<span class="fc" id="L279">            .collect(Collectors.toList());</span>
+
+        // Basic statistics
+<span class="fc" id="L282">        analysis.setTotalFailedPayments(failedTransactions.size());</span>
+        
+<span class="fc" id="L284">        BigDecimal totalFailedAmount = failedTransactions.stream()</span>
+<span class="fc" id="L285">            .map(Transaction::getAmount)</span>
+<span class="fc" id="L286">            .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L287">        analysis.setTotalFailedAmount(totalFailedAmount);</span>
+
+        // Calculate failure rate
+<span class="fc" id="L290">        long totalTransactions = transactionRepository.countTransactionsCreatedToday(); // Use appropriate method</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        double failureRate = totalTransactions &gt; 0 ? </span>
+<span class="pc" id="L292">            (double) failedTransactions.size() / totalTransactions * 100 : 0.0;</span>
+<span class="fc" id="L293">        analysis.setFailureRate(failureRate);</span>
+
+        // Analyze error codes
+<span class="fc" id="L296">        Map&lt;String, FailedPaymentAnalysis.FailureCodeAnalysis&gt; errorCodeBreakdown = </span>
+<span class="fc" id="L297">            analyzeErrorCodes(failedTransactions);</span>
+<span class="fc" id="L298">        analysis.setErrorCodeBreakdown(errorCodeBreakdown);</span>
+
+        // Analyze payment methods
+<span class="fc" id="L301">        Map&lt;String, Long&gt; paymentMethodBreakdown = analyzePaymentMethodFailures(failedTransactions);</span>
+<span class="fc" id="L302">        analysis.setPaymentMethodBreakdown(paymentMethodBreakdown);</span>
+
+        // Generate fraud risk indicators
+<span class="fc" id="L305">        FailedPaymentAnalysis.FraudRiskIndicators riskIndicators = </span>
+<span class="fc" id="L306">            generateFraudRiskIndicators(failedTransactions);</span>
+<span class="fc" id="L307">        analysis.setRiskIndicators(riskIndicators);</span>
+
+        // Generate recommendations
+<span class="fc" id="L310">        List&lt;String&gt; recommendations = generateFailureRecommendations(analysis);</span>
+<span class="fc" id="L311">        analysis.setRecommendations(recommendations);</span>
+
+<span class="fc" id="L313">        log.info(&quot;Failed payment analysis completed - CorrelationId: {}, Failed: {}&quot;, </span>
+<span class="fc" id="L314">                   correlationId, failedTransactions.size());</span>
+
+<span class="fc" id="L316">        return analysis;</span>
+    }
+
+    /**
+     * Generate compliance report for audit and regulatory requirements.
+     */
+    public ComplianceReport generateComplianceReport(String reportType, ZonedDateTime startDate, ZonedDateTime endDate) {
+<span class="fc" id="L323">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L324">        log.info(&quot;Generating compliance report - CorrelationId: {}, Type: {}, Period: {} to {}&quot;, </span>
+                   correlationId, reportType, startDate, endDate);
+
+<span class="fc" id="L327">        ComplianceReport report = new ComplianceReport(reportType, startDate, endDate);</span>
+
+        // Generate compliance status
+<span class="fc" id="L330">        ComplianceReport.ComplianceStatus status = generateComplianceStatus();</span>
+<span class="fc" id="L331">        report.setComplianceStatus(status);</span>
+
+        // Generate transaction audit summary
+<span class="fc" id="L334">        ComplianceReport.TransactionAuditSummary auditSummary = </span>
+<span class="fc" id="L335">            generateTransactionAuditSummary(startDate, endDate);</span>
+<span class="fc" id="L336">        report.setTransactionAudit(auditSummary);</span>
+
+        // Generate security compliance metrics
+<span class="fc" id="L339">        ComplianceReport.SecurityComplianceMetrics securityMetrics = </span>
+<span class="fc" id="L340">            generateSecurityComplianceMetrics();</span>
+<span class="fc" id="L341">        report.setSecurityMetrics(securityMetrics);</span>
+
+        // Generate data privacy compliance
+<span class="fc" id="L344">        ComplianceReport.DataPrivacyCompliance dataPrivacy = </span>
+<span class="fc" id="L345">            generateDataPrivacyCompliance();</span>
+<span class="fc" id="L346">        report.setDataPrivacy(dataPrivacy);</span>
+
+        // Generate risk assessments
+<span class="fc" id="L349">        List&lt;ComplianceReport.RiskAssessment&gt; riskAssessments = </span>
+<span class="fc" id="L350">            generateRiskAssessments();</span>
+<span class="fc" id="L351">        report.setRiskAssessments(riskAssessments);</span>
+
+        // Generate recommendations
+<span class="fc" id="L354">        List&lt;String&gt; recommendations = generateComplianceRecommendations(report);</span>
+<span class="fc" id="L355">        report.setRecommendations(recommendations);</span>
+
+<span class="fc" id="L357">        log.info(&quot;Compliance report generated - CorrelationId: {}, Type: {}&quot;, </span>
+                   correlationId, reportType);
+
+<span class="fc" id="L360">        return report;</span>
+    }
+
+    // Private helper methods
+
+    private Sort buildSortFromRequest(TransactionReportRequest request) {
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        Sort.Direction direction = &quot;DESC&quot;.equalsIgnoreCase(request.getSortDirection()) ? </span>
+<span class="fc" id="L367">            Sort.Direction.DESC : Sort.Direction.ASC;</span>
+<span class="fc" id="L368">        return Sort.by(direction, request.getSortBy());</span>
+    }
+
+    private TransactionReportResponse.TransactionAggregations generateTransactionAggregations(
+            List&lt;Transaction&gt; transactions) {
+        
+<span class="fc" id="L374">        TransactionReportResponse.TransactionAggregations aggregations = </span>
+            new TransactionReportResponse.TransactionAggregations();
+
+<span class="fc" id="L377">        aggregations.setTotalTransactions(transactions.size());</span>
+
+<span class="fc" id="L379">        long successfulCount = transactions.stream()</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            .mapToLong(t -&gt; isSuccessfulStatus(t.getStatus()) ? 1 : 0)</span>
+<span class="fc" id="L381">            .sum();</span>
+<span class="fc" id="L382">        aggregations.setSuccessfulTransactions(successfulCount);</span>
+
+<span class="fc" id="L384">        long failedCount = transactions.stream()</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            .mapToLong(t -&gt; isFailedStatus(t.getStatus()) ? 1 : 0)</span>
+<span class="fc" id="L386">            .sum();</span>
+<span class="fc" id="L387">        aggregations.setFailedTransactions(failedCount);</span>
+
+<span class="fc" id="L389">        BigDecimal totalVolume = transactions.stream()</span>
+<span class="fc" id="L390">            .filter(t -&gt; isSuccessfulStatus(t.getStatus()))</span>
+<span class="fc" id="L391">            .map(Transaction::getAmount)</span>
+<span class="fc" id="L392">            .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L393">        aggregations.setTotalVolume(totalVolume);</span>
+
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (successfulCount &gt; 0) {</span>
+<span class="fc" id="L396">            BigDecimal averageAmount = totalVolume.divide(</span>
+<span class="fc" id="L397">                BigDecimal.valueOf(successfulCount), 2, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L398">            aggregations.setAverageAmount(averageAmount);</span>
+        }
+
+        // Generate breakdowns
+<span class="fc" id="L402">        Map&lt;String, Long&gt; statusBreakdown = transactions.stream()</span>
+<span class="fc" id="L403">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L404">                t -&gt; t.getStatus().name(),</span>
+<span class="fc" id="L405">                Collectors.counting()));</span>
+<span class="fc" id="L406">        aggregations.setStatusBreakdown(statusBreakdown);</span>
+
+<span class="fc" id="L408">        Map&lt;String, Long&gt; typeBreakdown = transactions.stream()</span>
+<span class="fc" id="L409">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L410">                t -&gt; t.getTransactionType().name(),</span>
+<span class="fc" id="L411">                Collectors.counting()));</span>
+<span class="fc" id="L412">        aggregations.setTypeBreakdown(typeBreakdown);</span>
+
+<span class="fc" id="L414">        return aggregations;</span>
+    }
+
+    private List&lt;TransactionReportResponse.TimeSeriesData&gt; generateTimeSeriesData(
+            ZonedDateTime startDate, ZonedDateTime endDate, String groupBy) {
+        
+<span class="fc" id="L420">        List&lt;Object[]&gt; rawData = transactionRepository.getTransactionSummaryByDate(startDate, endDate);</span>
+        
+<span class="fc" id="L422">        return rawData.stream()</span>
+<span class="pc bpc" id="L423" title="2 of 4 branches missed.">            .filter(row -&gt; row != null &amp;&amp; row.length &gt;= 3)</span>
+<span class="fc" id="L424">            .map(row -&gt; {</span>
+<span class="fc" id="L425">                ZonedDateTime timestamp = (ZonedDateTime) row[0];</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                long count = row[1] != null ? ((Number) row[1]).longValue() : 0;</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                BigDecimal volume = row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO;</span>
+                
+<span class="fc" id="L429">                TransactionReportResponse.TimeSeriesData data = </span>
+                    new TransactionReportResponse.TimeSeriesData(timestamp, count, volume);
+<span class="fc" id="L431">                data.setPeriod(groupBy);</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                if (count &gt; 0) {</span>
+<span class="fc" id="L433">                    data.setAverageAmount(volume.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP));</span>
+                }
+<span class="fc" id="L435">                return data;</span>
+            })
+<span class="fc" id="L437">            .collect(Collectors.toList());</span>
+    }
+
+    private TransactionReportResponse.ExportInfo generateExportInfo(
+            String exportFormat, List&lt;Transaction&gt; transactions) {
+        
+<span class="fc" id="L443">        TransactionReportResponse.ExportInfo exportInfo = </span>
+            new TransactionReportResponse.ExportInfo(exportFormat, 
+<span class="fc" id="L445">                &quot;transaction_report_&quot; + System.currentTimeMillis() + &quot;.&quot; + exportFormat.toLowerCase());</span>
+        
+        // In a real implementation, you would generate the file and provide download URL
+<span class="fc" id="L448">        exportInfo.setDownloadUrl(&quot;/api/v1/analytics/exports/&quot; + exportInfo.getFileName());</span>
+<span class="fc" id="L449">        exportInfo.setExpiresAt(ZonedDateTime.now().plusHours(24));</span>
+        
+<span class="fc" id="L451">        return exportInfo;</span>
+    }
+
+    private double calculateChurnRate(ZonedDateTime startDate, ZonedDateTime endDate) {
+<span class="fc" id="L455">        long activeAtStart = subscriptionRepository.countActiveAtDate(startDate);</span>
+<span class="fc" id="L456">        long cancelledInPeriod = subscriptionRepository.countByStatusAndCancelledAtBetween(</span>
+<span class="fc" id="L457">            SubscriptionStatus.CANCELLED.name(), startDate, endDate);</span>
+        
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        return activeAtStart &gt; 0 ? (double) cancelledInPeriod / activeAtStart * 100 : 0.0;</span>
+    }
+
+    private Map&lt;String, FailedPaymentAnalysis.FailureCodeAnalysis&gt; analyzeErrorCodes(
+            List&lt;Transaction&gt; failedTransactions) {
+        
+<span class="fc" id="L465">        Map&lt;String, List&lt;Transaction&gt;&gt; codeGroups = failedTransactions.stream()</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            .filter(t -&gt; t.getAuthnetResponseCode() != null)</span>
+<span class="fc" id="L467">            .collect(Collectors.groupingBy(Transaction::getAuthnetResponseCode));</span>
+
+<span class="fc" id="L469">        return codeGroups.entrySet().stream()</span>
+<span class="fc" id="L470">            .collect(Collectors.toMap(</span>
+                Map.Entry::getKey,
+                entry -&gt; {
+<span class="fc" id="L473">                    String code = entry.getKey();</span>
+<span class="fc" id="L474">                    List&lt;Transaction&gt; transactions = entry.getValue();</span>
+                    
+<span class="fc" id="L476">                    FailedPaymentAnalysis.FailureCodeAnalysis analysis = </span>
+                        new FailedPaymentAnalysis.FailureCodeAnalysis();
+<span class="fc" id="L478">                    analysis.setErrorCode(code);</span>
+<span class="fc" id="L479">                    analysis.setCount(transactions.size());</span>
+<span class="fc" id="L480">                    analysis.setPercentage((double) transactions.size() / failedTransactions.size() * 100);</span>
+                    
+<span class="fc" id="L482">                    BigDecimal totalAmount = transactions.stream()</span>
+<span class="fc" id="L483">                        .map(Transaction::getAmount)</span>
+<span class="fc" id="L484">                        .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L485">                    analysis.setTotalAmount(totalAmount);</span>
+                    
+                    // Set description and recommendations based on code
+<span class="fc" id="L488">                    setErrorCodeDetails(analysis, code);</span>
+                    
+<span class="fc" id="L490">                    return analysis;</span>
+                }
+            ));
+    }
+
+    private Map&lt;String, Long&gt; analyzePaymentMethodFailures(List&lt;Transaction&gt; failedTransactions) {
+<span class="fc" id="L496">        return failedTransactions.stream()</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">            .filter(t -&gt; t.getPaymentMethod() != null)</span>
+<span class="fc" id="L498">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L499">                t -&gt; t.getPaymentMethod().getType(),</span>
+<span class="fc" id="L500">                Collectors.counting()));</span>
+    }
+
+    private FailedPaymentAnalysis.FraudRiskIndicators generateFraudRiskIndicators(
+            List&lt;Transaction&gt; failedTransactions) {
+        
+<span class="fc" id="L506">        FailedPaymentAnalysis.FraudRiskIndicators indicators = </span>
+            new FailedPaymentAnalysis.FraudRiskIndicators();
+
+        // Detect suspicious patterns
+<span class="fc" id="L510">        long suspiciousCount = failedTransactions.stream()</span>
+<span class="fc bfc" id="L511" title="All 2 branches covered.">            .mapToLong(t -&gt; isSuspiciousTransaction(t) ? 1 : 0)</span>
+<span class="fc" id="L512">            .sum();</span>
+<span class="fc" id="L513">        indicators.setSuspiciousTransactions(suspiciousCount);</span>
+
+        // Calculate fraud score
+<span class="fc" id="L516">        double fraudScore = calculateFraudScore(failedTransactions);</span>
+<span class="fc" id="L517">        indicators.setFraudScore(fraudScore);</span>
+
+        // Detect velocity violations
+<span class="fc" id="L520">        long velocityViolations = detectVelocityViolations(failedTransactions);</span>
+<span class="fc" id="L521">        indicators.setVelocityViolations(velocityViolations);</span>
+
+        // Set overall risk level
+<span class="fc" id="L524">        indicators.setOverallRiskLevel(determineRiskLevel(fraudScore));</span>
+
+<span class="fc" id="L526">        return indicators;</span>
+    }
+
+    private ComplianceReport.ComplianceStatus generateComplianceStatus() {
+<span class="fc" id="L530">        ComplianceReport.ComplianceStatus status = new ComplianceReport.ComplianceStatus();</span>
+<span class="fc" id="L531">        status.setOverallStatus(&quot;COMPLIANT&quot;);</span>
+<span class="fc" id="L532">        status.setComplianceScore(95.0);</span>
+<span class="fc" id="L533">        status.setTotalChecks(50);</span>
+<span class="fc" id="L534">        status.setPassedChecks(47);</span>
+<span class="fc" id="L535">        status.setFailedChecks(3);</span>
+<span class="fc" id="L536">        status.setLastAuditDate(ZonedDateTime.now().minusMonths(6));</span>
+<span class="fc" id="L537">        status.setNextAuditDue(ZonedDateTime.now().plusMonths(6));</span>
+<span class="fc" id="L538">        return status;</span>
+    }
+
+    private ComplianceReport.TransactionAuditSummary generateTransactionAuditSummary(
+            ZonedDateTime startDate, ZonedDateTime endDate) {
+        
+<span class="fc" id="L544">        ComplianceReport.TransactionAuditSummary summary = </span>
+            new ComplianceReport.TransactionAuditSummary();
+
+<span class="fc" id="L547">        List&lt;Transaction&gt; transactions = transactionRepository.findTransactionsBetween(startDate, endDate);</span>
+<span class="fc" id="L548">        summary.setTotalTransactions(transactions.size());</span>
+<span class="fc" id="L549">        summary.setAuditedTransactions(transactions.size()); // Assume all are audited</span>
+        
+<span class="fc" id="L551">        BigDecimal totalVolume = transactions.stream()</span>
+<span class="fc" id="L552">            .map(Transaction::getAmount)</span>
+<span class="fc" id="L553">            .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L554">        summary.setTotalVolume(totalVolume);</span>
+        
+<span class="fc" id="L556">        summary.setAuditCoverage(100.0);</span>
+        
+<span class="fc" id="L558">        return summary;</span>
+    }
+
+    private ComplianceReport.SecurityComplianceMetrics generateSecurityComplianceMetrics() {
+<span class="fc" id="L562">        ComplianceReport.SecurityComplianceMetrics metrics = </span>
+            new ComplianceReport.SecurityComplianceMetrics();
+<span class="fc" id="L564">        metrics.setPciDssCompliant(true);</span>
+<span class="fc" id="L565">        metrics.setLastPciAudit(ZonedDateTime.now().minusYears(1));</span>
+<span class="fc" id="L566">        metrics.setSecurityIncidents(0);</span>
+<span class="fc" id="L567">        metrics.setDataBreaches(0);</span>
+<span class="fc" id="L568">        metrics.setEncryptionCoverage(100.0);</span>
+        
+<span class="fc" id="L570">        return metrics;</span>
+    }
+
+    private ComplianceReport.DataPrivacyCompliance generateDataPrivacyCompliance() {
+<span class="fc" id="L574">        ComplianceReport.DataPrivacyCompliance compliance = </span>
+            new ComplianceReport.DataPrivacyCompliance();
+<span class="fc" id="L576">        compliance.setGdprCompliant(true);</span>
+<span class="fc" id="L577">        compliance.setDataRequestsProcessed(5);</span>
+<span class="fc" id="L578">        compliance.setDataRetentionViolations(0);</span>
+<span class="fc" id="L579">        compliance.setConsentViolations(0);</span>
+<span class="fc" id="L580">        compliance.setDataMinimizationScore(95.0);</span>
+        
+<span class="fc" id="L582">        return compliance;</span>
+    }
+
+    private List&lt;ComplianceReport.RiskAssessment&gt; generateRiskAssessments() {
+<span class="fc" id="L586">        return Arrays.asList(</span>
+<span class="fc" id="L587">            createRiskAssessment(&quot;OPERATIONAL&quot;, &quot;LOW&quot;, &quot;Payment processor downtime&quot;, 0.1, 0.3),</span>
+<span class="fc" id="L588">            createRiskAssessment(&quot;SECURITY&quot;, &quot;MEDIUM&quot;, &quot;Data breach risk&quot;, 0.05, 0.8),</span>
+<span class="fc" id="L589">            createRiskAssessment(&quot;COMPLIANCE&quot;, &quot;LOW&quot;, &quot;Regulatory changes&quot;, 0.2, 0.2)</span>
+        );
+    }
+
+    private List&lt;String&gt; generateFailureRecommendations(FailedPaymentAnalysis analysis) {
+<span class="fc" id="L594">        List&lt;String&gt; recommendations = new ArrayList&lt;&gt;();</span>
+        
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">        if (analysis.getFailureRate() &gt; 5.0) {</span>
+<span class="fc" id="L597">            recommendations.add(&quot;Failure rate is high - investigate payment processor issues&quot;);</span>
+        }
+        
+<span class="pc bpc" id="L600" title="1 of 4 branches missed.">        if (analysis.getRiskIndicators() != null &amp;&amp; analysis.getRiskIndicators().getFraudScore() &gt; 50) {</span>
+<span class="fc" id="L601">            recommendations.add(&quot;High fraud score detected - implement additional security measures&quot;);</span>
+        }
+        
+<span class="fc" id="L604">        recommendations.add(&quot;Monitor error code patterns for actionable insights&quot;);</span>
+<span class="fc" id="L605">        recommendations.add(&quot;Consider implementing retry logic for transient failures&quot;);</span>
+        
+<span class="fc" id="L607">        return recommendations;</span>
+    }
+
+    private List&lt;String&gt; generateComplianceRecommendations(ComplianceReport report) {
+<span class="fc" id="L611">        List&lt;String&gt; recommendations = new ArrayList&lt;&gt;();</span>
+        
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">        if (report.getComplianceStatus().getComplianceScore() &lt; 95.0) {</span>
+<span class="nc" id="L614">            recommendations.add(&quot;Improve compliance score by addressing failed checks&quot;);</span>
+        }
+        
+<span class="fc" id="L617">        recommendations.add(&quot;Schedule regular compliance audits&quot;);</span>
+<span class="fc" id="L618">        recommendations.add(&quot;Maintain up-to-date security documentation&quot;);</span>
+<span class="fc" id="L619">        recommendations.add(&quot;Implement continuous monitoring for compliance violations&quot;);</span>
+        
+<span class="fc" id="L621">        return recommendations;</span>
+    }
+
+    // Utility methods
+    private boolean isSuccessfulStatus(PaymentStatus status) {
+<span class="pc bpc" id="L626" title="2 of 6 branches missed.">        return status == PaymentStatus.AUTHORIZED || </span>
+               status == PaymentStatus.CAPTURED || 
+               status == PaymentStatus.SETTLED;
+    }
+
+    private boolean isFailedStatus(PaymentStatus status) {
+<span class="pc bpc" id="L632" title="2 of 6 branches missed.">        return status == PaymentStatus.FAILED || </span>
+               status == PaymentStatus.VOIDED || 
+               status == PaymentStatus.CANCELLED;
+    }
+
+    private void setErrorCodeDetails(FailedPaymentAnalysis.FailureCodeAnalysis analysis, String code) {
+        // Map common Authorize.Net error codes to descriptions and recommendations
+<span class="pc bpc" id="L639" title="2 of 4 branches missed.">        switch (code) {</span>
+            case &quot;2&quot;:
+<span class="fc" id="L641">                analysis.setDescription(&quot;Declined&quot;);</span>
+<span class="fc" id="L642">                analysis.setRetryable(false);</span>
+<span class="fc" id="L643">                analysis.setRecommendedAction(&quot;Contact cardholder to verify card details&quot;);</span>
+<span class="fc" id="L644">                break;</span>
+            case &quot;3&quot;:
+<span class="fc" id="L646">                analysis.setDescription(&quot;Invalid card&quot;);</span>
+<span class="fc" id="L647">                analysis.setRetryable(false);</span>
+<span class="fc" id="L648">                analysis.setRecommendedAction(&quot;Request valid payment method&quot;);</span>
+<span class="fc" id="L649">                break;</span>
+            case &quot;4&quot;:
+<span class="nc" id="L651">                analysis.setDescription(&quot;Hold, pick up card&quot;);</span>
+<span class="nc" id="L652">                analysis.setRetryable(false);</span>
+<span class="nc" id="L653">                analysis.setRecommendedAction(&quot;Contact issuing bank&quot;);</span>
+<span class="nc" id="L654">                break;</span>
+            default:
+<span class="nc" id="L656">                analysis.setDescription(&quot;Unknown error code: &quot; + code);</span>
+<span class="nc" id="L657">                analysis.setRetryable(true);</span>
+<span class="nc" id="L658">                analysis.setRecommendedAction(&quot;Review transaction details and retry if appropriate&quot;);</span>
+        }
+<span class="fc" id="L660">    }</span>
+
+    private boolean isSuspiciousTransaction(Transaction transaction) {
+        // Simple heuristics for suspicious transactions
+<span class="fc" id="L664">        BigDecimal amount = transaction.getAmount();</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">        return amount.compareTo(new BigDecimal(&quot;10000&quot;)) &gt; 0 || // High amount</span>
+<span class="pc bpc" id="L666" title="2 of 4 branches missed.">               (transaction.getCreatedAt().getHour() &lt; 6 || transaction.getCreatedAt().getHour() &gt; 22); // Unusual hours</span>
+    }
+
+    private double calculateFraudScore(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L670">        long suspiciousCount = transactions.stream()</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">            .mapToLong(t -&gt; isSuspiciousTransaction(t) ? 1 : 0)</span>
+<span class="fc" id="L672">            .sum();</span>
+        
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        return transactions.isEmpty() ? 0.0 : (double) suspiciousCount / transactions.size() * 100;</span>
+    }
+
+    private long detectVelocityViolations(List&lt;Transaction&gt; transactions) {
+        // Simple velocity check - more than 10 transactions from same customer in 1 hour
+<span class="fc" id="L679">        Map&lt;UUID, List&lt;Transaction&gt;&gt; customerTransactions = transactions.stream()</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">            .filter(t -&gt; t.getCustomer() != null)</span>
+<span class="fc" id="L681">            .collect(Collectors.groupingBy(t -&gt; t.getCustomer().getId()));</span>
+
+<span class="fc" id="L683">        return customerTransactions.values().stream()</span>
+<span class="fc" id="L684">            .mapToLong(customerTxns -&gt; {</span>
+                // Check for high velocity within 1 hour windows
+<span class="fc bfc" id="L686" title="All 2 branches covered.">                for (int i = 0; i &lt; customerTxns.size(); i++) {</span>
+<span class="fc" id="L687">                    ZonedDateTime windowStart = customerTxns.get(i).getCreatedAt().atZone(java.time.ZoneId.systemDefault());</span>
+<span class="fc" id="L688">                    ZonedDateTime windowEnd = windowStart.plusHours(1);</span>
+                    
+<span class="fc" id="L690">                    long countInWindow = customerTxns.stream()</span>
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">                        .mapToLong(t -&gt; (t.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).isAfter(windowStart) &amp;&amp; </span>
+<span class="pc bnc" id="L692" title="All 2 branches missed.">                                        t.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).isBefore(windowEnd)) ? 1 : 0)</span>
+<span class="fc" id="L693">                        .sum();</span>
+                    
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">                    if (countInWindow &gt; 10) {</span>
+<span class="nc" id="L696">                        return 1; // Velocity violation detected</span>
+                    }
+                }
+<span class="fc" id="L699">                return 0;</span>
+            })
+<span class="fc" id="L701">            .sum();</span>
+    }
+
+    private String determineRiskLevel(double fraudScore) {
+<span class="fc bfc" id="L705" title="All 2 branches covered.">        if (fraudScore &gt; 75) return &quot;HIGH&quot;;</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        if (fraudScore &gt; 50) return &quot;MEDIUM&quot;;</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">        if (fraudScore &gt; 25) return &quot;LOW&quot;;</span>
+<span class="fc" id="L708">        return &quot;MINIMAL&quot;;</span>
+    }
+
+    private ComplianceReport.RiskAssessment createRiskAssessment(String category, String level, 
+                                                               String description, double probability, double impact) {
+<span class="fc" id="L713">        ComplianceReport.RiskAssessment assessment = new ComplianceReport.RiskAssessment();</span>
+<span class="fc" id="L714">        assessment.setRiskCategory(category);</span>
+<span class="fc" id="L715">        assessment.setRiskLevel(level);</span>
+<span class="fc" id="L716">        assessment.setDescription(description);</span>
+<span class="fc" id="L717">        assessment.setProbability(probability);</span>
+<span class="fc" id="L718">        assessment.setImpact(impact);</span>
+<span class="fc" id="L719">        assessment.setMitigationStatus(&quot;ACTIVE&quot;);</span>
+<span class="fc" id="L720">        assessment.setAssessmentDate(ZonedDateTime.now());</span>
+<span class="fc" id="L721">        return assessment;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

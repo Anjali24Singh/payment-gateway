@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.mapper</a> &gt; <span class="el_source">SubscriptionMapperImpl.java</span></div><h1>SubscriptionMapperImpl.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.mapper;
+
+import com.talentica.paymentgateway.dto.subscription.CreateSubscriptionRequest;
+import com.talentica.paymentgateway.dto.subscription.PlanResponse;
+import com.talentica.paymentgateway.dto.subscription.SubscriptionResponse;
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.entity.Subscription;
+import com.talentica.paymentgateway.entity.SubscriptionPlan;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-01-05T19:18:43+0530&quot;,
+    comments = &quot;version: 1.5.5.Final, compiler: javac, environment: Java 17.0.12 (Oracle Corporation)&quot;
+)
+@Component
+<span class="fc" id="L21">public class SubscriptionMapperImpl implements SubscriptionMapper {</span>
+
+    @Override
+    public SubscriptionResponse toSubscriptionResponse(Subscription subscription) {
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L26">            return null;</span>
+        }
+
+<span class="nc" id="L29">        SubscriptionResponse subscriptionResponse = new SubscriptionResponse();</span>
+
+<span class="nc" id="L31">        subscriptionResponse.setSubscriptionId( subscription.getSubscriptionId() );</span>
+<span class="nc" id="L32">        subscriptionResponse.setCustomerId( subscriptionCustomerCustomerReference( subscription ) );</span>
+<span class="nc" id="L33">        subscriptionResponse.setPlanCode( subscriptionPlanPlanCode( subscription ) );</span>
+<span class="nc" id="L34">        subscriptionResponse.setPlanName( subscriptionPlanName( subscription ) );</span>
+<span class="nc" id="L35">        subscriptionResponse.setPlanAmount( subscriptionPlanAmount( subscription ) );</span>
+<span class="nc" id="L36">        subscriptionResponse.setCurrency( subscriptionPlanCurrency( subscription ) );</span>
+<span class="nc" id="L37">        subscriptionResponse.setStatus( subscription.getStatus() );</span>
+<span class="nc" id="L38">        subscriptionResponse.setCreatedAt( map( subscription.getCreatedAt() ) );</span>
+<span class="nc" id="L39">        subscriptionResponse.setCurrentPeriodStart( subscription.getCurrentPeriodStart() );</span>
+<span class="nc" id="L40">        subscriptionResponse.setCurrentPeriodEnd( subscription.getCurrentPeriodEnd() );</span>
+<span class="nc" id="L41">        subscriptionResponse.setTrialStart( subscription.getTrialStart() );</span>
+<span class="nc" id="L42">        subscriptionResponse.setTrialEnd( subscription.getTrialEnd() );</span>
+<span class="nc" id="L43">        subscriptionResponse.setNextBillingDate( subscription.getNextBillingDate() );</span>
+<span class="nc" id="L44">        subscriptionResponse.setBillingCycleAnchor( subscription.getBillingCycleAnchor() );</span>
+<span class="nc" id="L45">        subscriptionResponse.setCancelledAt( subscription.getCancelledAt() );</span>
+<span class="nc" id="L46">        subscriptionResponse.setCancellationReason( subscription.getCancellationReason() );</span>
+<span class="nc" id="L47">        subscriptionResponse.setDaysUntilNextBilling( subscription.getDaysUntilNextBilling() );</span>
+<span class="nc" id="L48">        Map&lt;String, Object&gt; map = subscription.getMetadata();</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L50">            subscriptionResponse.setMetadata( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc" id="L52">        subscriptionResponse.setUpdatedAt( map( subscription.getUpdatedAt() ) );</span>
+
+<span class="nc" id="L54">        return subscriptionResponse;</span>
+    }
+
+    @Override
+    public PlanResponse toPlanResponse(SubscriptionPlan plan) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if ( plan == null ) {</span>
+<span class="nc" id="L60">            return null;</span>
+        }
+
+<span class="nc" id="L63">        PlanResponse planResponse = new PlanResponse();</span>
+
+<span class="nc" id="L65">        planResponse.setPlanCode( plan.getPlanCode() );</span>
+<span class="nc" id="L66">        planResponse.setName( plan.getName() );</span>
+<span class="nc" id="L67">        planResponse.setDescription( plan.getDescription() );</span>
+<span class="nc" id="L68">        planResponse.setAmount( plan.getAmount() );</span>
+<span class="nc" id="L69">        planResponse.setCurrency( plan.getCurrency() );</span>
+<span class="nc" id="L70">        planResponse.setIntervalUnit( plan.getIntervalUnit() );</span>
+<span class="nc" id="L71">        planResponse.setIntervalCount( plan.getIntervalCount() );</span>
+<span class="nc" id="L72">        planResponse.setTrialPeriodDays( plan.getTrialPeriodDays() );</span>
+<span class="nc" id="L73">        planResponse.setIsActive( plan.getIsActive() );</span>
+<span class="nc" id="L74">        planResponse.setCreatedAt( map( plan.getCreatedAt() ) );</span>
+<span class="nc" id="L75">        planResponse.setUpdatedAt( map( plan.getUpdatedAt() ) );</span>
+<span class="nc" id="L76">        Map&lt;String, Object&gt; map = plan.getMetadata();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L78">            planResponse.setMetadata( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc" id="L80">        planResponse.setFormattedInterval( plan.getFormattedInterval() );</span>
+<span class="nc" id="L81">        planResponse.setFormattedPrice( plan.getFormattedPrice() );</span>
+<span class="nc" id="L82">        planResponse.setDisplayName( plan.getDisplayName() );</span>
+
+<span class="nc" id="L84">        return planResponse;</span>
+    }
+
+    @Override
+    public Subscription toSubscription(CreateSubscriptionRequest request) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if ( request == null ) {</span>
+<span class="nc" id="L90">            return null;</span>
+        }
+
+<span class="nc" id="L93">        Subscription subscription = new Subscription();</span>
+
+<span class="nc" id="L95">        return subscription;</span>
+    }
+
+    private String subscriptionCustomerCustomerReference(Subscription subscription) {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L100">            return null;</span>
+        }
+<span class="nc" id="L102">        Customer customer = subscription.getCustomer();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if ( customer == null ) {</span>
+<span class="nc" id="L104">            return null;</span>
+        }
+<span class="nc" id="L106">        String customerReference = customer.getCustomerReference();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if ( customerReference == null ) {</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+<span class="nc" id="L110">        return customerReference;</span>
+    }
+
+    private String subscriptionPlanPlanCode(Subscription subscription) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L115">            return null;</span>
+        }
+<span class="nc" id="L117">        SubscriptionPlan plan = subscription.getPlan();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if ( plan == null ) {</span>
+<span class="nc" id="L119">            return null;</span>
+        }
+<span class="nc" id="L121">        String planCode = plan.getPlanCode();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if ( planCode == null ) {</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+<span class="nc" id="L125">        return planCode;</span>
+    }
+
+    private String subscriptionPlanName(Subscription subscription) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L130">            return null;</span>
+        }
+<span class="nc" id="L132">        SubscriptionPlan plan = subscription.getPlan();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if ( plan == null ) {</span>
+<span class="nc" id="L134">            return null;</span>
+        }
+<span class="nc" id="L136">        String name = plan.getName();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if ( name == null ) {</span>
+<span class="nc" id="L138">            return null;</span>
+        }
+<span class="nc" id="L140">        return name;</span>
+    }
+
+    private BigDecimal subscriptionPlanAmount(Subscription subscription) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L145">            return null;</span>
+        }
+<span class="nc" id="L147">        SubscriptionPlan plan = subscription.getPlan();</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if ( plan == null ) {</span>
+<span class="nc" id="L149">            return null;</span>
+        }
+<span class="nc" id="L151">        BigDecimal amount = plan.getAmount();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if ( amount == null ) {</span>
+<span class="nc" id="L153">            return null;</span>
+        }
+<span class="nc" id="L155">        return amount;</span>
+    }
+
+    private String subscriptionPlanCurrency(Subscription subscription) {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if ( subscription == null ) {</span>
+<span class="nc" id="L160">            return null;</span>
+        }
+<span class="nc" id="L162">        SubscriptionPlan plan = subscription.getPlan();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if ( plan == null ) {</span>
+<span class="nc" id="L164">            return null;</span>
+        }
+<span class="nc" id="L166">        String currency = plan.getCurrency();</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if ( currency == null ) {</span>
+<span class="nc" id="L168">            return null;</span>
+        }
+<span class="nc" id="L170">        return currency;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

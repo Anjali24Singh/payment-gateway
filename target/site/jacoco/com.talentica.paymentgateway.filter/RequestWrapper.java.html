@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.filter</a> &gt; <span class="el_source">RequestWrapper.java</span></div><h1>RequestWrapper.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.filter;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import java.util.*;
+
+/**
+ * HTTP request wrapper that adds auto-generated tracking headers.
+ * Makes correlation ID and idempotency key available to controllers without manual extraction.
+ */
+public class RequestWrapper extends HttpServletRequestWrapper {
+
+    private final Map&lt;String, String&gt; customHeaders;
+
+    public RequestWrapper(HttpServletRequest request, String correlationId, String idempotencyKey) {
+<span class="fc" id="L16">        super(request);</span>
+<span class="fc" id="L17">        this.customHeaders = new HashMap&lt;&gt;();</span>
+        
+        // Add auto-generated headers
+<span class="fc" id="L20">        customHeaders.put(&quot;X-Correlation-ID&quot;, correlationId);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (idempotencyKey != null) {</span>
+<span class="nc" id="L22">            customHeaders.put(&quot;Idempotency-Key&quot;, idempotencyKey);</span>
+        }
+<span class="fc" id="L24">    }</span>
+
+    @Override
+    public String getHeader(String name) {
+        // Return custom header if exists, otherwise delegate to original request
+<span class="fc" id="L29">        String customHeader = customHeaders.get(name);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (customHeader != null) {</span>
+<span class="nc" id="L31">            return customHeader;</span>
+        }
+<span class="fc" id="L33">        return super.getHeader(name);</span>
+    }
+
+    @Override
+    public Enumeration&lt;String&gt; getHeaderNames() {
+        // Combine original headers with custom headers
+<span class="fc" id="L39">        Set&lt;String&gt; headerNames = new HashSet&lt;&gt;();</span>
+        
+        // Add original headers
+<span class="fc" id="L42">        Enumeration&lt;String&gt; originalHeaders = super.getHeaderNames();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        while (originalHeaders.hasMoreElements()) {</span>
+<span class="fc" id="L44">            headerNames.add(originalHeaders.nextElement());</span>
+        }
+        
+        // Add custom headers
+<span class="fc" id="L48">        headerNames.addAll(customHeaders.keySet());</span>
+        
+<span class="fc" id="L50">        return Collections.enumeration(headerNames);</span>
+    }
+
+    @Override
+    public Enumeration&lt;String&gt; getHeaders(String name) {
+        // Return custom header if exists, otherwise delegate to original request
+<span class="fc" id="L56">        String customHeader = customHeaders.get(name);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (customHeader != null) {</span>
+<span class="fc" id="L58">            return Collections.enumeration(Arrays.asList(customHeader));</span>
+        }
+<span class="fc" id="L60">        return super.getHeaders(name);</span>
+    }
+
+    /**
+     * Get the correlation ID for this request
+     */
+    public String getCorrelationId() {
+<span class="nc" id="L67">        return customHeaders.get(&quot;X-Correlation-ID&quot;);</span>
+    }
+
+    /**
+     * Get the idempotency key for this request (may be null for non-payment operations)
+     */
+    public String getIdempotencyKey() {
+<span class="nc" id="L74">        return customHeaders.get(&quot;Idempotency-Key&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

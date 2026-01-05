@@ -1,0 +1,45 @@
+# Local Test Configuration - No Database Dependencies
+
+spring:
+  # Disable auto-configuration that requires database
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+  # Disable Flyway
+  flyway:
+    enabled: false
+
+  # Disable JPA
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+# Server Configuration
+server:
+  port: 8080
+
+# Logging Configuration
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework: INFO
+
+# Management Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Application Specific Configuration
+app:
+  name: Payment Gateway Integration Platform
+  version: 1.0.0
+  description: Comprehensive payment processing solution with Authorize.Net integration

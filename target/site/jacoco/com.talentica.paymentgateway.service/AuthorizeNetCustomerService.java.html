@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthorizeNetCustomerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">AuthorizeNetCustomerService.java</span></div><h1>AuthorizeNetCustomerService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.payment.CustomerRequest;
+import com.talentica.paymentgateway.dto.payment.PaymentMethodRequest;
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import net.authorize.Environment;
+import net.authorize.api.contract.v1.*;
+import net.authorize.api.controller.CreateCustomerProfileController;
+import net.authorize.api.controller.CreateCustomerPaymentProfileController;
+import net.authorize.api.controller.GetCustomerProfileController;
+import net.authorize.api.controller.GetCustomerPaymentProfileController;
+import net.authorize.api.controller.UpdateCustomerProfileController;
+import net.authorize.api.controller.UpdateCustomerPaymentProfileController;
+import net.authorize.api.controller.DeleteCustomerProfileController;
+import net.authorize.api.controller.DeleteCustomerPaymentProfileController;
+import net.authorize.api.controller.ValidateCustomerPaymentProfileController;
+import net.authorize.api.controller.base.ApiOperationBase;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service for managing Authorize.Net Customer Information Manager (CIM) operations.
+ * This is the missing piece that makes customers appear in the Authorize.Net portal.
+ * 
+ * Key Functions:
+ * 1. Create customer profiles in Authorize.Net (not just local DB)
+ * 2. Create payment profiles under customer profiles
+ * 3. Enable proper ARB subscription management
+ */
+<span class="fc" id="L32">@Slf4j</span>
+@Service
+public class AuthorizeNetCustomerService {
+
+    private final MerchantAuthenticationType merchant;
+    private final Environment environment;
+
+    public AuthorizeNetCustomerService(MerchantAuthenticationType merchant,
+<span class="fc" id="L40">                                     Environment environment) {</span>
+<span class="fc" id="L41">        this.merchant = merchant;</span>
+<span class="fc" id="L42">        this.environment = environment;</span>
+<span class="fc" id="L43">    }</span>
+
+    /**
+     * Creates a customer profile in Authorize.Net CIM.
+     * This is the critical missing piece - customers must exist in Authorize.Net, not just local DB.
+     * 
+     * @param customer Local customer entity
+     * @param customerRequest Customer request data
+     * @return Authorize.Net customer profile ID
+     */
+    public String createCustomerProfile(Customer customer, CustomerRequest customerRequest) {
+<span class="fc" id="L54">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+        try {
+            // Set the environment for this operation
+<span class="fc" id="L58">            ApiOperationBase.setEnvironment(environment);</span>
+            
+            // Create customer profile request
+<span class="fc" id="L61">            CustomerProfileType profile = new CustomerProfileType();</span>
+<span class="fc" id="L62">            profile.setMerchantCustomerId(customer.getCustomerId());</span>
+<span class="fc" id="L63">            profile.setEmail(customer.getEmail());</span>
+            
+            // Set description field - this is what appears as &quot;Name&quot; in the portal
+<span class="fc" id="L66">            String customerName = &quot;&quot;;</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">            if (customer.getFirstName() != null &amp;&amp; customer.getLastName() != null) {</span>
+<span class="fc" id="L68">                customerName = customer.getFirstName() + &quot; &quot; + customer.getLastName();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            } else if (customer.getFirstName() != null) {</span>
+<span class="fc" id="L70">                customerName = customer.getFirstName();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            } else if (customer.getLastName() != null) {</span>
+<span class="fc" id="L72">                customerName = customer.getLastName();</span>
+            } else {
+<span class="fc" id="L74">                customerName = &quot;Customer &quot; + customer.getCustomerId();</span>
+            }
+<span class="fc" id="L76">            profile.setDescription(customerName);</span>
+            
+<span class="fc" id="L78">            log.info(&quot;Setting customer profile description to: '{}' for customer: {}&quot;, </span>
+<span class="fc" id="L79">                       customerName, customer.getEmail());</span>
+            
+<span class="fc" id="L81">            CreateCustomerProfileRequest apiRequest = new CreateCustomerProfileRequest();</span>
+<span class="fc" id="L82">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="fc" id="L83">            apiRequest.setProfile(profile);</span>
+            
+<span class="fc" id="L85">            log.info(&quot;Creating Authorize.Net customer profile - Customer ID: {}, Email: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L86">                       customer.getCustomerId(), customer.getEmail(), correlationId);</span>
+            
+            // Execute the request
+<span class="fc" id="L89">            CreateCustomerProfileController controller = new CreateCustomerProfileController(apiRequest);</span>
+<span class="fc" id="L90">            controller.execute();</span>
+            
+<span class="fc" id="L92">            CreateCustomerProfileResponse response = controller.getApiResponse();</span>
+            
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (response != null) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                if (response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L96">                    String customerProfileId = response.getCustomerProfileId();</span>
+<span class="nc" id="L97">                    log.info(&quot;✅ SUCCESS: Customer profile created in Authorize.Net - Profile ID: {}, Customer ID: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L98">                               customerProfileId, customer.getCustomerId(), correlationId);</span>
+<span class="nc" id="L99">                    return customerProfileId;</span>
+                } else {
+<span class="nc" id="L101">                    String errorMessage = response.getMessages().getMessage().get(0).getText();</span>
+<span class="nc" id="L102">                    log.error(&quot;❌ FAILED: Customer profile creation - Customer ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L103">                                customer.getCustomerId(), errorMessage, correlationId);</span>
+<span class="nc" id="L104">                    throw new PaymentProcessingException(</span>
+                        &quot;Failed to create customer profile: &quot; + errorMessage, correlationId);
+                }
+            } else {
+<span class="fc" id="L108">                log.error(&quot;❌ NULL RESPONSE: Authorize.Net customer profile creation - Customer ID: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L109">                            customer.getCustomerId(), correlationId);</span>
+<span class="fc" id="L110">                throw new PaymentProcessingException(</span>
+                    &quot;No response received from Authorize.Net&quot;, correlationId);
+            }
+
+<span class="fc" id="L114">        } catch (Exception e) {</span>
+<span class="fc" id="L115">            log.error(&quot;❌ EXCEPTION: Customer profile creation - Customer ID: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L116">                        customer.getCustomerId(), correlationId, e);</span>
+<span class="fc" id="L117">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L118">                &quot;Failed to create customer profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Creates a payment profile under an existing customer profile.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param paymentMethod Payment method details
+     * @param customer Customer entity for billing address
+     * @return Payment profile ID
+     */
+    public String createPaymentProfile(String customerProfileId, PaymentMethodRequest paymentMethod, Customer customer) {
+<span class="fc" id="L131">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L133">        log.info(&quot;Creating payment profile - Customer Profile ID: {}, Payment Type: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L134">                   customerProfileId, paymentMethod.getType(), correlationId);</span>
+
+        try {
+            // Set API credentials and environment
+<span class="fc" id="L138">            ApiOperationBase.setEnvironment(environment);</span>
+
+            // Create payment profile
+<span class="fc" id="L141">            CustomerPaymentProfileType paymentProfile = new CustomerPaymentProfileType();</span>
+            
+            // Set billing address
+<span class="fc" id="L144">            CustomerAddressType billingAddress = new CustomerAddressType();</span>
+<span class="fc" id="L145">            billingAddress.setFirstName(customer.getFirstName());</span>
+<span class="fc" id="L146">            billingAddress.setLastName(customer.getLastName());</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (customer.getBillingAddressLine1() != null) {</span>
+<span class="fc" id="L148">                billingAddress.setAddress(customer.getBillingAddressLine1());</span>
+<span class="fc" id="L149">                billingAddress.setCity(customer.getBillingCity());</span>
+<span class="fc" id="L150">                billingAddress.setState(customer.getBillingState());</span>
+<span class="fc" id="L151">                billingAddress.setZip(customer.getBillingPostalCode());</span>
+<span class="fc" id="L152">                billingAddress.setCountry(customer.getBillingCountry());</span>
+            }
+<span class="fc" id="L154">            paymentProfile.setBillTo(billingAddress);</span>
+
+            // Set payment method
+<span class="fc" id="L157">            PaymentType payment = new PaymentType();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (&quot;CREDIT_CARD&quot;.equals(paymentMethod.getType())) {</span>
+<span class="fc" id="L159">                CreditCardType creditCard = new CreditCardType();</span>
+<span class="fc" id="L160">                creditCard.setCardNumber(paymentMethod.getCardNumber());</span>
+<span class="fc" id="L161">                creditCard.setExpirationDate(paymentMethod.getExpiryMonth() + paymentMethod.getExpiryYear());</span>
+<span class="fc" id="L162">                creditCard.setCardCode(paymentMethod.getCvv());</span>
+<span class="fc" id="L163">                payment.setCreditCard(creditCard);</span>
+            }
+<span class="fc" id="L165">            paymentProfile.setPayment(payment);</span>
+
+<span class="fc" id="L167">            CreateCustomerPaymentProfileRequest apiRequest = new CreateCustomerPaymentProfileRequest();</span>
+<span class="fc" id="L168">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="fc" id="L169">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+<span class="fc" id="L170">            apiRequest.setPaymentProfile(paymentProfile);</span>
+
+<span class="fc" id="L172">            CreateCustomerPaymentProfileController controller = new CreateCustomerPaymentProfileController(apiRequest);</span>
+<span class="fc" id="L173">            controller.execute();</span>
+
+<span class="fc" id="L175">            CreateCustomerPaymentProfileResponse response = controller.getApiResponse();</span>
+
+<span class="pc bpc" id="L177" title="3 of 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L178">                String paymentProfileId = response.getCustomerPaymentProfileId();</span>
+<span class="nc" id="L179">                log.info(&quot;Successfully created payment profile - Profile ID: {}, Customer Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, customerProfileId, correlationId);
+<span class="nc" id="L181">                return paymentProfileId;</span>
+            } else {
+<span class="pc bpc" id="L183" title="3 of 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L184">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="fc" id="L185">                    : &quot;Unknown error creating payment profile&quot;;</span>
+                
+<span class="fc" id="L187">                log.error(&quot;Failed to create payment profile - Customer Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, errorMessage, correlationId);
+                
+<span class="fc" id="L190">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to create payment profile in Authorize.Net: &quot; + errorMessage, correlationId);
+            }
+
+<span class="fc" id="L194">        } catch (Exception e) {</span>
+<span class="fc" id="L195">            log.error(&quot;Exception creating payment profile - Customer Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        customerProfileId, correlationId, e);
+<span class="fc" id="L197">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L198">                &quot;Failed to create payment profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Retrieves a customer profile from Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @return Customer profile information
+     */
+    public CustomerProfileMaskedType getCustomerProfile(String customerProfileId) {
+<span class="fc" id="L209">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L211">        log.info(&quot;Retrieving customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+<span class="fc" id="L215">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="fc" id="L217">            GetCustomerProfileRequest apiRequest = new GetCustomerProfileRequest();</span>
+<span class="fc" id="L218">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="fc" id="L219">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+
+<span class="fc" id="L221">            GetCustomerProfileController controller = new GetCustomerProfileController(apiRequest);</span>
+<span class="fc" id="L222">            controller.execute();</span>
+
+<span class="fc" id="L224">            GetCustomerProfileResponse response = controller.getApiResponse();</span>
+
+<span class="pc bpc" id="L226" title="3 of 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L227">                CustomerProfileMaskedType profile = response.getProfile();</span>
+<span class="nc" id="L228">                log.info(&quot;Successfully retrieved customer profile - Profile ID: {}, Email: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L229">                           customerProfileId, profile.getEmail(), correlationId);</span>
+<span class="nc" id="L230">                return profile;</span>
+            } else {
+<span class="pc bpc" id="L232" title="3 of 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L233">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="fc" id="L234">                    : &quot;Unknown error retrieving customer profile&quot;;</span>
+                
+<span class="fc" id="L236">                log.error(&quot;Failed to retrieve customer profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, errorMessage, correlationId);
+                
+<span class="fc" id="L239">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to retrieve customer profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="fc" id="L243">        } catch (Exception e) {</span>
+<span class="fc" id="L244">            log.error(&quot;Exception retrieving customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        customerProfileId, correlationId, e);
+<span class="fc" id="L246">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L247">                &quot;Failed to retrieve customer profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Retrieves a customer payment profile from Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param paymentProfileId Payment profile ID
+     * @return Payment profile information
+     */
+    public CustomerPaymentProfileMaskedType getCustomerPaymentProfile(String customerProfileId, String paymentProfileId) {
+<span class="pc bpc" id="L259" title="1 of 4 branches missed.">        if (customerProfileId == null || customerProfileId.isBlank()) {</span>
+<span class="fc" id="L260">            throw new PaymentProcessingException(&quot;Failed to retrieve customer payment profile: Customer profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+<span class="pc bpc" id="L262" title="3 of 4 branches missed.">        if (paymentProfileId == null || paymentProfileId.isBlank()) {</span>
+<span class="fc" id="L263">            throw new PaymentProcessingException(&quot;Failed to retrieve customer payment profile: Payment profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+        
+<span class="nc" id="L266">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="nc" id="L268">        log.info(&quot;Retrieving payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="nc" id="L272">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="nc" id="L274">            GetCustomerPaymentProfileRequest apiRequest = new GetCustomerPaymentProfileRequest();</span>
+<span class="nc" id="L275">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="nc" id="L276">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L277">            apiRequest.setCustomerPaymentProfileId(paymentProfileId);</span>
+
+<span class="nc" id="L279">            GetCustomerPaymentProfileController controller = new GetCustomerPaymentProfileController(apiRequest);</span>
+<span class="nc" id="L280">            controller.execute();</span>
+
+<span class="nc" id="L282">            GetCustomerPaymentProfileResponse response = controller.getApiResponse();</span>
+
+<span class="nc bnc" id="L284" title="All 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L285">                CustomerPaymentProfileMaskedType paymentProfile = response.getPaymentProfile();</span>
+<span class="nc" id="L286">                log.info(&quot;Successfully retrieved payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, correlationId);
+<span class="nc" id="L288">                return paymentProfile;</span>
+            } else {
+<span class="nc bnc" id="L290" title="All 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L291">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="nc" id="L292">                    : &quot;Unknown error retrieving payment profile&quot;;</span>
+                
+<span class="nc" id="L294">                log.error(&quot;Failed to retrieve payment profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, errorMessage, correlationId);
+                
+<span class="nc" id="L297">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to retrieve payment profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="nc" id="L301">        } catch (Exception e) {</span>
+<span class="nc" id="L302">            log.error(&quot;Exception retrieving payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        paymentProfileId, correlationId, e);
+<span class="nc" id="L304">            throw new PaymentProcessingException(</span>
+<span class="nc" id="L305">                &quot;Failed to retrieve payment profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Updates a customer profile in Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param customer Updated customer entity
+     * @return Success status
+     */
+    public boolean updateCustomerProfile(String customerProfileId, Customer customer) {
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        if (customerProfileId == null || customerProfileId.isBlank()) {</span>
+<span class="fc" id="L318">            throw new PaymentProcessingException(&quot;Failed to update customer profile: Customer profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (customer == null) {</span>
+<span class="fc" id="L321">            throw new PaymentProcessingException(&quot;Failed to update customer profile: Customer is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+        
+<span class="nc" id="L324">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="nc" id="L326">        log.info(&quot;Updating customer profile - Profile ID: {}, Customer ID: {}, CorrelationId: {}&quot;, </span>
+<span class="nc" id="L327">                   customerProfileId, customer.getCustomerId(), correlationId);</span>
+
+        try {
+<span class="nc" id="L330">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="nc" id="L332">            CustomerProfileExType profile = new CustomerProfileExType();</span>
+<span class="nc" id="L333">            profile.setCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L334">            profile.setMerchantCustomerId(customer.getCustomerId());</span>
+<span class="nc" id="L335">            profile.setEmail(customer.getEmail());</span>
+            
+            // Set description field - this is what appears as &quot;Name&quot; in the portal
+<span class="nc" id="L338">            String customerName = &quot;&quot;;</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">            if (customer.getFirstName() != null &amp;&amp; customer.getLastName() != null) {</span>
+<span class="nc" id="L340">                customerName = customer.getFirstName() + &quot; &quot; + customer.getLastName();</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            } else if (customer.getFirstName() != null) {</span>
+<span class="nc" id="L342">                customerName = customer.getFirstName();</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            } else if (customer.getLastName() != null) {</span>
+<span class="nc" id="L344">                customerName = customer.getLastName();</span>
+            } else {
+<span class="nc" id="L346">                customerName = &quot;Customer &quot; + customer.getCustomerId();</span>
+            }
+<span class="nc" id="L348">            profile.setDescription(customerName);</span>
+
+<span class="nc" id="L350">            UpdateCustomerProfileRequest apiRequest = new UpdateCustomerProfileRequest();</span>
+<span class="nc" id="L351">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="nc" id="L352">            apiRequest.setProfile(profile);</span>
+
+<span class="nc" id="L354">            UpdateCustomerProfileController controller = new UpdateCustomerProfileController(apiRequest);</span>
+<span class="nc" id="L355">            controller.execute();</span>
+
+<span class="nc" id="L357">            UpdateCustomerProfileResponse response = controller.getApiResponse();</span>
+
+<span class="nc bnc" id="L359" title="All 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L360">                log.info(&quot;Successfully updated customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, correlationId);
+<span class="nc" id="L362">                return true;</span>
+            } else {
+<span class="nc bnc" id="L364" title="All 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L365">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="nc" id="L366">                    : &quot;Unknown error updating customer profile&quot;;</span>
+                
+<span class="nc" id="L368">                log.error(&quot;Failed to update customer profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, errorMessage, correlationId);
+                
+<span class="nc" id="L371">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to update customer profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="nc" id="L375">        } catch (Exception e) {</span>
+<span class="nc" id="L376">            log.error(&quot;Exception updating customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        customerProfileId, correlationId, e);
+<span class="nc" id="L378">            throw new PaymentProcessingException(</span>
+<span class="nc" id="L379">                &quot;Failed to update customer profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Updates a customer payment profile in Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param paymentProfileId Payment profile ID
+     * @param paymentMethod Updated payment method details
+     * @param customer Customer entity for billing address
+     * @return Success status
+     */
+    public boolean updateCustomerPaymentProfile(String customerProfileId, String paymentProfileId, 
+                                              PaymentMethodRequest paymentMethod, Customer customer) {
+<span class="nc" id="L394">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="nc" id="L396">        log.info(&quot;Updating payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="nc" id="L400">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="nc" id="L402">            CustomerPaymentProfileExType paymentProfile = new CustomerPaymentProfileExType();</span>
+<span class="nc" id="L403">            paymentProfile.setCustomerPaymentProfileId(paymentProfileId);</span>
+            
+            // Set billing address
+<span class="nc" id="L406">            CustomerAddressType billingAddress = new CustomerAddressType();</span>
+<span class="nc" id="L407">            billingAddress.setFirstName(customer.getFirstName());</span>
+<span class="nc" id="L408">            billingAddress.setLastName(customer.getLastName());</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">            if (customer.getBillingAddressLine1() != null) {</span>
+<span class="nc" id="L410">                billingAddress.setAddress(customer.getBillingAddressLine1());</span>
+<span class="nc" id="L411">                billingAddress.setCity(customer.getBillingCity());</span>
+<span class="nc" id="L412">                billingAddress.setState(customer.getBillingState());</span>
+<span class="nc" id="L413">                billingAddress.setZip(customer.getBillingPostalCode());</span>
+<span class="nc" id="L414">                billingAddress.setCountry(customer.getBillingCountry());</span>
+            }
+<span class="nc" id="L416">            paymentProfile.setBillTo(billingAddress);</span>
+
+            // Set payment method
+<span class="nc" id="L419">            PaymentType payment = new PaymentType();</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            if (&quot;CREDIT_CARD&quot;.equals(paymentMethod.getType())) {</span>
+<span class="nc" id="L421">                CreditCardType creditCard = new CreditCardType();</span>
+<span class="nc" id="L422">                creditCard.setCardNumber(paymentMethod.getCardNumber());</span>
+<span class="nc" id="L423">                creditCard.setExpirationDate(paymentMethod.getExpiryMonth() + paymentMethod.getExpiryYear());</span>
+<span class="nc" id="L424">                creditCard.setCardCode(paymentMethod.getCvv());</span>
+<span class="nc" id="L425">                payment.setCreditCard(creditCard);</span>
+            }
+<span class="nc" id="L427">            paymentProfile.setPayment(payment);</span>
+
+<span class="nc" id="L429">            UpdateCustomerPaymentProfileRequest apiRequest = new UpdateCustomerPaymentProfileRequest();</span>
+<span class="nc" id="L430">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="nc" id="L431">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L432">            apiRequest.setPaymentProfile(paymentProfile);</span>
+<span class="nc" id="L433">            apiRequest.setValidationMode(ValidationModeEnum.TEST_MODE);</span>
+
+<span class="nc" id="L435">            UpdateCustomerPaymentProfileController controller = new UpdateCustomerPaymentProfileController(apiRequest);</span>
+<span class="nc" id="L436">            controller.execute();</span>
+
+<span class="nc" id="L438">            UpdateCustomerPaymentProfileResponse response = controller.getApiResponse();</span>
+
+<span class="nc bnc" id="L440" title="All 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L441">                log.info(&quot;Successfully updated payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, correlationId);
+<span class="nc" id="L443">                return true;</span>
+            } else {
+<span class="nc bnc" id="L445" title="All 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L446">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="nc" id="L447">                    : &quot;Unknown error updating payment profile&quot;;</span>
+                
+<span class="nc" id="L449">                log.error(&quot;Failed to update payment profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, errorMessage, correlationId);
+                
+<span class="nc" id="L452">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to update payment profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="nc" id="L456">        } catch (Exception e) {</span>
+<span class="nc" id="L457">            log.error(&quot;Exception updating payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        paymentProfileId, correlationId, e);
+<span class="nc" id="L459">            throw new PaymentProcessingException(</span>
+<span class="nc" id="L460">                &quot;Failed to update payment profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Deletes a customer profile from Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @return Success status
+     */
+    public boolean deleteCustomerProfile(String customerProfileId) {
+<span class="fc" id="L471">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L473">        log.info(&quot;Deleting customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, correlationId);
+
+        try {
+<span class="fc" id="L477">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="fc" id="L479">            DeleteCustomerProfileRequest apiRequest = new DeleteCustomerProfileRequest();</span>
+<span class="fc" id="L480">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="fc" id="L481">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+
+<span class="fc" id="L483">            DeleteCustomerProfileController controller = new DeleteCustomerProfileController(apiRequest);</span>
+<span class="fc" id="L484">            controller.execute();</span>
+
+<span class="fc" id="L486">            DeleteCustomerProfileResponse response = controller.getApiResponse();</span>
+
+<span class="pc bpc" id="L488" title="3 of 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L489">                log.info(&quot;Successfully deleted customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, correlationId);
+<span class="nc" id="L491">                return true;</span>
+            } else {
+<span class="pc bpc" id="L493" title="3 of 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L494">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="fc" id="L495">                    : &quot;Unknown error deleting customer profile&quot;;</span>
+                
+<span class="fc" id="L497">                log.error(&quot;Failed to delete customer profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           customerProfileId, errorMessage, correlationId);
+                
+<span class="fc" id="L500">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to delete customer profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="fc" id="L504">        } catch (Exception e) {</span>
+<span class="fc" id="L505">            log.error(&quot;Exception deleting customer profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        customerProfileId, correlationId, e);
+<span class="fc" id="L507">            throw new PaymentProcessingException(</span>
+<span class="fc" id="L508">                &quot;Failed to delete customer profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Deletes a customer payment profile from Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param paymentProfileId Payment profile ID
+     * @return Success status
+     */
+    public boolean deleteCustomerPaymentProfile(String customerProfileId, String paymentProfileId) {
+<span class="pc bpc" id="L520" title="1 of 4 branches missed.">        if (customerProfileId == null || customerProfileId.isBlank()) {</span>
+<span class="fc" id="L521">            throw new PaymentProcessingException(&quot;Failed to delete customer payment profile: Customer profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+<span class="pc bpc" id="L523" title="3 of 4 branches missed.">        if (paymentProfileId == null || paymentProfileId.isBlank()) {</span>
+<span class="fc" id="L524">            throw new PaymentProcessingException(&quot;Failed to delete customer payment profile: Payment profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+        
+<span class="nc" id="L527">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="nc" id="L529">        log.info(&quot;Deleting payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="nc" id="L533">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="nc" id="L535">            DeleteCustomerPaymentProfileRequest apiRequest = new DeleteCustomerPaymentProfileRequest();</span>
+<span class="nc" id="L536">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="nc" id="L537">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L538">            apiRequest.setCustomerPaymentProfileId(paymentProfileId);</span>
+
+<span class="nc" id="L540">            DeleteCustomerPaymentProfileController controller = new DeleteCustomerPaymentProfileController(apiRequest);</span>
+<span class="nc" id="L541">            controller.execute();</span>
+
+<span class="nc" id="L543">            DeleteCustomerPaymentProfileResponse response = controller.getApiResponse();</span>
+
+<span class="nc bnc" id="L545" title="All 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L546">                log.info(&quot;Successfully deleted payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, correlationId);
+<span class="nc" id="L548">                return true;</span>
+            } else {
+<span class="nc bnc" id="L550" title="All 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L551">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="nc" id="L552">                    : &quot;Unknown error deleting payment profile&quot;;</span>
+                
+<span class="nc" id="L554">                log.error(&quot;Failed to delete payment profile - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, errorMessage, correlationId);
+                
+<span class="nc" id="L557">                throw new PaymentProcessingException(</span>
+                    &quot;Failed to delete payment profile: &quot; + errorMessage, correlationId);
+            }
+
+<span class="nc" id="L561">        } catch (Exception e) {</span>
+<span class="nc" id="L562">            log.error(&quot;Exception deleting payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        paymentProfileId, correlationId, e);
+<span class="nc" id="L564">            throw new PaymentProcessingException(</span>
+<span class="nc" id="L565">                &quot;Failed to delete payment profile: &quot; + e.getMessage(), correlationId);</span>
+        }
+    }
+
+    /**
+     * Validates a customer payment profile in Authorize.Net.
+     * 
+     * @param customerProfileId Authorize.Net customer profile ID
+     * @param paymentProfileId Payment profile ID
+     * @return Validation result
+     */
+    public boolean validateCustomerPaymentProfile(String customerProfileId, String paymentProfileId) {
+<span class="pc bpc" id="L577" title="1 of 4 branches missed.">        if (customerProfileId == null || customerProfileId.isBlank()) {</span>
+<span class="fc" id="L578">            throw new PaymentProcessingException(&quot;Failed to validate payment profile: Customer profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+<span class="pc bpc" id="L580" title="3 of 4 branches missed.">        if (paymentProfileId == null || paymentProfileId.isBlank()) {</span>
+<span class="fc" id="L581">            throw new PaymentProcessingException(&quot;Failed to validate payment profile: Payment profile ID is required&quot;, &quot;INVALID_PARAMETER&quot;);</span>
+        }
+        
+<span class="nc" id="L584">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="nc" id="L586">        log.info(&quot;Validating payment profile - Customer Profile ID: {}, Payment Profile ID: {}, CorrelationId: {}&quot;, </span>
+                   customerProfileId, paymentProfileId, correlationId);
+
+        try {
+<span class="nc" id="L590">            ApiOperationBase.setEnvironment(environment);</span>
+
+<span class="nc" id="L592">            ValidateCustomerPaymentProfileRequest apiRequest = new ValidateCustomerPaymentProfileRequest();</span>
+<span class="nc" id="L593">            apiRequest.setMerchantAuthentication(merchant);</span>
+<span class="nc" id="L594">            apiRequest.setCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L595">            apiRequest.setCustomerPaymentProfileId(paymentProfileId);</span>
+<span class="nc" id="L596">            apiRequest.setValidationMode(ValidationModeEnum.TEST_MODE);</span>
+
+<span class="nc" id="L598">            ValidateCustomerPaymentProfileController controller = new ValidateCustomerPaymentProfileController(apiRequest);</span>
+<span class="nc" id="L599">            controller.execute();</span>
+
+<span class="nc" id="L601">            ValidateCustomerPaymentProfileResponse response = controller.getApiResponse();</span>
+
+<span class="nc bnc" id="L603" title="All 4 branches missed.">            if (response != null &amp;&amp; response.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+<span class="nc" id="L604">                log.info(&quot;Payment profile validation successful - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, correlationId);
+<span class="nc" id="L606">                return true;</span>
+            } else {
+<span class="nc bnc" id="L608" title="All 4 branches missed.">                String errorMessage = response != null &amp;&amp; response.getMessages().getMessage().size() &gt; 0 </span>
+<span class="nc" id="L609">                    ? response.getMessages().getMessage().get(0).getText()</span>
+<span class="nc" id="L610">                    : &quot;Unknown validation error&quot;;</span>
+                
+<span class="nc" id="L612">                log.warn(&quot;Payment profile validation failed - Profile ID: {}, Error: {}, CorrelationId: {}&quot;, </span>
+                           paymentProfileId, errorMessage, correlationId);
+<span class="nc" id="L614">                return false;</span>
+            }
+
+<span class="nc" id="L617">        } catch (Exception e) {</span>
+<span class="nc" id="L618">            log.error(&quot;Exception validating payment profile - Profile ID: {}, CorrelationId: {}&quot;, </span>
+                        paymentProfileId, correlationId, e);
+<span class="nc" id="L620">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

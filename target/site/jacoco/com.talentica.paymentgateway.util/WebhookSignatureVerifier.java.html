@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookSignatureVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.util</a> &gt; <span class="el_source">WebhookSignatureVerifier.java</span></div><h1>WebhookSignatureVerifier.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.util;
+
+import com.talentica.paymentgateway.config.properties.WebhookProperties;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Map;
+
+/**
+ * Utility class for verifying webhook signatures.
+ * Supports multiple signature algorithms including HMAC-SHA256 and SHA-256.
+ * 
+ * Signature verification is crucial for webhook security to ensure that:
+ * 1. The webhook request actually came from Authorize.Net
+ * 2. The payload hasn't been tampered with during transmission
+ * 3. The request is not a replay attack
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L29">@Slf4j</span>
+@Component
+<span class="fc" id="L31">@RequiredArgsConstructor</span>
+public class WebhookSignatureVerifier {
+    
+    private static final String HMAC_SHA256_ALGORITHM = &quot;HmacSHA256&quot;;
+    private static final String HMAC_SHA512_ALGORITHM = &quot;HmacSHA512&quot;;
+    private static final String SHA256_ALGORITHM = &quot;SHA-256&quot;;
+    
+    // Standard webhook signature headers
+    private static final String SIGNATURE_HEADER = &quot;X-ANET-Signature&quot;;
+    private static final String SIGNATURE_HEADER_ALT = &quot;X-Signature&quot;;
+    private static final String SHA1_SIGNATURE_HEADER = &quot;sha1&quot;;
+    private static final String SHA256_SIGNATURE_HEADER = &quot;sha256&quot;;
+    
+    private final WebhookProperties webhookProperties;
+    
+    /**
+     * Verifies webhook signature from HTTP headers.
+     * 
+     * @param headers HTTP headers from the webhook request
+     * @param payload Raw webhook payload
+     * @return true if signature is valid or verification is disabled, false otherwise
+     */
+    public boolean verifySignature(Map&lt;String, String&gt; headers, String payload) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!webhookProperties.getSignature().isEnabled()) {</span>
+<span class="fc" id="L55">            log.debug(&quot;Webhook signature verification is disabled&quot;);</span>
+<span class="fc" id="L56">            return true;</span>
+        }
+        
+<span class="fc" id="L59">        String webhookSecret = webhookProperties.getSignature().getSecret();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!StringUtils.hasText(webhookSecret)) {</span>
+<span class="fc" id="L61">            log.warn(&quot;Webhook signature secret not configured, allowing request&quot;);</span>
+<span class="fc" id="L62">            return true;</span>
+        }
+        
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (payload == null) {</span>
+<span class="nc" id="L66">            log.error(&quot;Webhook payload is null, cannot verify signature&quot;);</span>
+<span class="nc" id="L67">            return false;</span>
+        }
+        
+        try {
+            // Try different signature header formats
+<span class="fc" id="L72">            String signature = extractSignature(headers);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (!StringUtils.hasText(signature)) {</span>
+<span class="nc" id="L74">                log.error(&quot;No signature found in webhook headers&quot;);</span>
+<span class="nc" id="L75">                return false;</span>
+            }
+            
+            // Verify signature using configured algorithm
+<span class="fc" id="L79">            boolean isValid = verifySignatureWithAlgorithm(signature, payload);</span>
+            
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (isValid) {</span>
+<span class="fc" id="L82">                log.debug(&quot;Webhook signature verification successful&quot;);</span>
+            } else {
+<span class="nc" id="L84">                log.error(&quot;Webhook signature verification failed&quot;);</span>
+            }
+            
+<span class="fc" id="L87">            return isValid;</span>
+            
+<span class="nc" id="L89">        } catch (Exception e) {</span>
+<span class="nc" id="L90">            log.error(&quot;Error verifying webhook signature: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L91">            return false;</span>
+        }
+    }
+    
+    /**
+     * Verifies webhook signature with a specific secret.
+     * Useful for testing or when using different secrets for different endpoints.
+     * 
+     * @param headers HTTP headers from the webhook request
+     * @param payload Raw webhook payload
+     * @param secret Webhook secret to use for verification
+     * @return true if signature is valid, false otherwise
+     */
+    public boolean verifySignatureWithSecret(Map&lt;String, String&gt; headers, String payload, String secret) {
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        if (!StringUtils.hasText(secret) || payload == null) {</span>
+<span class="nc" id="L106">            return false;</span>
+        }
+        
+        try {
+<span class="fc" id="L110">            String signature = extractSignature(headers);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (!StringUtils.hasText(signature)) {</span>
+<span class="nc" id="L112">                return false;</span>
+            }
+            
+<span class="fc" id="L115">            return verifySignatureWithAlgorithm(signature, payload, secret);</span>
+            
+<span class="nc" id="L117">        } catch (Exception e) {</span>
+<span class="nc" id="L118">            log.error(&quot;Error verifying webhook signature with custom secret: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L119">            return false;</span>
+        }
+    }
+    
+    /**
+     * Generates signature for outgoing webhook requests.
+     * 
+     * @param payload Webhook payload to sign
+     * @return Generated signature
+     */
+    public String generateSignature(String payload) {
+<span class="nc" id="L130">        String webhookSecret = webhookProperties.getSignature().getSecret();</span>
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if (!StringUtils.hasText(webhookSecret) || payload == null) {</span>
+<span class="nc" id="L132">            log.warn(&quot;Cannot generate signature: secret or payload is empty&quot;);</span>
+<span class="nc" id="L133">            return null;</span>
+        }
+        
+        try {
+<span class="nc" id="L137">            return generateSignatureWithSecret(payload, webhookSecret);</span>
+<span class="nc" id="L138">        } catch (Exception e) {</span>
+<span class="nc" id="L139">            log.error(&quot;Error generating webhook signature: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L140">            return null;</span>
+        }
+    }
+    
+    /**
+     * Generates signature with a specific secret.
+     * 
+     * @param payload Webhook payload to sign
+     * @param secret Secret to use for signing
+     * @return Generated signature
+     */
+    public String generateSignatureWithSecret(String payload, String secret) {
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (!StringUtils.hasText(secret) || payload == null) {</span>
+<span class="nc" id="L153">            return null;</span>
+        }
+        
+<span class="fc" id="L156">        String algorithm = webhookProperties.getSignature().getAlgorithm();</span>
+        try {
+<span class="pc bpc" id="L158" title="1 of 3 branches missed.">            switch (algorithm.toUpperCase()) {</span>
+                case &quot;HMAC_SHA256&quot;:
+<span class="fc" id="L160">                    return generateHmacSha256Signature(payload, secret);</span>
+                case &quot;SHA256&quot;:
+<span class="fc" id="L162">                    return generateSha256Signature(payload + secret);</span>
+                default:
+<span class="nc" id="L164">                    log.warn(&quot;Unknown signature algorithm: {}, using HMAC_SHA256&quot;, algorithm);</span>
+<span class="nc" id="L165">                    return generateHmacSha256Signature(payload, secret);</span>
+            }
+<span class="nc" id="L167">        } catch (Exception e) {</span>
+<span class="nc" id="L168">            log.error(&quot;Error generating signature with secret: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L169">            return null;</span>
+        }
+    }
+    
+    /**
+     * Extracts signature from webhook headers.
+     * Supports multiple header formats used by different webhook providers.
+     * 
+     * @param headers HTTP headers
+     * @return Extracted signature or null if not found
+     */
+    private String extractSignature(Map&lt;String, String&gt; headers) {
+        // Convert headers to case-insensitive lookup
+<span class="fc" id="L182">        Map&lt;String, String&gt; lowerHeaders = headers.entrySet().stream()</span>
+<span class="fc" id="L183">                .collect(java.util.stream.Collectors.toMap(</span>
+<span class="fc" id="L184">                    entry -&gt; entry.getKey().toLowerCase(),</span>
+                    Map.Entry::getValue,
+<span class="nc" id="L186">                    (existing, replacement) -&gt; existing</span>
+                ));
+        
+        // Try standard Authorize.Net signature header
+<span class="fc" id="L190">        String signature = lowerHeaders.get(SIGNATURE_HEADER.toLowerCase());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (StringUtils.hasText(signature)) {</span>
+<span class="fc" id="L192">            return cleanSignature(signature);</span>
+        }
+        
+        // Try alternative signature header
+<span class="fc" id="L196">        signature = lowerHeaders.get(SIGNATURE_HEADER_ALT.toLowerCase());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (StringUtils.hasText(signature)) {</span>
+<span class="fc" id="L198">            return cleanSignature(signature);</span>
+        }
+        
+        // Try GitHub-style signature header
+<span class="fc" id="L202">        signature = lowerHeaders.get(&quot;x-hub-signature-256&quot;);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (StringUtils.hasText(signature)) {</span>
+<span class="fc" id="L204">            return cleanSignature(signature);</span>
+        }
+        
+        // Try Stripe-style signature header
+<span class="fc" id="L208">        signature = lowerHeaders.get(&quot;stripe-signature&quot;);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (StringUtils.hasText(signature)) {</span>
+<span class="fc" id="L210">            return extractStripeSignature(signature);</span>
+        }
+        
+<span class="nc" id="L213">        return null;</span>
+    }
+    
+    /**
+     * Cleans signature by removing algorithm prefixes.
+     */
+    private String cleanSignature(String signature) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (!StringUtils.hasText(signature)) {</span>
+<span class="nc" id="L221">            return signature;</span>
+        }
+        
+        // Remove common prefixes
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (signature.startsWith(&quot;sha512=&quot;)) {</span>
+<span class="nc" id="L226">            return signature.substring(7);</span>
+        }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (signature.startsWith(&quot;sha256=&quot;)) {</span>
+<span class="fc" id="L229">            return signature.substring(7);</span>
+        }
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (signature.startsWith(&quot;sha1=&quot;)) {</span>
+<span class="nc" id="L232">            return signature.substring(5);</span>
+        }
+        
+<span class="fc" id="L235">        return signature;</span>
+    }
+    
+    /**
+     * Extracts signature from Stripe-style signature header.
+     * Format: t=timestamp,v1=signature
+     */
+    private String extractStripeSignature(String signatureHeader) {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (!StringUtils.hasText(signatureHeader)) {</span>
+<span class="nc" id="L244">            return null;</span>
+        }
+        
+<span class="fc" id="L247">        String[] parts = signatureHeader.split(&quot;,&quot;);</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        for (String part : parts) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (part.startsWith(&quot;v1=&quot;)) {</span>
+<span class="fc" id="L250">                return part.substring(3);</span>
+            }
+        }
+        
+<span class="nc" id="L254">        return null;</span>
+    }
+    
+    /**
+     * Verifies signature using the configured algorithm.
+     */
+    private boolean verifySignatureWithAlgorithm(String signature, String payload) {
+<span class="fc" id="L261">        return verifySignatureWithAlgorithm(signature, payload, webhookProperties.getSignature().getSecret());</span>
+    }
+    
+    /**
+     * Verifies signature using the configured algorithm with a specific secret.
+     */
+    private boolean verifySignatureWithAlgorithm(String signature, String payload, String secret) {
+<span class="fc" id="L268">        String algorithm = webhookProperties.getSignature().getAlgorithm();</span>
+        try {
+<span class="fc" id="L270">            log.debug(&quot;Using signature algorithm: {}&quot;, algorithm);</span>
+            String expectedSignature;
+            
+<span class="pc bpc" id="L273" title="2 of 4 branches missed.">            switch (algorithm.toUpperCase()) {</span>
+                case &quot;HMAC_SHA256&quot;:
+<span class="fc" id="L275">                    expectedSignature = generateHmacSha256Signature(payload, secret);</span>
+<span class="fc" id="L276">                    break;</span>
+                case &quot;HMAC_SHA512&quot;:
+<span class="nc" id="L278">                    expectedSignature = generateHmacSha512Signature(payload, secret);</span>
+<span class="nc" id="L279">                    break;</span>
+                case &quot;SHA256&quot;:
+<span class="fc" id="L281">                    expectedSignature = generateSha256Signature(payload + secret);</span>
+<span class="fc" id="L282">                    break;</span>
+                default:
+<span class="nc" id="L284">                    log.warn(&quot;Unknown signature algorithm: {}, using HMAC_SHA256&quot;, algorithm);</span>
+<span class="nc" id="L285">                    expectedSignature = generateHmacSha256Signature(payload, secret);</span>
+                    break;
+            }
+            
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (expectedSignature == null) {</span>
+<span class="nc" id="L290">                log.error(&quot;Failed to generate expected signature&quot;);</span>
+<span class="nc" id="L291">                return false;</span>
+            }
+            
+<span class="fc" id="L294">            log.debug(&quot;Expected signature: {}&quot;, expectedSignature);</span>
+<span class="fc" id="L295">            log.debug(&quot;Received signature: {}&quot;, signature);</span>
+            
+            // Use secure comparison to prevent timing attacks
+<span class="fc" id="L298">            boolean isValid = secureCompare(signature.toLowerCase(), expectedSignature.toLowerCase());</span>
+<span class="fc" id="L299">            log.debug(&quot;Signature validation result: {}&quot;, isValid);</span>
+<span class="fc" id="L300">            return isValid;</span>
+            
+<span class="nc" id="L302">        } catch (Exception e) {</span>
+<span class="nc" id="L303">            log.error(&quot;Error verifying signature with algorithm {}: {}&quot;, algorithm, e.getMessage(), e);</span>
+<span class="nc" id="L304">            return false;</span>
+        }
+    }
+    
+    /**
+     * Generates HMAC-SHA256 signature.
+     */
+    private String generateHmacSha256Signature(String payload, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
+<span class="fc" id="L312">        Mac mac = Mac.getInstance(HMAC_SHA256_ALGORITHM);</span>
+<span class="fc" id="L313">        SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_SHA256_ALGORITHM);</span>
+<span class="fc" id="L314">        mac.init(secretKeySpec);</span>
+        
+<span class="fc" id="L316">        byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L317">        return bytesToHex(hash);</span>
+    }
+    
+    /**
+     * Generates HMAC-SHA512 signature.
+     */
+    private String generateHmacSha512Signature(String payload, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
+<span class="nc" id="L324">        Mac mac = Mac.getInstance(HMAC_SHA512_ALGORITHM);</span>
+<span class="nc" id="L325">        SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_SHA512_ALGORITHM);</span>
+<span class="nc" id="L326">        mac.init(secretKeySpec);</span>
+        
+<span class="nc" id="L328">        byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L329">        return bytesToHex(hash);</span>
+    }
+    
+    /**
+     * Generates SHA-256 signature.
+     */
+    private String generateSha256Signature(String data) throws NoSuchAlgorithmException {
+<span class="fc" id="L336">        MessageDigest digest = MessageDigest.getInstance(SHA256_ALGORITHM);</span>
+<span class="fc" id="L337">        byte[] hash = digest.digest(data.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L338">        return bytesToHex(hash);</span>
+    }
+    
+    /**
+     * Converts byte array to hexadecimal string.
+     */
+    private String bytesToHex(byte[] bytes) {
+<span class="fc" id="L345">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (byte b : bytes) {</span>
+<span class="fc" id="L347">            result.append(String.format(&quot;%02x&quot;, b));</span>
+        }
+<span class="fc" id="L349">        return result.toString();</span>
+    }
+    
+    /**
+     * Secure string comparison to prevent timing attacks.
+     */
+    private boolean secureCompare(String a, String b) {
+<span class="pc bpc" id="L356" title="2 of 6 branches missed.">        if (a == null || b == null || a.length() != b.length()) {</span>
+<span class="fc" id="L357">            return false;</span>
+        }
+        
+<span class="fc" id="L360">        int result = 0;</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length(); i++) {</span>
+<span class="fc" id="L362">            result |= a.charAt(i) ^ b.charAt(i);</span>
+        }
+        
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        return result == 0;</span>
+    }
+    
+    /**
+     * Validates webhook timestamp to prevent replay attacks.
+     * 
+     * @param timestamp Webhook timestamp
+     * @param toleranceMinutes Allowed time difference in minutes
+     * @return true if timestamp is within tolerance, false otherwise
+     */
+    public boolean validateTimestamp(long timestamp, int toleranceMinutes) {
+<span class="fc" id="L376">        long currentTime = System.currentTimeMillis() / 1000; // Convert to seconds</span>
+<span class="fc" id="L377">        long timeDifference = Math.abs(currentTime - timestamp);</span>
+<span class="fc" id="L378">        long toleranceSeconds = toleranceMinutes * 60L;</span>
+        
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        boolean isValid = timeDifference &lt;= toleranceSeconds;</span>
+        
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (!isValid) {</span>
+<span class="fc" id="L383">            log.warn(&quot;Webhook timestamp validation failed. Current: {}, Webhook: {}, Difference: {} seconds&quot;, </span>
+<span class="fc" id="L384">                       currentTime, timestamp, timeDifference);</span>
+        }
+        
+<span class="fc" id="L387">        return isValid;</span>
+    }
+    
+    /**
+     * Gets configuration info for debugging.
+     */
+    public String getConfigurationInfo() {
+<span class="fc" id="L394">        return String.format(&quot;WebhookSignatureVerifier{enabled=%s, algorithm=%s, secretConfigured=%s}&quot;, </span>
+<span class="fc" id="L395">                           webhookProperties.getSignature().isEnabled(), </span>
+<span class="fc" id="L396">                           webhookProperties.getSignature().getAlgorithm(), </span>
+<span class="fc" id="L397">                           StringUtils.hasText(webhookProperties.getSignature().getSecret()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

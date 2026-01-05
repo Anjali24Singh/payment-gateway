@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionReportRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.analytics</a> &gt; <span class="el_source">TransactionReportRequest.java</span></div><h1>TransactionReportRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.analytics;
+
+import com.talentica.paymentgateway.entity.PaymentStatus;
+import com.talentica.paymentgateway.entity.TransactionType;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.UUID;
+
+/**
+ * DTO for transaction reporting requests with comprehensive filtering options.
+ * Supports date ranges, amounts, statuses, and export formats.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Transaction reporting request with filtering and export options&quot;)
+public class TransactionReportRequest {
+    
+    @Schema(description = &quot;Start date for the report period&quot;)
+    private ZonedDateTime startDate;
+    
+    @Schema(description = &quot;End date for the report period&quot;)
+    private ZonedDateTime endDate;
+    
+    @Schema(description = &quot;Filter by customer ID&quot;)
+    private UUID customerId;
+    
+    @Schema(description = &quot;Filter by order ID&quot;)
+    private UUID orderId;
+    
+    @Schema(description = &quot;Filter by payment status&quot;)
+    private PaymentStatus status;
+    
+    @Schema(description = &quot;Filter by transaction type&quot;)
+    private TransactionType transactionType;
+    
+    @Schema(description = &quot;Minimum transaction amount&quot;)
+    private BigDecimal minAmount;
+    
+    @Schema(description = &quot;Maximum transaction amount&quot;)
+    private BigDecimal maxAmount;
+    
+    @Schema(description = &quot;Currency filter (e.g., USD, EUR)&quot;)
+    private String currency;
+    
+    @Schema(description = &quot;Payment method type filter&quot;)
+    private String paymentMethodType;
+    
+    @Schema(description = &quot;Include successful transactions only&quot;)
+    private Boolean successfulOnly;
+    
+    @Schema(description = &quot;Include failed transactions only&quot;)
+    private Boolean failedOnly;
+    
+    @Schema(description = &quot;Group results by time period (DAY, WEEK, MONTH)&quot;)
+    private String groupBy;
+    
+<span class="fc" id="L62">    @Schema(description = &quot;Export format (JSON, CSV, PDF)&quot;, allowableValues = {&quot;JSON&quot;, &quot;CSV&quot;, &quot;PDF&quot;})</span>
+    private String exportFormat = &quot;JSON&quot;;
+    
+<span class="fc" id="L65">    @Schema(description = &quot;Page number for pagination&quot;)</span>
+    @Min(value = 0, message = &quot;Page number must be non-negative&quot;)
+<span class="fc" id="L67">    private Integer page = 0;</span>
+    
+<span class="fc" id="L69">    @Schema(description = &quot;Page size for pagination&quot;)</span>
+    @Min(value = 1, message = &quot;Page size must be positive&quot;)
+    @Max(value = 1000, message = &quot;Page size must not exceed 1000&quot;)
+<span class="fc" id="L72">    private Integer size = 50;</span>
+    
+<span class="fc" id="L74">    @Schema(description = &quot;Sort field&quot;)</span>
+    private String sortBy = &quot;createdAt&quot;;
+    
+<span class="fc" id="L77">    @Schema(description = &quot;Sort direction (ASC, DESC)&quot;)</span>
+    private String sortDirection = &quot;DESC&quot;;
+    
+<span class="fc" id="L80">    @Schema(description = &quot;Include metadata in the response&quot;)</span>
+<span class="fc" id="L81">    private Boolean includeMetadata = true;</span>
+    
+<span class="fc" id="L83">    @Schema(description = &quot;Include aggregation statistics&quot;)</span>
+<span class="fc" id="L84">    private Boolean includeAggregations = false;</span>
+    
+    // Constructors
+<span class="fc" id="L87">    public TransactionReportRequest() {}</span>
+    
+    // Getters and Setters
+    public ZonedDateTime getStartDate() {
+<span class="fc" id="L91">        return startDate;</span>
+    }
+    
+    public void setStartDate(ZonedDateTime startDate) {
+<span class="fc" id="L95">        this.startDate = startDate;</span>
+<span class="fc" id="L96">    }</span>
+    
+    public ZonedDateTime getEndDate() {
+<span class="fc" id="L99">        return endDate;</span>
+    }
+    
+    public void setEndDate(ZonedDateTime endDate) {
+<span class="fc" id="L103">        this.endDate = endDate;</span>
+<span class="fc" id="L104">    }</span>
+    
+    public UUID getCustomerId() {
+<span class="fc" id="L107">        return customerId;</span>
+    }
+    
+    public void setCustomerId(UUID customerId) {
+<span class="fc" id="L111">        this.customerId = customerId;</span>
+<span class="fc" id="L112">    }</span>
+    
+    public UUID getOrderId() {
+<span class="fc" id="L115">        return orderId;</span>
+    }
+    
+    public void setOrderId(UUID orderId) {
+<span class="fc" id="L119">        this.orderId = orderId;</span>
+<span class="fc" id="L120">    }</span>
+    
+    public PaymentStatus getStatus() {
+<span class="fc" id="L123">        return status;</span>
+    }
+    
+    public void setStatus(PaymentStatus status) {
+<span class="fc" id="L127">        this.status = status;</span>
+<span class="fc" id="L128">    }</span>
+    
+    public TransactionType getTransactionType() {
+<span class="fc" id="L131">        return transactionType;</span>
+    }
+    
+    public void setTransactionType(TransactionType transactionType) {
+<span class="fc" id="L135">        this.transactionType = transactionType;</span>
+<span class="fc" id="L136">    }</span>
+    
+    public BigDecimal getMinAmount() {
+<span class="fc" id="L139">        return minAmount;</span>
+    }
+    
+    public void setMinAmount(BigDecimal minAmount) {
+<span class="fc" id="L143">        this.minAmount = minAmount;</span>
+<span class="fc" id="L144">    }</span>
+    
+    public BigDecimal getMaxAmount() {
+<span class="fc" id="L147">        return maxAmount;</span>
+    }
+    
+    public void setMaxAmount(BigDecimal maxAmount) {
+<span class="fc" id="L151">        this.maxAmount = maxAmount;</span>
+<span class="fc" id="L152">    }</span>
+    
+    public String getCurrency() {
+<span class="fc" id="L155">        return currency;</span>
+    }
+    
+    public void setCurrency(String currency) {
+<span class="fc" id="L159">        this.currency = currency;</span>
+<span class="fc" id="L160">    }</span>
+    
+    public String getPaymentMethodType() {
+<span class="fc" id="L163">        return paymentMethodType;</span>
+    }
+    
+    public void setPaymentMethodType(String paymentMethodType) {
+<span class="fc" id="L167">        this.paymentMethodType = paymentMethodType;</span>
+<span class="fc" id="L168">    }</span>
+    
+    public Boolean getSuccessfulOnly() {
+<span class="fc" id="L171">        return successfulOnly;</span>
+    }
+    
+    public void setSuccessfulOnly(Boolean successfulOnly) {
+<span class="fc" id="L175">        this.successfulOnly = successfulOnly;</span>
+<span class="fc" id="L176">    }</span>
+    
+    public Boolean getFailedOnly() {
+<span class="fc" id="L179">        return failedOnly;</span>
+    }
+    
+    public void setFailedOnly(Boolean failedOnly) {
+<span class="fc" id="L183">        this.failedOnly = failedOnly;</span>
+<span class="fc" id="L184">    }</span>
+    
+    public String getGroupBy() {
+<span class="fc" id="L187">        return groupBy;</span>
+    }
+    
+    public void setGroupBy(String groupBy) {
+<span class="fc" id="L191">        this.groupBy = groupBy;</span>
+<span class="fc" id="L192">    }</span>
+    
+    public String getExportFormat() {
+<span class="fc" id="L195">        return exportFormat;</span>
+    }
+    
+    public void setExportFormat(String exportFormat) {
+<span class="fc" id="L199">        this.exportFormat = exportFormat;</span>
+<span class="fc" id="L200">    }</span>
+    
+    public Integer getPage() {
+<span class="fc" id="L203">        return page;</span>
+    }
+    
+    public void setPage(Integer page) {
+<span class="fc" id="L207">        this.page = page;</span>
+<span class="fc" id="L208">    }</span>
+    
+    public Integer getSize() {
+<span class="fc" id="L211">        return size;</span>
+    }
+    
+    public void setSize(Integer size) {
+<span class="fc" id="L215">        this.size = size;</span>
+<span class="fc" id="L216">    }</span>
+    
+    public String getSortBy() {
+<span class="fc" id="L219">        return sortBy;</span>
+    }
+    
+    public void setSortBy(String sortBy) {
+<span class="fc" id="L223">        this.sortBy = sortBy;</span>
+<span class="fc" id="L224">    }</span>
+    
+    public String getSortDirection() {
+<span class="fc" id="L227">        return sortDirection;</span>
+    }
+    
+    public void setSortDirection(String sortDirection) {
+<span class="fc" id="L231">        this.sortDirection = sortDirection;</span>
+<span class="fc" id="L232">    }</span>
+    
+    public Boolean getIncludeMetadata() {
+<span class="fc" id="L235">        return includeMetadata;</span>
+    }
+    
+    public void setIncludeMetadata(Boolean includeMetadata) {
+<span class="fc" id="L239">        this.includeMetadata = includeMetadata;</span>
+<span class="fc" id="L240">    }</span>
+    
+    public Boolean getIncludeAggregations() {
+<span class="fc" id="L243">        return includeAggregations;</span>
+    }
+    
+    public void setIncludeAggregations(Boolean includeAggregations) {
+<span class="fc" id="L247">        this.includeAggregations = includeAggregations;</span>
+<span class="fc" id="L248">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

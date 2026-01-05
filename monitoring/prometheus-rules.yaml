@@ -1,0 +1,202 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-gateway-alerts
+  labels:
+    app: payment-gateway
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: payment-gateway.rules
+    rules:
+    # High-level SLI/SLO alerts
+    - alert: PaymentGatewayHighErrorRate
+      expr: |
+        (
+          rate(http_requests_total{job="payment-gateway",status=~"5.."}[5m]) /
+          rate(http_requests_total{job="payment-gateway"}[5m])
+        ) > 0.05
+      for: 2m
+      labels:
+        severity: critical
+        service: payment-gateway
+        category: availability
+      annotations:
+        summary: "Payment Gateway high error rate"
+        description: "Payment Gateway error rate is {{ $value | humanizePercentage }} which is above the threshold of 5%"
+        runbook_url: "https://runbooks.payment-gateway.com/high-error-rate"
+    
+    - alert: PaymentGatewayHighLatency
+      expr: |
+        histogram_quantile(0.95, 
+          rate(http_request_duration_seconds_bucket{job="payment-gateway"}[5m])
+        ) > 2.0
+      for: 5m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: performance
+      annotations:
+        summary: "Payment Gateway high latency"
+        description: "Payment Gateway P95 latency is {{ $value }}s which is above the threshold of 2s"
+        runbook_url: "https://runbooks.payment-gateway.com/high-latency"
+    
+    # Payment-specific alerts
+    - alert: PaymentProcessingFailureRate
+      expr: |
+        (
+          rate(payment_operations_total{status="failure"}[5m]) /
+          rate(payment_operations_total[5m])
+        ) > 0.02
+      for: 3m
+      labels:
+        severity: critical
+        service: payment-gateway
+        category: business
+      annotations:
+        summary: "High payment processing failure rate"
+        description: "Payment processing failure rate is {{ $value | humanizePercentage }} which is above the threshold of 2%"
+        runbook_url: "https://runbooks.payment-gateway.com/payment-failures"
+    
+    - alert: AuthorizeNetApiErrors
+      expr: |
+        rate(authorizenet_api_errors_total[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: external-dependency
+      annotations:
+        summary: "High Authorize.Net API error rate"
+        description: "Authorize.Net API error rate is {{ $value }} errors/second"
+        runbook_url: "https://runbooks.payment-gateway.com/authorizenet-errors"
+    
+    # Infrastructure alerts
+    - alert: PaymentGatewayDown
+      expr: up{job="payment-gateway"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: payment-gateway
+        category: availability
+      annotations:
+        summary: "Payment Gateway is down"
+        description: "Payment Gateway instance {{ $labels.instance }} is down"
+        runbook_url: "https://runbooks.payment-gateway.com/service-down"
+    
+    - alert: PaymentGatewayHighCPU
+      expr: |
+        rate(container_cpu_usage_seconds_total{pod=~"payment-gateway-.*"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: resource
+      annotations:
+        summary: "Payment Gateway high CPU usage"
+        description: "Payment Gateway pod {{ $labels.pod }} CPU usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://runbooks.payment-gateway.com/high-cpu"
+    
+    - alert: PaymentGatewayHighMemory
+      expr: |
+        (
+          container_memory_working_set_bytes{pod=~"payment-gateway-.*"} /
+          container_spec_memory_limit_bytes{pod=~"payment-gateway-.*"}
+        ) > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: resource
+      annotations:
+        summary: "Payment Gateway high memory usage"
+        description: "Payment Gateway pod {{ $labels.pod }} memory usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://runbooks.payment-gateway.com/high-memory"
+    
+    # Database alerts
+    - alert: DatabaseConnectionPoolExhaustion
+      expr: |
+        hikaricp_connections_active{pool="HikariPool-1"} /
+        hikaricp_connections_max{pool="HikariPool-1"} > 0.9
+      for: 5m
+      labels:
+        severity: critical
+        service: payment-gateway
+        category: database
+      annotations:
+        summary: "Database connection pool near exhaustion"
+        description: "Database connection pool usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://runbooks.payment-gateway.com/db-pool-exhaustion"
+    
+    - alert: DatabaseSlowQueries
+      expr: |
+        histogram_quantile(0.95,
+          rate(hikaricp_connections_acquire_seconds_bucket[5m])
+        ) > 1.0
+      for: 5m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: database
+      annotations:
+        summary: "Database slow query performance"
+        description: "Database P95 connection acquisition time is {{ $value }}s"
+        runbook_url: "https://runbooks.payment-gateway.com/slow-queries"
+    
+    # Security alerts
+    - alert: HighAuthenticationFailures
+      expr: |
+        rate(authentication_attempts_total{status="failure"}[5m]) > 5
+      for: 2m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: security
+      annotations:
+        summary: "High authentication failure rate"
+        description: "Authentication failure rate is {{ $value }} failures/second"
+        runbook_url: "https://runbooks.payment-gateway.com/auth-failures"
+    
+    - alert: RateLimitTriggered
+      expr: |
+        rate(rate_limit_triggered_total[5m]) > 1
+      for: 1m
+      labels:
+        severity: info
+        service: payment-gateway
+        category: security
+      annotations:
+        summary: "Rate limiting actively triggered"
+        description: "Rate limiting is being triggered {{ $value }} times/second"
+        runbook_url: "https://runbooks.payment-gateway.com/rate-limiting"
+    
+    # Business metrics alerts
+    - alert: LowTransactionVolume
+      expr: |
+        rate(payment_operations_total[1h]) < 10
+      for: 30m
+      labels:
+        severity: info
+        service: payment-gateway
+        category: business
+      annotations:
+        summary: "Unusually low transaction volume"
+        description: "Transaction volume is {{ $value }} transactions/hour which is below normal"
+        runbook_url: "https://runbooks.payment-gateway.com/low-volume"
+    
+    - alert: HighRefundRate
+      expr: |
+        (
+          rate(payment_operations_total{operation="refund"}[1h]) /
+          rate(payment_operations_total{operation="purchase"}[1h])
+        ) > 0.1
+      for: 30m
+      labels:
+        severity: warning
+        service: payment-gateway
+        category: business
+      annotations:
+        summary: "High refund rate detected"
+        description: "Refund rate is {{ $value | humanizePercentage }} which is above normal threshold"
+        runbook_url: "https://runbooks.payment-gateway.com/high-refunds"

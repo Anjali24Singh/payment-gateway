@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">SubscriptionController.java</span></div><h1>SubscriptionController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.subscription.*;
+import com.talentica.paymentgateway.service.SubscriptionService;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * REST controller for subscription management operations.
+ * Provides endpoints for subscription lifecycle management including
+ * creation, updates, cancellation, pause/resume, and retrieval.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L33">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/subscriptions&quot;)
+@Tag(name = &quot;Subscriptions&quot;, description = &quot;Subscription management operations&quot;)
+@SecurityRequirement(name = &quot;JWT&quot;)
+@SecurityRequirement(name = &quot;ApiKey&quot;)
+public class SubscriptionController {
+
+    private final SubscriptionService subscriptionService;
+
+<span class="fc" id="L43">    public SubscriptionController(SubscriptionService subscriptionService) {</span>
+<span class="fc" id="L44">        this.subscriptionService = subscriptionService;</span>
+<span class="fc" id="L45">    }</span>
+
+    @Operation(summary = &quot;List all subscriptions&quot;, 
+               description = &quot;Retrieves a paginated list of all subscriptions&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscriptions retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Page&lt;SubscriptionResponse&gt;&gt; getAllSubscriptions(
+            @PageableDefault(size = 20, sort = &quot;createdAt&quot;, direction = Sort.Direction.DESC) Pageable pageable) {
+        
+<span class="fc" id="L58">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L60">        log.info(&quot;Retrieving all subscriptions - CorrelationId: {}&quot;, correlationId);</span>
+
+        // For now, return empty page - full implementation would call subscriptionService.getAllSubscriptions(pageable)
+<span class="fc" id="L63">        Page&lt;SubscriptionResponse&gt; subscriptions = Page.empty(pageable);</span>
+        
+<span class="fc" id="L65">        log.info(&quot;Retrieved {} subscriptions - CorrelationId: {}&quot;, </span>
+<span class="fc" id="L66">                   subscriptions.getTotalElements(), correlationId);</span>
+
+<span class="fc" id="L68">        return ResponseEntity.ok()</span>
+<span class="fc" id="L69">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L70">                           .body(subscriptions);</span>
+    }
+
+    @Operation(summary = &quot;Create a new subscription&quot;, 
+               description = &quot;Creates a new subscription for a customer with specified plan and payment method&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Subscription created successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Customer, plan, or payment method not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Duplicate subscription (idempotency)&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; createSubscription(
+            @Valid @RequestBody CreateSubscriptionRequest request) {
+        
+<span class="fc" id="L88">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L90">        log.info(&quot;Creating subscription - Customer: {}, Plan: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L91">                   request.getCustomerId(), request.getPlanCode(), correlationId);</span>
+
+<span class="fc" id="L93">        SubscriptionResponse response = subscriptionService.createSubscription(request);</span>
+        
+<span class="fc" id="L95">        log.info(&quot;Subscription created successfully - ID: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L96">                   response.getSubscriptionId(), correlationId);</span>
+
+<span class="fc" id="L98">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L99">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L100">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Update a subscription&quot;, 
+               description = &quot;Updates an existing subscription with plan changes, payment method updates, etc.&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscription updated successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid request parameters&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription, plan, or payment method not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Cannot update inactive subscription&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PutMapping(&quot;/{subscriptionId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; updateSubscription(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId,
+            @Valid @RequestBody UpdateSubscriptionRequest request) {
+        
+<span class="fc" id="L119">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L121">        log.info(&quot;Updating subscription - ID: {}, CorrelationId: {}&quot;, subscriptionId, correlationId);</span>
+
+<span class="fc" id="L123">        SubscriptionResponse response = subscriptionService.updateSubscription(subscriptionId, request);</span>
+        
+<span class="fc" id="L125">        log.info(&quot;Subscription updated successfully - ID: {}, CorrelationId: {}&quot;, </span>
+                   subscriptionId, correlationId);
+
+<span class="fc" id="L128">        return ResponseEntity.ok()</span>
+<span class="fc" id="L129">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L130">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Cancel a subscription&quot;, 
+               description = &quot;Cancels a subscription either immediately or at the end of the current period&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscription cancelled successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid cancellation request&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Subscription already cancelled&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{subscriptionId}/cancel&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; cancelSubscription(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId,
+            @Valid @RequestBody CancelSubscriptionRequest request) {
+        
+<span class="fc" id="L149">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L151">        log.info(&quot;Cancelling subscription - ID: {}, When: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L152">                   subscriptionId, request.getWhen(), correlationId);</span>
+
+<span class="fc" id="L154">        SubscriptionResponse response = subscriptionService.cancelSubscription(subscriptionId, request);</span>
+        
+<span class="fc" id="L156">        log.info(&quot;Subscription cancelled successfully - ID: {}, CorrelationId: {}&quot;, </span>
+                   subscriptionId, correlationId);
+
+<span class="fc" id="L159">        return ResponseEntity.ok()</span>
+<span class="fc" id="L160">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L161">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Pause a subscription&quot;, 
+               description = &quot;Temporarily pauses an active subscription&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscription paused successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Cannot pause inactive subscription&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{subscriptionId}/pause&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; pauseSubscription(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId) {
+        
+<span class="fc" id="L178">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L180">        log.info(&quot;Pausing subscription - ID: {}, CorrelationId: {}&quot;, subscriptionId, correlationId);</span>
+
+<span class="fc" id="L182">        SubscriptionResponse response = subscriptionService.pauseSubscription(subscriptionId);</span>
+        
+<span class="fc" id="L184">        log.info(&quot;Subscription paused successfully - ID: {}, CorrelationId: {}&quot;, </span>
+                   subscriptionId, correlationId);
+
+<span class="fc" id="L187">        return ResponseEntity.ok()</span>
+<span class="fc" id="L188">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L189">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Resume a paused subscription&quot;, 
+               description = &quot;Resumes a previously paused subscription&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscription resumed successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription not found&quot;),
+        @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Cannot resume non-paused subscription&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{subscriptionId}/resume&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; resumeSubscription(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId) {
+        
+<span class="fc" id="L206">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L208">        log.info(&quot;Resuming subscription - ID: {}, CorrelationId: {}&quot;, subscriptionId, correlationId);</span>
+
+<span class="fc" id="L210">        SubscriptionResponse response = subscriptionService.resumeSubscription(subscriptionId);</span>
+        
+<span class="fc" id="L212">        log.info(&quot;Subscription resumed successfully - ID: {}, CorrelationId: {}&quot;, </span>
+                   subscriptionId, correlationId);
+
+<span class="fc" id="L215">        return ResponseEntity.ok()</span>
+<span class="fc" id="L216">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L217">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get subscription details&quot;, 
+               description = &quot;Retrieves detailed information about a specific subscription&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Subscription details retrieved successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = SubscriptionResponse.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/{subscriptionId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;SubscriptionResponse&gt; getSubscription(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId) {
+        
+<span class="fc" id="L233">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L235">        log.debug(&quot;Retrieving subscription - ID: {}, CorrelationId: {}&quot;, subscriptionId, correlationId);</span>
+
+<span class="fc" id="L237">        SubscriptionResponse response = subscriptionService.getSubscription(subscriptionId);</span>
+
+<span class="fc" id="L239">        return ResponseEntity.ok()</span>
+<span class="fc" id="L240">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L241">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Get customer subscriptions&quot;, 
+               description = &quot;Retrieves all subscriptions for a specific customer with pagination&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Customer subscriptions retrieved successfully&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Customer not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @GetMapping(&quot;/customer/{customerId}&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Page&lt;SubscriptionResponse&gt;&gt; getCustomerSubscriptions(
+            @Parameter(description = &quot;Customer ID&quot;) @PathVariable String customerId,
+            @PageableDefault(size = 20, sort = &quot;createdAt&quot;, direction = Sort.Direction.DESC) Pageable pageable) {
+        
+<span class="fc" id="L257">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L259">        log.debug(&quot;Retrieving customer subscriptions - Customer: {}, CorrelationId: {}&quot;, </span>
+                    customerId, correlationId);
+
+<span class="fc" id="L262">        Page&lt;SubscriptionResponse&gt; response = subscriptionService.getCustomerSubscriptions(customerId, pageable);</span>
+
+<span class="fc" id="L264">        return ResponseEntity.ok()</span>
+<span class="fc" id="L265">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L266">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Calculate proration for subscription change&quot;, 
+               description = &quot;Calculates proration amount for a potential subscription plan change&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Proration calculated successfully&quot;,
+                    content = @Content(schema = @Schema(implementation = ProrationCalculation.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription or plan not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{subscriptionId}/calculate-proration&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;ProrationCalculation&gt; calculateProration(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId,
+            @Parameter(description = &quot;New plan code&quot;) @RequestParam String newPlanCode,
+            @Parameter(description = &quot;Change date (optional, defaults to now)&quot;) 
+            @RequestParam(required = false) String changeDate) {
+        
+<span class="fc" id="L285">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L287">        log.debug(&quot;Calculating proration - Subscription: {}, New Plan: {}, CorrelationId: {}&quot;, </span>
+                    subscriptionId, newPlanCode, correlationId);
+
+        // This would require implementing the calculation in the service
+        // For now, return a placeholder response
+<span class="fc" id="L292">        ProrationCalculation response = new ProrationCalculation(&quot;Proration calculation not yet implemented&quot;);</span>
+
+<span class="fc" id="L294">        return ResponseEntity.ok()</span>
+<span class="fc" id="L295">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L296">                           .body(response);</span>
+    }
+
+    @Operation(summary = &quot;Preview subscription change&quot;, 
+               description = &quot;Previews the effects of a subscription change without applying it&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Change preview generated successfully&quot;),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Subscription not found&quot;),
+        @ApiResponse(responseCode = &quot;500&quot;, description = &quot;Internal server error&quot;)
+    })
+    @PostMapping(&quot;/{subscriptionId}/preview-change&quot;)
+    @PreAuthorize(&quot;hasRole('ADMIN') or hasRole('USER')&quot;)
+    public ResponseEntity&lt;Object&gt; previewSubscriptionChange(
+            @Parameter(description = &quot;Subscription ID&quot;) @PathVariable String subscriptionId,
+            @Valid @RequestBody UpdateSubscriptionRequest request) {
+        
+<span class="fc" id="L312">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L314">        log.debug(&quot;Previewing subscription change - ID: {}, CorrelationId: {}&quot;, </span>
+                    subscriptionId, correlationId);
+
+        // This would require implementing preview logic in the service
+        // For now, return a placeholder response
+<span class="fc" id="L319">        Object response = new Object() {</span>
+<span class="fc" id="L320">            public String message = &quot;Change preview not yet implemented&quot;;</span>
+        };
+
+<span class="fc" id="L323">        return ResponseEntity.ok()</span>
+<span class="fc" id="L324">                           .header(&quot;X-Correlation-ID&quot;, correlationId)</span>
+<span class="fc" id="L325">                           .body(response);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

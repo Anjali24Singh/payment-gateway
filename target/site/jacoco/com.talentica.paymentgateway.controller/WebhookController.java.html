@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">WebhookController.java</span></div><h1>WebhookController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.webhook.AuthorizeNetWebhookRequest;
+import com.talentica.paymentgateway.dto.webhook.WebhookResponse;
+import com.talentica.paymentgateway.service.MetricsService;
+import com.talentica.paymentgateway.service.WebhookProcessingService;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * REST Controller for handling webhook events from payment processors.
+ * Supports Authorize.Net webhook notifications for payment status updates.
+ * 
+ * Features:
+ * - Signature verification for security
+ * - Asynchronous processing for scalability  
+ * - Duplicate event detection
+ * - Comprehensive logging and metrics
+ * - Industry-standard webhook response handling
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L50">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/webhooks&quot;)
+@Validated
+@Tag(name = &quot;Webhooks&quot;, description = &quot;Webhook endpoints for payment processor notifications&quot;)
+<span class="fc" id="L55">public class WebhookController {</span>
+    
+    @Autowired
+    private WebhookProcessingService webhookProcessingService;
+    
+    @Autowired
+    private MetricsService metricsService;
+    
+    /**
+     * Handles Authorize.Net webhook notifications.
+     * 
+     * @param webhookRequest Webhook payload from Authorize.Net
+     * @param request HTTP servlet request for header extraction
+     * @return Webhook response indicating processing status
+     */
+    @PostMapping(value = &quot;/authorize-net&quot;, 
+                consumes = MediaType.APPLICATION_JSON_VALUE,
+                produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+        summary = &quot;Receive Authorize.Net webhook notifications&quot;,
+        description = &quot;Endpoint for receiving and processing webhook notifications from Authorize.Net &quot; +
+                     &quot;for payment events including successful payments, refunds, voids, and fraud reviews. &quot; +
+                     &quot;All webhooks are processed asynchronously with signature verification and duplicate detection.&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = &quot;200&quot;,
+            description = &quot;Webhook received and processing initiated successfully&quot;,
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = WebhookResponse.class),
+                examples = @ExampleObject(
+                    name = &quot;Success Response&quot;,
+                    value = &quot;&quot;&quot;
+                    {
+                        &quot;status&quot;: &quot;success&quot;,
+                        &quot;message&quot;: &quot;Webhook processed successfully&quot;,
+                        &quot;eventId&quot;: &quot;evt_1234567890&quot;,
+                        &quot;processedAt&quot;: &quot;2024-01-15T10:30:00Z&quot;,
+                        &quot;correlationId&quot;: &quot;corr-abc123def456&quot;
+                    }
+                    &quot;&quot;&quot;
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = &quot;400&quot;,
+            description = &quot;Invalid webhook payload or signature verification failed&quot;,
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = WebhookResponse.class),
+                examples = @ExampleObject(
+                    name = &quot;Validation Error&quot;,
+                    value = &quot;&quot;&quot;
+                    {
+                        &quot;status&quot;: &quot;validation_error&quot;,
+                        &quot;message&quot;: &quot;Invalid webhook payload&quot;,
+                        &quot;eventId&quot;: &quot;evt_1234567890&quot;,
+                        &quot;correlationId&quot;: &quot;corr-abc123def456&quot;,
+                        &quot;error&quot;: {
+                            &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+                            &quot;description&quot;: &quot;Required field missing: notificationId&quot;,
+                            &quot;suggestion&quot;: &quot;Ensure all required fields are present in the webhook payload&quot;
+                        }
+                    }
+                    &quot;&quot;&quot;
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = &quot;401&quot;,
+            description = &quot;Webhook signature verification failed&quot;,
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = WebhookResponse.class),
+                examples = @ExampleObject(
+                    name = &quot;Signature Error&quot;,
+                    value = &quot;&quot;&quot;
+                    {
+                        &quot;status&quot;: &quot;signature_error&quot;,
+                        &quot;message&quot;: &quot;Invalid webhook signature&quot;,
+                        &quot;eventId&quot;: &quot;evt_1234567890&quot;,
+                        &quot;correlationId&quot;: &quot;corr-abc123def456&quot;,
+                        &quot;error&quot;: {
+                            &quot;code&quot;: &quot;SIGNATURE_INVALID&quot;,
+                            &quot;description&quot;: &quot;Webhook signature verification failed&quot;,
+                            &quot;suggestion&quot;: &quot;Verify webhook signature configuration&quot;
+                        }
+                    }
+                    &quot;&quot;&quot;
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = &quot;409&quot;,
+            description = &quot;Duplicate webhook event detected&quot;,
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = WebhookResponse.class),
+                examples = @ExampleObject(
+                    name = &quot;Duplicate Event&quot;,
+                    value = &quot;&quot;&quot;
+                    {
+                        &quot;status&quot;: &quot;duplicate&quot;,
+                        &quot;message&quot;: &quot;Event already processed&quot;,
+                        &quot;eventId&quot;: &quot;evt_1234567890&quot;,
+                        &quot;correlationId&quot;: &quot;corr-abc123def456&quot;
+                    }
+                    &quot;&quot;&quot;
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = &quot;500&quot;,
+            description = &quot;Internal server error during webhook processing&quot;,
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = WebhookResponse.class),
+                examples = @ExampleObject(
+                    name = &quot;Processing Error&quot;,
+                    value = &quot;&quot;&quot;
+                    {
+                        &quot;status&quot;: &quot;processing_error&quot;,
+                        &quot;message&quot;: &quot;Internal processing error&quot;,
+                        &quot;eventId&quot;: &quot;evt_1234567890&quot;,
+                        &quot;correlationId&quot;: &quot;corr-abc123def456&quot;,
+                        &quot;error&quot;: {
+                            &quot;code&quot;: &quot;PROCESSING_ERROR&quot;,
+                            &quot;description&quot;: &quot;Database connection failed&quot;,
+                            &quot;suggestion&quot;: &quot;Check application logs for details&quot;
+                        }
+                    }
+                    &quot;&quot;&quot;
+                )
+            )
+        )
+    })
+    public ResponseEntity&lt;WebhookResponse&gt; handleAuthorizeNetWebhook(
+            @Parameter(description = &quot;Authorize.Net webhook payload&quot;, required = true)
+            @Valid @RequestBody AuthorizeNetWebhookRequest webhookRequest,
+            HttpServletRequest request) {
+        
+<span class="fc" id="L197">        Instant startTime = Instant.now();</span>
+<span class="fc" id="L198">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        String eventId = webhookRequest != null ? webhookRequest.getNotificationId() : &quot;unknown&quot;;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        String eventType = webhookRequest != null ? webhookRequest.getEventType() : &quot;unknown&quot;;</span>
+        
+        try {
+            // Set correlation ID for this request
+<span class="fc" id="L204">            MDC.put(&quot;correlationId&quot;, correlationId);</span>
+            
+<span class="fc" id="L206">            log.info(&quot;Received Authorize.Net webhook - EventID: {}, Type: {}, IP: {}&quot;, </span>
+<span class="fc" id="L207">                       eventId, eventType, getClientIpAddress(request));</span>
+            
+            // Extract headers for signature verification
+<span class="fc" id="L210">            Map&lt;String, String&gt; headers = extractHeaders(request);</span>
+            
+            // Get raw payload for signature verification
+<span class="fc" id="L213">            String rawPayload = extractRawPayload(request, webhookRequest);</span>
+            
+            // Record webhook received metric
+<span class="fc" id="L216">            metricsService.incrementWebhookReceived(eventType);</span>
+            
+            // Process webhook asynchronously
+<span class="fc" id="L219">            CompletableFuture&lt;WebhookResponse&gt; futureResponse = webhookProcessingService</span>
+<span class="fc" id="L220">                .processWebhookAsync(webhookRequest, headers, rawPayload);</span>
+            
+            // Wait for processing to complete (with timeout handling)
+<span class="fc" id="L223">            WebhookResponse response = futureResponse.get();</span>
+            
+            // Determine HTTP status based on response
+<span class="fc" id="L226">            HttpStatus httpStatus = determineHttpStatus(response);</span>
+            
+            // Record processing metrics
+<span class="fc" id="L229">            long processingTimeMs = java.time.Duration.between(startTime, Instant.now()).toMillis();</span>
+<span class="fc" id="L230">            metricsService.recordWebhookProcessingTime(eventType, processingTimeMs);</span>
+            
+<span class="fc" id="L232">            log.info(&quot;Webhook processing completed - EventID: {}, Status: {}, Duration: {}ms&quot;, </span>
+<span class="fc" id="L233">                       eventId, response.getStatus(), processingTimeMs);</span>
+            
+<span class="fc" id="L235">            return ResponseEntity.status(httpStatus).body(response);</span>
+            
+<span class="fc" id="L237">        } catch (Exception e) {</span>
+<span class="fc" id="L238">            log.error(&quot;Error handling webhook - EventID: {}, Type: {}, Error: {}&quot;, </span>
+<span class="fc" id="L239">                        eventId, eventType, e.getMessage(), e);</span>
+            
+<span class="fc" id="L241">            metricsService.incrementWebhookProcessed(eventType, &quot;error&quot;);</span>
+            
+<span class="fc" id="L243">            WebhookResponse errorResponse = WebhookResponse.processingError(</span>
+                eventId, correlationId, &quot;Internal server error&quot;, e);
+            
+<span class="fc" id="L246">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+            
+        } finally {
+<span class="fc" id="L249">            MDC.clear();</span>
+        }
+    }
+    
+    /**
+     * Health check endpoint for webhook service.
+     */
+    @GetMapping(value = &quot;/health&quot;, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+        summary = &quot;Webhook service health check&quot;,
+        description = &quot;Returns health status of the webhook processing service including statistics and configuration.&quot;
+    )
+    @ApiResponse(
+        responseCode = &quot;200&quot;,
+        description = &quot;Webhook service is healthy&quot;,
+        content = @Content(
+            mediaType = MediaType.APPLICATION_JSON_VALUE,
+            examples = @ExampleObject(
+                name = &quot;Health Status&quot;,
+                value = &quot;&quot;&quot;
+                {
+                    &quot;status&quot;: &quot;healthy&quot;,
+                    &quot;timestamp&quot;: &quot;2024-01-15T10:30:00Z&quot;,
+                    &quot;statistics&quot;: {
+                        &quot;webhooksLast24Hours&quot;: 150,
+                        &quot;successfulDeliveries&quot;: 145,
+                        &quot;failedDeliveries&quot;: 3,
+                        &quot;pendingDeliveries&quot;: 2,
+                        &quot;retryingDeliveries&quot;: 0
+                    },
+                    &quot;configuration&quot;: {
+                        &quot;signatureVerificationEnabled&quot;: true,
+                        &quot;duplicateDetectionEnabled&quot;: true,
+                        &quot;asyncProcessingEnabled&quot;: true
+                    }
+                }
+                &quot;&quot;&quot;
+            )
+        )
+    )
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getWebhookHealth() {
+<span class="fc" id="L290">        Map&lt;String, Object&gt; health = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L291">        health.put(&quot;status&quot;, &quot;healthy&quot;);</span>
+<span class="fc" id="L292">        health.put(&quot;timestamp&quot;, Instant.now());</span>
+        
+        // Try to get statistics, but don't fail if database is not available
+        try {
+<span class="fc" id="L296">            health.put(&quot;statistics&quot;, webhookProcessingService.getProcessingStatistics());</span>
+<span class="fc" id="L297">        } catch (Exception e) {</span>
+<span class="fc" id="L298">            log.warn(&quot;Failed to retrieve webhook statistics: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L299">            Map&lt;String, Object&gt; fallbackStats = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L300">            fallbackStats.put(&quot;webhooksLast24Hours&quot;, 0);</span>
+<span class="fc" id="L301">            fallbackStats.put(&quot;successfulDeliveries&quot;, 0);</span>
+<span class="fc" id="L302">            fallbackStats.put(&quot;failedDeliveries&quot;, 0);</span>
+<span class="fc" id="L303">            fallbackStats.put(&quot;pendingDeliveries&quot;, 0);</span>
+<span class="fc" id="L304">            fallbackStats.put(&quot;retryingDeliveries&quot;, 0);</span>
+<span class="fc" id="L305">            fallbackStats.put(&quot;note&quot;, &quot;Statistics unavailable - database connection issue&quot;);</span>
+<span class="fc" id="L306">            health.put(&quot;statistics&quot;, fallbackStats);</span>
+<span class="fc" id="L307">        }</span>
+        
+<span class="fc" id="L309">        Map&lt;String, Object&gt; config = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L310">        config.put(&quot;signatureVerificationEnabled&quot;, true);</span>
+<span class="fc" id="L311">        config.put(&quot;duplicateDetectionEnabled&quot;, true);</span>
+<span class="fc" id="L312">        config.put(&quot;asyncProcessingEnabled&quot;, true);</span>
+<span class="fc" id="L313">        health.put(&quot;configuration&quot;, config);</span>
+        
+<span class="fc" id="L315">        return ResponseEntity.ok(health);</span>
+    }
+    
+    /**
+     * Endpoint for testing webhook processing with sample data.
+     */
+    @PostMapping(value = &quot;/test&quot;, 
+                consumes = MediaType.APPLICATION_JSON_VALUE,
+                produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+        summary = &quot;Test webhook processing&quot;,
+        description = &quot;Test endpoint for validating webhook processing functionality with sample data. &quot; +
+                     &quot;Only available in development and staging environments.&quot;
+    )
+    public ResponseEntity&lt;WebhookResponse&gt; testWebhook(
+            @RequestBody(required = false) Map&lt;String, Object&gt; testPayload,
+            HttpServletRequest request) {
+        
+<span class="fc" id="L333">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+        try {
+<span class="fc" id="L336">            log.info(&quot;Test webhook request received - IP: {}, CorrelationID: {}&quot;, </span>
+<span class="fc" id="L337">                       getClientIpAddress(request), correlationId);</span>
+            
+            // Create test response
+<span class="fc" id="L340">            WebhookResponse response = WebhookResponse.success(&quot;test-event-id&quot;, correlationId, </span>
+                                                             &quot;Test webhook processed successfully&quot;);
+            
+<span class="fc" id="L343">            return ResponseEntity.ok(response);</span>
+            
+<span class="nc" id="L345">        } catch (Exception e) {</span>
+<span class="nc" id="L346">            log.error(&quot;Error processing test webhook - CorrelationID: {}, Error: {}&quot;, </span>
+<span class="nc" id="L347">                        correlationId, e.getMessage(), e);</span>
+            
+<span class="nc" id="L349">            WebhookResponse errorResponse = WebhookResponse.processingError(</span>
+                &quot;test-event-id&quot;, correlationId, &quot;Test webhook error&quot;, e);
+            
+<span class="nc" id="L352">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);</span>
+        }
+    }
+    
+    /**
+     * Extracts HTTP headers from the request.
+     */
+    private Map&lt;String, String&gt; extractHeaders(HttpServletRequest request) {
+<span class="fc" id="L360">        Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L362">        Enumeration&lt;String&gt; headerNames = request.getHeaderNames();</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        while (headerNames.hasMoreElements()) {</span>
+<span class="fc" id="L364">            String headerName = headerNames.nextElement();</span>
+<span class="fc" id="L365">            String headerValue = request.getHeader(headerName);</span>
+<span class="fc" id="L366">            headers.put(headerName, headerValue);</span>
+<span class="fc" id="L367">        }</span>
+        
+<span class="fc" id="L369">        return headers;</span>
+    }
+    
+    /**
+     * Extracts raw payload for signature verification.
+     * In a real implementation, this would require access to the raw request body.
+     * For now, we'll serialize the webhook request back to JSON.
+     */
+    private String extractRawPayload(HttpServletRequest request, AuthorizeNetWebhookRequest webhookRequest) {
+        try {
+            // In production, you would capture the raw request body before JSON parsing
+            // For this implementation, we'll use the parsed object
+<span class="fc" id="L381">            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();</span>
+<span class="fc" id="L382">            mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());</span>
+<span class="fc" id="L383">            return mapper.writeValueAsString(webhookRequest);</span>
+<span class="nc" id="L384">        } catch (Exception e) {</span>
+<span class="nc" id="L385">            log.warn(&quot;Could not extract raw payload for signature verification: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L386">            return &quot;&quot;;</span>
+        }
+    }
+    
+    /**
+     * Determines HTTP status code based on webhook response.
+     */
+    private HttpStatus determineHttpStatus(WebhookResponse response) {
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (response == null) {</span>
+<span class="nc" id="L395">            return HttpStatus.INTERNAL_SERVER_ERROR;</span>
+        }
+        
+<span class="pc bpc" id="L398" title="1 of 6 branches missed.">        switch (response.getStatus()) {</span>
+            case &quot;success&quot;:
+<span class="fc" id="L400">                return HttpStatus.OK;</span>
+            case &quot;duplicate&quot;:
+<span class="fc" id="L402">                return HttpStatus.CONFLICT;</span>
+            case &quot;signature_error&quot;:
+<span class="fc" id="L404">                return HttpStatus.UNAUTHORIZED;</span>
+            case &quot;validation_error&quot;:
+<span class="fc" id="L406">                return HttpStatus.BAD_REQUEST;</span>
+            case &quot;processing_error&quot;:
+            case &quot;error&quot;:
+<span class="fc" id="L409">                return HttpStatus.INTERNAL_SERVER_ERROR;</span>
+            default:
+<span class="nc" id="L411">                return HttpStatus.OK;</span>
+        }
+    }
+    
+    /**
+     * Extracts client IP address from request.
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+<span class="fc" id="L419">        String xForwardedFor = request.getHeader(&quot;X-Forwarded-For&quot;);</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">        if (xForwardedFor != null &amp;&amp; !xForwardedFor.isEmpty()) {</span>
+<span class="fc" id="L421">            return xForwardedFor.split(&quot;,&quot;)[0].trim();</span>
+        }
+        
+<span class="fc" id="L424">        String xRealIp = request.getHeader(&quot;X-Real-IP&quot;);</span>
+<span class="pc bpc" id="L425" title="3 of 4 branches missed.">        if (xRealIp != null &amp;&amp; !xRealIp.isEmpty()) {</span>
+<span class="nc" id="L426">            return xRealIp;</span>
+        }
+        
+<span class="fc" id="L429">        return request.getRemoteAddr();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

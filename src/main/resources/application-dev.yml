@@ -1,0 +1,150 @@
+# Development Environment Configuration
+
+spring:
+  # DevTools Configuration for auto-refresh
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main/java,src/main/resources
+      exclude: static/**,public/**
+    livereload:
+      enabled: true
+      port: 35729
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:payment-gateway}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:your_db_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 0
+      validation-timeout: 5000
+      pool-name: PaymentGatewayCP
+      auto-commit: false
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      
+  # Flyway Configuration for Development
+  flyway:
+    enabled: true
+    mixed: true
+      
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+          
+  # JPA Configuration for Development
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+# Server Configuration
+server:
+  port: 8080
+
+# Logging Configuration for Development
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    net.authorize: DEBUG
+  file:
+    name: logs/payment-gateway-dev.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+
+# Management Configuration for Development
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  # Disable tracing for development since Zipkin is not running
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      endpoint: ""
+
+# Application Specific Configuration for Development
+app:
+  # Authorize.Net Configuration (Sandbox)
+  authorize-net:
+    environment: SANDBOX
+    api-login-id: ${AUTHNET_API_LOGIN_ID:YOUR_API_LOGIN_ID}
+    transaction-key: ${AUTHNET_TRANSACTION_KEY:YOUR_TRANSACTION_KEY}
+    base-url: https://apitest.authorize.net/xml/v1/request.api
+    timeout: 30000
+    retry-attempts: 3
+    retry-delay: 1000
+    
+  # CORS Configuration for Development
+  cors:
+    allowed-origins: 
+      - http://localhost:3000
+      - http://localhost:4200
+      - http://localhost:8081
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600
+    
+  # Security Configuration for Development
+  security:
+    jwt:
+      debug: true
+    api-key:
+      debug: true
+      
+  # Rate Limiting for Development (More Lenient)
+  rate-limit:
+    enabled: true
+    default-limit: 10000 # requests per hour
+    burst-limit: 1000 # burst capacity
+    
+  # Development Features
+  dev:
+    mock-payments: ${MOCK_PAYMENTS:true} # Set to true to mock Authorize.Net calls
+    detailed-errors: true
+    sql-logging: true
+    
+  # Make services more resilient for local development
+  database:
+    fail-fast: false # Don't fail immediately if DB is not available
+    
+  redis:
+    fail-fast: false # Don't fail immediately if Redis is not available
+    
+  # Webhook Configuration for Development
+  webhook:
+    signature:
+      algorithm: ${APP_WEBHOOK_SIGNATURE_ALGORITHM:HMAC_SHA512}
+      secret: ${WEBHOOK_SIGNATURE_SECRET:YOUR_WEBHOOK_SIGNATURE_SECRET_128_CHARS_LONG}
+      enabled: false

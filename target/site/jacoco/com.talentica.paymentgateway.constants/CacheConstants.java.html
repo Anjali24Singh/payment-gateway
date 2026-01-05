@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CacheConstants.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.constants</a> &gt; <span class="el_source">CacheConstants.java</span></div><h1>CacheConstants.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.constants;
+
+/**
+ * Cache-related constants for Spring Cache annotations.
+ * Centralizes cache names and TTL configurations.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+public final class CacheConstants {
+
+<span class="nc" id="L12">    private CacheConstants() {</span>
+<span class="nc" id="L13">        throw new UnsupportedOperationException(&quot;This is a constants class and cannot be instantiated&quot;);</span>
+    }
+
+    // Cache Names
+    public static final String API_KEY_VALIDATION_CACHE = &quot;apiKeyValidation&quot;;
+    public static final String CLIENT_PERMISSIONS_CACHE = &quot;clientPermissions&quot;;
+    public static final String CUSTOMER_PROFILES_CACHE = &quot;customerProfiles&quot;;
+    public static final String SUBSCRIPTION_PLANS_CACHE = &quot;subscriptionPlans&quot;;
+    public static final String PAYMENT_METHODS_CACHE = &quot;paymentMethods&quot;;
+    public static final String USER_DETAILS_CACHE = &quot;userDetails&quot;;
+    public static final String ANALYTICS_CACHE = &quot;analytics&quot;;
+
+    // Cache TTL (in seconds)
+    public static final long API_KEY_CACHE_TTL = 3600; // 1 hour
+    public static final long PERMISSIONS_CACHE_TTL = 3600; // 1 hour
+    public static final long CUSTOMER_CACHE_TTL = 1800; // 30 minutes
+    public static final long SUBSCRIPTION_PLAN_CACHE_TTL = 21600; // 6 hours
+    public static final long PAYMENT_METHOD_CACHE_TTL = 900; // 15 minutes
+    public static final long USER_CACHE_TTL = 1800; // 30 minutes
+    public static final long ANALYTICS_CACHE_TTL = 300; // 5 minutes
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

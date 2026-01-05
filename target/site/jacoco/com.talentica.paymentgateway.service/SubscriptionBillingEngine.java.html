@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionBillingEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">SubscriptionBillingEngine.java</span></div><h1>SubscriptionBillingEngine.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.payment.PurchaseRequest;
+import com.talentica.paymentgateway.dto.payment.PaymentMethodRequest;
+import com.talentica.paymentgateway.dto.payment.PaymentResponse;
+import com.talentica.paymentgateway.entity.*;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.repository.*;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Billing engine for processing recurring subscription charges.
+ * Handles automatic billing, failed payment retry logic, and dunning management.
+ * 
+ * Features:
+ * - Automated recurring billing processing
+ * - Invoice generation and payment attempts
+ * - Failed payment retry with exponential backoff
+ * - Dunning management and grace periods
+ * - Subscription lifecycle management based on payment status
+ * - Comprehensive billing analytics and reporting
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L37">@Slf4j</span>
+@Service
+@Transactional
+public class SubscriptionBillingEngine {
+
+    private static final int MAX_RETRY_ATTEMPTS = 5;
+<span class="fc" id="L43">    private static final int[] RETRY_DELAY_DAYS = {1, 3, 7, 14, 30}; // Exponential backoff</span>
+    private static final int GRACE_PERIOD_DAYS = 3;
+
+    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionInvoiceRepository invoiceRepository;
+    private final PaymentService paymentService;
+    private final MetricsService metricsService;
+    private final NotificationService notificationService;
+
+    public SubscriptionBillingEngine(SubscriptionRepository subscriptionRepository,
+                                   SubscriptionInvoiceRepository invoiceRepository,
+                                   PaymentService paymentService,
+                                   MetricsService metricsService,
+<span class="fc" id="L56">                                   NotificationService notificationService) {</span>
+<span class="fc" id="L57">        this.subscriptionRepository = subscriptionRepository;</span>
+<span class="fc" id="L58">        this.invoiceRepository = invoiceRepository;</span>
+<span class="fc" id="L59">        this.paymentService = paymentService;</span>
+<span class="fc" id="L60">        this.metricsService = metricsService;</span>
+<span class="fc" id="L61">        this.notificationService = notificationService;</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Processes all subscriptions due for billing.
+     * Scheduled to run every hour during business hours.
+     */
+    @Scheduled(cron = &quot;0 0 * * * *&quot;) // Every hour
+    public void processDueBilling() {
+<span class="fc" id="L70">        log.info(&quot;Starting scheduled billing process&quot;);</span>
+        
+<span class="fc" id="L72">        List&lt;Subscription&gt; dueSubscriptions = subscriptionRepository.findSubscriptionsDueForBilling(ZonedDateTime.now());</span>
+        
+<span class="fc" id="L74">        log.info(&quot;Found {} subscriptions due for billing&quot;, dueSubscriptions.size());</span>
+        
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (Subscription subscription : dueSubscriptions) {</span>
+            try {
+<span class="fc" id="L78">                processSubscriptionBilling(subscription);</span>
+<span class="nc" id="L79">            } catch (Exception e) {</span>
+<span class="nc" id="L80">                log.error(&quot;Error processing billing for subscription: {}&quot;, </span>
+<span class="nc" id="L81">                           subscription.getSubscriptionId(), e);</span>
+                // Continue with next subscription
+<span class="fc" id="L83">            }</span>
+<span class="fc" id="L84">        }</span>
+        
+<span class="fc" id="L86">        log.info(&quot;Completed scheduled billing process&quot;);</span>
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Processes failed payment retries.
+     * Scheduled to run daily at 9 AM.
+     */
+    @Scheduled(cron = &quot;0 0 9 * * *&quot;) // Daily at 9 AM
+    public void processFailedPaymentRetries() {
+<span class="fc" id="L95">        log.info(&quot;Starting failed payment retry process&quot;);</span>
+        
+<span class="fc" id="L97">        List&lt;SubscriptionInvoice&gt; retryInvoices = invoiceRepository.findInvoicesDueForRetry(ZonedDateTime.now());</span>
+        
+<span class="fc" id="L99">        log.info(&quot;Found {} invoices due for retry&quot;, retryInvoices.size());</span>
+        
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (SubscriptionInvoice invoice : retryInvoices) {</span>
+            try {
+<span class="fc" id="L103">                retryFailedPayment(invoice);</span>
+<span class="nc" id="L104">            } catch (Exception e) {</span>
+<span class="nc" id="L105">                log.error(&quot;Error retrying payment for invoice: {}&quot;, </span>
+<span class="nc" id="L106">                           invoice.getInvoiceNumber(), e);</span>
+                // Continue with next invoice
+<span class="fc" id="L108">            }</span>
+<span class="fc" id="L109">        }</span>
+        
+<span class="fc" id="L111">        log.info(&quot;Completed failed payment retry process&quot;);</span>
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Processes subscription lifecycle events.
+     * Scheduled to run daily at 6 AM.
+     */
+    @Scheduled(cron = &quot;0 0 6 * * *&quot;) // Daily at 6 AM
+    public void processSubscriptionLifecycle() {
+<span class="fc" id="L120">        log.info(&quot;Starting subscription lifecycle process&quot;);</span>
+        
+        // Handle trial expirations
+<span class="fc" id="L123">        handleTrialExpirations();</span>
+        
+        // Handle past due subscriptions
+<span class="fc" id="L126">        handlePastDueSubscriptions();</span>
+        
+        // Handle scheduled cancellations
+<span class="fc" id="L129">        handleScheduledCancellations();</span>
+        
+        // Handle scheduled plan changes
+<span class="fc" id="L132">        handleScheduledPlanChanges();</span>
+        
+<span class="fc" id="L134">        log.info(&quot;Completed subscription lifecycle process&quot;);</span>
+<span class="fc" id="L135">    }</span>
+
+    /**
+     * Processes billing for a specific subscription.
+     * 
+     * @param subscription Subscription to bill
+     */
+    @Async
+    public CompletableFuture&lt;Void&gt; processSubscriptionBilling(Subscription subscription) {
+<span class="fc" id="L144">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L146">        log.info(&quot;Processing billing for subscription: {} - CorrelationId: {}&quot;, </span>
+<span class="fc" id="L147">                   subscription.getSubscriptionId(), correlationId);</span>
+
+        try {
+            // Skip if subscription is not active
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (!subscription.isActive()) {</span>
+<span class="fc" id="L152">                log.warn(&quot;Skipping billing for inactive subscription: {}&quot;, </span>
+<span class="fc" id="L153">                           subscription.getSubscriptionId());</span>
+<span class="fc" id="L154">                return CompletableFuture.completedFuture(null);</span>
+            }
+
+            // Check if already billed for current period
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (isAlreadyBilled(subscription)) {</span>
+<span class="fc" id="L159">                log.info(&quot;Subscription already billed for current period: {}&quot;, </span>
+<span class="fc" id="L160">                           subscription.getSubscriptionId());</span>
+<span class="fc" id="L161">                return CompletableFuture.completedFuture(null);</span>
+            }
+
+            // Create invoice
+<span class="fc" id="L165">            SubscriptionInvoice invoice = createBillingInvoice(subscription);</span>
+            
+            // Attempt payment
+<span class="fc" id="L168">            boolean paymentSuccessful = attemptPayment(invoice);</span>
+            
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (paymentSuccessful) {</span>
+                // Advance billing cycle
+<span class="fc" id="L172">                subscription.advanceBillingCycle();</span>
+<span class="fc" id="L173">                subscriptionRepository.save(subscription);</span>
+                
+                // Send success notification
+<span class="fc" id="L176">                notificationService.sendBillingSuccessNotification(subscription, invoice);</span>
+                
+                // Record metrics
+<span class="fc" id="L179">                metricsService.recordSuccessfulBilling(subscription.getPlan().getPlanCode(), invoice.getAmount());</span>
+                
+<span class="fc" id="L181">                log.info(&quot;Billing successful for subscription: {}&quot;, subscription.getSubscriptionId());</span>
+            } else {
+                // Handle failed payment
+<span class="fc" id="L184">                handleFailedPayment(subscription, invoice);</span>
+                
+<span class="fc" id="L186">                log.warn(&quot;Billing failed for subscription: {}&quot;, subscription.getSubscriptionId());</span>
+            }
+
+<span class="fc" id="L189">        } catch (Exception e) {</span>
+<span class="fc" id="L190">            log.error(&quot;Error processing billing for subscription: {}&quot;, </span>
+<span class="fc" id="L191">                        subscription.getSubscriptionId(), e);</span>
+<span class="fc" id="L192">            metricsService.recordBillingError(subscription.getPlan().getPlanCode());</span>
+<span class="fc" id="L193">            throw new PaymentProcessingException(&quot;Billing processing failed&quot;, &quot;BILLING_ERROR&quot;, e);</span>
+<span class="fc" id="L194">        }</span>
+
+<span class="fc" id="L196">        return CompletableFuture.completedFuture(null);</span>
+    }
+
+    /**
+     * Retries a failed payment for an invoice.
+     * 
+     * @param invoice Invoice to retry payment for
+     */
+    public void retryFailedPayment(SubscriptionInvoice invoice) {
+<span class="fc" id="L205">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+        
+<span class="fc" id="L207">        log.info(&quot;Retrying failed payment for invoice: {} - Attempt: {} - CorrelationId: {}&quot;, </span>
+<span class="fc" id="L208">                   invoice.getInvoiceNumber(), invoice.getPaymentAttempts() + 1, correlationId);</span>
+
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (invoice.getPaymentAttempts() &gt;= MAX_RETRY_ATTEMPTS) {</span>
+<span class="fc" id="L211">            log.warn(&quot;Maximum retry attempts reached for invoice: {}&quot;, invoice.getInvoiceNumber());</span>
+<span class="fc" id="L212">            handleMaxRetriesReached(invoice);</span>
+<span class="fc" id="L213">            return;</span>
+        }
+
+<span class="fc" id="L216">        boolean paymentSuccessful = attemptPayment(invoice);</span>
+        
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (paymentSuccessful) {</span>
+<span class="fc" id="L219">            log.info(&quot;Retry payment successful for invoice: {}&quot;, invoice.getInvoiceNumber());</span>
+            
+            // Reactivate subscription if it was past due
+<span class="fc" id="L222">            Subscription subscription = invoice.getSubscription();</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (subscription.isPastDue()) {</span>
+<span class="fc" id="L224">                subscription.activate();</span>
+<span class="fc" id="L225">                subscriptionRepository.save(subscription);</span>
+<span class="fc" id="L226">                log.info(&quot;Subscription reactivated after successful payment: {}&quot;, </span>
+<span class="fc" id="L227">                           subscription.getSubscriptionId());</span>
+            }
+            
+            // Send success notification
+<span class="fc" id="L231">            notificationService.sendPaymentRetrySuccessNotification(subscription, invoice);</span>
+            
+<span class="fc" id="L233">        } else {</span>
+<span class="fc" id="L234">            log.warn(&quot;Retry payment failed for invoice: {}&quot;, invoice.getInvoiceNumber());</span>
+            
+            // Schedule next retry if within limits
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (invoice.getPaymentAttempts() &lt; MAX_RETRY_ATTEMPTS) {</span>
+<span class="fc" id="L238">                invoice.scheduleNextPaymentAttempt();</span>
+<span class="fc" id="L239">                invoiceRepository.save(invoice);</span>
+                
+                // Send retry notification
+<span class="fc" id="L242">                notificationService.sendPaymentRetryNotification(</span>
+<span class="fc" id="L243">                    invoice.getSubscription(), invoice, invoice.getPaymentAttempts());</span>
+            }
+        }
+        
+        // Record metrics
+<span class="fc" id="L248">        metricsService.recordPaymentRetry(</span>
+<span class="fc" id="L249">            invoice.getSubscription().getPlan().getPlanCode(), </span>
+<span class="fc" id="L250">            invoice.getPaymentAttempts(), </span>
+            paymentSuccessful);
+<span class="fc" id="L252">    }</span>
+
+    /**
+     * Creates a billing invoice for a subscription.
+     * 
+     * @param subscription Subscription to create invoice for
+     * @return Created invoice
+     */
+    private SubscriptionInvoice createBillingInvoice(Subscription subscription) {
+<span class="fc" id="L261">        String invoiceNumber = generateInvoiceNumber();</span>
+        
+<span class="fc" id="L263">        SubscriptionInvoice invoice = new SubscriptionInvoice();</span>
+<span class="fc" id="L264">        invoice.setInvoiceNumber(invoiceNumber);</span>
+<span class="fc" id="L265">        invoice.setSubscription(subscription);</span>
+<span class="fc" id="L266">        invoice.setCustomer(subscription.getCustomer());</span>
+<span class="fc" id="L267">        invoice.setAmount(subscription.getPlan().getAmount());</span>
+<span class="fc" id="L268">        invoice.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L269">        invoice.setStatus(&quot;PENDING&quot;);</span>
+<span class="fc" id="L270">        invoice.setPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L271">        invoice.setPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L272">        invoice.setDueDate(ZonedDateTime.now().plusDays(GRACE_PERIOD_DAYS));</span>
+<span class="fc" id="L273">        invoice.addMetadata(&quot;billingCycle&quot;, subscription.getPlan().getFormattedInterval());</span>
+<span class="fc" id="L274">        invoice.addMetadata(&quot;subscriptionId&quot;, subscription.getSubscriptionId());</span>
+        
+<span class="fc" id="L276">        invoice = invoiceRepository.save(invoice);</span>
+<span class="fc" id="L277">        subscription.addInvoice(invoice);</span>
+        
+<span class="fc" id="L279">        log.info(&quot;Created billing invoice: {} for subscription: {}&quot;, </span>
+<span class="fc" id="L280">                   invoiceNumber, subscription.getSubscriptionId());</span>
+        
+<span class="fc" id="L282">        return invoice;</span>
+    }
+
+    /**
+     * Attempts payment for an invoice.
+     * 
+     * @param invoice Invoice to process payment for
+     * @return true if payment successful, false otherwise
+     */
+    private boolean attemptPayment(SubscriptionInvoice invoice) {
+        try {
+<span class="fc" id="L293">            invoice.markAsProcessing();</span>
+<span class="fc" id="L294">            invoiceRepository.save(invoice);</span>
+            
+<span class="fc" id="L296">            Subscription subscription = invoice.getSubscription();</span>
+<span class="fc" id="L297">            PaymentMethod paymentMethod = subscription.getPaymentMethod();</span>
+            
+            // Create payment request
+<span class="fc" id="L300">            PurchaseRequest paymentRequest = createPaymentRequest(invoice, paymentMethod);</span>
+            
+            // Process payment
+<span class="fc" id="L303">            PaymentResponse paymentResponse = paymentService.processPurchase(paymentRequest);</span>
+            
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (paymentResponse.getSuccess()) {</span>
+                // Payment successful
+<span class="fc" id="L307">                invoice.markAsPaid(null); // TODO: Link to actual transaction</span>
+<span class="fc" id="L308">                invoiceRepository.save(invoice);</span>
+                
+<span class="fc" id="L310">                log.info(&quot;Payment successful for invoice: {}&quot;, invoice.getInvoiceNumber());</span>
+<span class="fc" id="L311">                return true;</span>
+                
+            } else {
+                // Payment failed
+<span class="fc" id="L315">                invoice.markAsFailed();</span>
+<span class="fc" id="L316">                invoiceRepository.save(invoice);</span>
+                
+<span class="fc" id="L318">                log.warn(&quot;Payment failed for invoice: {} - Reason: {}&quot;, </span>
+<span class="fc" id="L319">                           invoice.getInvoiceNumber(), paymentResponse.getMessage());</span>
+<span class="fc" id="L320">                return false;</span>
+            }
+            
+<span class="nc" id="L323">        } catch (Exception e) {</span>
+<span class="nc" id="L324">            log.error(&quot;Error processing payment for invoice: {}&quot;, invoice.getInvoiceNumber(), e);</span>
+            
+<span class="nc" id="L326">            invoice.markAsFailed();</span>
+<span class="nc" id="L327">            invoiceRepository.save(invoice);</span>
+            
+<span class="nc" id="L329">            return false;</span>
+        }
+    }
+
+    private PurchaseRequest createPaymentRequest(SubscriptionInvoice invoice, PaymentMethod paymentMethod) {
+<span class="fc" id="L334">        PurchaseRequest request = new PurchaseRequest();</span>
+<span class="fc" id="L335">        request.setAmount(invoice.getAmount());</span>
+<span class="fc" id="L336">        request.setCurrency(invoice.getCurrency());</span>
+<span class="fc" id="L337">        request.setDescription(&quot;Subscription billing for &quot; + invoice.getSubscription().getPlan().getName());</span>
+<span class="fc" id="L338">        request.setCustomerId(invoice.getCustomer().getCustomerId());</span>
+<span class="fc" id="L339">        request.setInvoiceNumber(invoice.getInvoiceNumber());</span>
+        
+        // Create payment method request
+<span class="fc" id="L342">        PaymentMethodRequest pmRequest = new PaymentMethodRequest();</span>
+<span class="fc" id="L343">        pmRequest.setType(paymentMethod.getType());</span>
+<span class="fc" id="L344">        pmRequest.setCardNumber(paymentMethod.getCardNumber());</span>
+<span class="fc" id="L345">        pmRequest.setExpiryMonth(paymentMethod.getExpiryMonth());</span>
+<span class="fc" id="L346">        pmRequest.setExpiryYear(paymentMethod.getExpiryYear());</span>
+<span class="fc" id="L347">        pmRequest.setCvv(paymentMethod.getCvv());</span>
+<span class="fc" id="L348">        pmRequest.setCardholderName(paymentMethod.getCardholderName());</span>
+        
+<span class="fc" id="L350">        request.setPaymentMethod(pmRequest);</span>
+        
+        // Set idempotency key
+<span class="fc" id="L353">        request.setIdempotencyKey(&quot;billing_&quot; + invoice.getInvoiceNumber() + &quot;_attempt_&quot; + </span>
+<span class="fc" id="L354">                                (invoice.getPaymentAttempts() + 1));</span>
+        
+<span class="fc" id="L356">        return request;</span>
+    }
+
+    private void handleFailedPayment(Subscription subscription, SubscriptionInvoice invoice) {
+        // Schedule retry
+<span class="fc" id="L361">        invoice.scheduleNextPaymentAttempt();</span>
+<span class="fc" id="L362">        invoiceRepository.save(invoice);</span>
+        
+        // Update subscription status if this is first failure
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (invoice.getPaymentAttempts() == 1) {</span>
+<span class="nc" id="L366">            subscription.markAsPastDue();</span>
+<span class="nc" id="L367">            subscriptionRepository.save(subscription);</span>
+        }
+        
+        // Send failed payment notification
+<span class="fc" id="L371">        notificationService.sendPaymentFailedNotification(subscription, invoice);</span>
+        
+        // Record metrics
+<span class="fc" id="L374">        metricsService.recordFailedBilling(subscription.getPlan().getPlanCode(), invoice.getAmount());</span>
+<span class="fc" id="L375">    }</span>
+
+    private void handleMaxRetriesReached(SubscriptionInvoice invoice) {
+<span class="fc" id="L378">        Subscription subscription = invoice.getSubscription();</span>
+        
+<span class="fc" id="L380">        log.warn(&quot;Maximum retries reached for subscription: {}&quot;, subscription.getSubscriptionId());</span>
+        
+        // Cancel subscription after max retries
+<span class="fc" id="L383">        subscription.cancel(&quot;Payment failures - max retry attempts reached&quot;);</span>
+<span class="fc" id="L384">        subscriptionRepository.save(subscription);</span>
+        
+        // Mark invoice as cancelled
+<span class="fc" id="L387">        invoice.markAsCancelled();</span>
+<span class="fc" id="L388">        invoiceRepository.save(invoice);</span>
+        
+        // Send final notice
+<span class="fc" id="L391">        notificationService.sendSubscriptionCancelledNotification(subscription, </span>
+            &quot;Subscription cancelled due to repeated payment failures&quot;);
+        
+        // Record metrics
+<span class="fc" id="L395">        metricsService.recordSubscriptionCancelledForNonPayment(subscription.getPlan().getPlanCode());</span>
+<span class="fc" id="L396">    }</span>
+
+    private boolean isAlreadyBilled(Subscription subscription) {
+        // Check if there's already a pending or paid invoice for current period
+<span class="fc" id="L400">        List&lt;SubscriptionInvoice&gt; periodInvoices = invoiceRepository</span>
+<span class="fc" id="L401">            .findBySubscriptionAndPeriodStartAndPeriodEnd(</span>
+                subscription, 
+<span class="fc" id="L403">                subscription.getCurrentPeriodStart(), </span>
+<span class="fc" id="L404">                subscription.getCurrentPeriodEnd());</span>
+        
+<span class="fc" id="L406">        return periodInvoices.stream()</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            .anyMatch(inv -&gt; &quot;PENDING&quot;.equals(inv.getStatus()) || </span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                           &quot;PAID&quot;.equals(inv.getStatus()) || </span>
+<span class="pc bnc" id="L409" title="All 2 branches missed.">                           &quot;PROCESSING&quot;.equals(inv.getStatus()));</span>
+    }
+
+    private void handleTrialExpirations() {
+<span class="fc" id="L413">        List&lt;Subscription&gt; trialExpiringSubscriptions = subscriptionRepository</span>
+<span class="fc" id="L414">            .findSubscriptionsEndingTrial(ZonedDateTime.now());</span>
+        
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        for (Subscription subscription : trialExpiringSubscriptions) {</span>
+<span class="fc" id="L417">            log.info(&quot;Processing trial expiration for subscription: {}&quot;, </span>
+<span class="fc" id="L418">                       subscription.getSubscriptionId());</span>
+            
+            // Start regular billing cycle
+<span class="fc" id="L421">            subscription.calculateNextBillingCycle();</span>
+<span class="fc" id="L422">            subscriptionRepository.save(subscription);</span>
+            
+            // Send trial expiration notification
+<span class="fc" id="L425">            notificationService.sendTrialExpirationNotification(subscription);</span>
+            
+            // Process immediate billing
+<span class="fc" id="L428">            processSubscriptionBilling(subscription);</span>
+<span class="fc" id="L429">        }</span>
+<span class="fc" id="L430">    }</span>
+
+    private void handlePastDueSubscriptions() {
+<span class="fc" id="L433">        List&lt;Subscription&gt; pastDueSubscriptions = subscriptionRepository</span>
+<span class="fc" id="L434">            .findByStatus(SubscriptionStatus.PAST_DUE);</span>
+        
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (Subscription subscription : pastDueSubscriptions) {</span>
+            // Check if subscription should be cancelled for non-payment
+<span class="fc" id="L438">            List&lt;SubscriptionInvoice&gt; unpaidInvoices = subscription.getUnpaidInvoices();</span>
+            
+<span class="fc" id="L440">            boolean shouldCancel = unpaidInvoices.stream()</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                .anyMatch(inv -&gt; inv.getPaymentAttempts() &gt;= MAX_RETRY_ATTEMPTS);</span>
+            
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (shouldCancel) {</span>
+<span class="fc" id="L444">                subscription.cancel(&quot;Cancelled for non-payment&quot;);</span>
+<span class="fc" id="L445">                subscriptionRepository.save(subscription);</span>
+                
+<span class="fc" id="L447">                notificationService.sendSubscriptionCancelledNotification(subscription, </span>
+                    &quot;Subscription cancelled due to non-payment&quot;);
+                
+<span class="fc" id="L450">                log.info(&quot;Cancelled past due subscription: {}&quot;, subscription.getSubscriptionId());</span>
+            }
+<span class="fc" id="L452">        }</span>
+<span class="fc" id="L453">    }</span>
+
+    private void handleScheduledCancellations() {
+<span class="fc" id="L456">        List&lt;Subscription&gt; scheduledCancellations = subscriptionRepository</span>
+<span class="fc" id="L457">            .findSubscriptionsWithScheduledCancellation(ZonedDateTime.now());</span>
+        
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        for (Subscription subscription : scheduledCancellations) {</span>
+<span class="fc" id="L460">            String reason = (String) subscription.getMetadata().get(&quot;cancellationReason&quot;);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            subscription.cancel(reason != null ? reason : &quot;Scheduled cancellation&quot;);</span>
+            
+<span class="fc" id="L463">            subscriptionRepository.save(subscription);</span>
+            
+<span class="fc" id="L465">            notificationService.sendSubscriptionCancelledNotification(subscription, reason);</span>
+            
+<span class="fc" id="L467">            log.info(&quot;Processed scheduled cancellation for subscription: {}&quot;, </span>
+<span class="fc" id="L468">                       subscription.getSubscriptionId());</span>
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">    }</span>
+
+    private void handleScheduledPlanChanges() {
+<span class="fc" id="L473">        List&lt;Subscription&gt; scheduledPlanChanges = subscriptionRepository</span>
+<span class="fc" id="L474">            .findSubscriptionsWithScheduledPlanChange(ZonedDateTime.now());</span>
+        
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        for (Subscription subscription : scheduledPlanChanges) {</span>
+<span class="fc" id="L477">            String newPlanCode = (String) subscription.getMetadata().get(&quot;scheduledPlanChange&quot;);</span>
+            
+            // Implementation would require plan repository lookup and plan change logic
+<span class="fc" id="L480">            log.info(&quot;Processing scheduled plan change for subscription: {} to plan: {}&quot;, </span>
+<span class="fc" id="L481">                       subscription.getSubscriptionId(), newPlanCode);</span>
+            
+            // Remove scheduled change metadata
+<span class="fc" id="L484">            subscription.getMetadata().remove(&quot;scheduledPlanChange&quot;);</span>
+<span class="fc" id="L485">            subscription.getMetadata().remove(&quot;planChangeDate&quot;);</span>
+            
+<span class="fc" id="L487">            subscriptionRepository.save(subscription);</span>
+<span class="fc" id="L488">        }</span>
+<span class="fc" id="L489">    }</span>
+
+    private String generateInvoiceNumber() {
+<span class="fc" id="L492">        return &quot;INV_&quot; + System.currentTimeMillis() + &quot;_&quot; + </span>
+<span class="fc" id="L493">               UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 8);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,1306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">PaymentService.java</span></div><h1>PaymentService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.config.AuthorizeNetConfig;
+import com.talentica.paymentgateway.dto.payment.*;
+import com.talentica.paymentgateway.entity.*;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.repository.TransactionRepository;
+import com.talentica.paymentgateway.repository.PaymentMethodRepository;
+import com.talentica.paymentgateway.repository.OrderRepository;
+import com.talentica.paymentgateway.repository.CustomerRepository;
+import com.talentica.paymentgateway.util.AuthorizeNetMapper;
+import lombok.extern.slf4j.Slf4j;
+import net.authorize.Environment;
+import net.authorize.api.contract.v1.*;
+import net.authorize.api.controller.CreateTransactionController;
+import net.authorize.api.controller.GetTransactionDetailsController;
+import net.authorize.api.controller.base.ApiOperationBase;
+
+import org.slf4j.MDC;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Service class for processing payments through Authorize.Net.
+ * Handles all payment operations including purchase, authorize, capture, refund, and void.
+ * 
+ * Features:
+ * - Idempotency support to prevent duplicate transactions
+ * - Comprehensive error handling
+ * - Transaction logging and audit trail
+ * - Integration with Authorize.Net SDK
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L43">@Slf4j</span>
+@Service
+@Transactional
+public class PaymentService {
+
+    private final AuthorizeNetConfig config;
+    private final MerchantAuthenticationType merchant;
+    private final Environment environment;
+    private final AuthorizeNetMapper mapper;
+    private final TransactionRepository transactionRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+    private final OrderRepository orderRepository;
+    private final CustomerRepository customerRepository;
+    private final MetricsService metricsService;
+    private final AuthorizeNetCustomerService authorizeNetCustomerService;
+
+    public PaymentService(AuthorizeNetConfig config,
+                         MerchantAuthenticationType merchant,
+                         Environment environment,
+                         AuthorizeNetMapper mapper,
+                         TransactionRepository transactionRepository,
+                         PaymentMethodRepository paymentMethodRepository,
+                         OrderRepository orderRepository,
+                         CustomerRepository customerRepository,
+                         MetricsService metricsService,
+<span class="fc" id="L68">                         AuthorizeNetCustomerService authorizeNetCustomerService) {</span>
+<span class="fc" id="L69">        this.config = config;</span>
+<span class="fc" id="L70">        this.merchant = merchant;</span>
+<span class="fc" id="L71">        this.environment = environment;</span>
+<span class="fc" id="L72">        this.mapper = mapper;</span>
+<span class="fc" id="L73">        this.transactionRepository = transactionRepository;</span>
+<span class="fc" id="L74">        this.paymentMethodRepository = paymentMethodRepository;</span>
+<span class="fc" id="L75">        this.orderRepository = orderRepository;</span>
+<span class="fc" id="L76">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L77">        this.metricsService = metricsService;</span>
+<span class="fc" id="L78">        this.authorizeNetCustomerService = authorizeNetCustomerService;</span>
+        
+        // Set environment for Authorize.Net SDK
+<span class="fc" id="L81">        ApiOperationBase.setEnvironment(environment);</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * Processes a direct purchase transaction (auth + capture).
+     * 
+     * @param request Purchase request details
+     * @return Payment response with transaction results
+     * @throws PaymentProcessingException if payment processing fails
+     */
+    public PaymentResponse processPurchase(PurchaseRequest request) {
+<span class="fc" id="L92">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="fc" id="L93">        String transactionId = mapper.generateTransactionId();</span>
+<span class="fc" id="L94">        Instant startTime = Instant.now();</span>
+        
+<span class="fc" id="L96">        log.info(&quot;Processing purchase transaction - TransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L97">                   transactionId, request.getAmount(), correlationId);</span>
+
+        // Track payment request metrics
+<span class="fc" id="L100">        metricsService.recordPaymentRequest();</span>
+<span class="fc" id="L101">        metricsService.recordPaymentMethodUsage(&quot;credit_card&quot;); // Assuming credit card for now</span>
+
+        // Check for idempotency
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (request.getIdempotencyKey() != null) {</span>
+<span class="fc" id="L105">            Optional&lt;Transaction&gt; existingTransaction = transactionRepository</span>
+<span class="fc" id="L106">                .findByIdempotencyKey(request.getIdempotencyKey());</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (existingTransaction.isPresent()) {</span>
+<span class="fc" id="L108">                log.info(&quot;Returning existing transaction for idempotency key: {}&quot;, </span>
+<span class="fc" id="L109">                           request.getIdempotencyKey());</span>
+                
+                // Track metrics for idempotent request
+<span class="fc" id="L112">                Duration processingTime = Duration.between(startTime, Instant.now());</span>
+<span class="fc" id="L113">                metricsService.recordTransaction(TransactionType.PURCHASE, processingTime);</span>
+                
+<span class="fc" id="L115">                return buildResponseFromTransaction(existingTransaction.get());</span>
+            }
+        }
+
+        try {
+            // Validate payment method
+<span class="fc" id="L121">            validatePaymentMethod(request.getPaymentMethod());</span>
+
+            // Create transaction entity
+<span class="fc" id="L124">            Transaction transaction = createTransactionEntity(request, transactionId, </span>
+                                                            TransactionType.PURCHASE, correlationId);
+<span class="fc" id="L126">            transaction = transactionRepository.save(transaction);</span>
+
+            // Map to Authorize.Net request
+<span class="fc" id="L129">            CreateTransactionRequest authNetRequest = mapper.mapToPurchaseTransaction(request, merchant);</span>
+            
+            // Execute payment
+<span class="fc" id="L132">            CreateTransactionController controller = new CreateTransactionController(authNetRequest);</span>
+<span class="fc" id="L133">            controller.execute();</span>
+<span class="fc" id="L134">            CreateTransactionResponse response = controller.getApiResponse();</span>
+
+            // Process response
+<span class="fc" id="L137">            PaymentResponse paymentResponse = mapper.mapToPaymentResponse(</span>
+<span class="fc" id="L138">                response, transactionId, &quot;PURCHASE&quot;, request.getPaymentMethod(), correlationId);</span>
+            
+            // Set the amount from the original request as mapper can't extract it from Authorize.Net response
+<span class="fc" id="L141">            paymentResponse.setAmount(request.getAmount());</span>
+
+            // Add customer information to response
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (transaction.getCustomer() != null) {</span>
+<span class="nc" id="L145">                Customer customer = transaction.getCustomer();</span>
+<span class="nc" id="L146">                paymentResponse.setCustomerId(customer.getCustomerId()); </span>
+<span class="nc" id="L147">                paymentResponse.setCustomerReference(customer.getCustomerReference());</span>
+<span class="nc" id="L148">                paymentResponse.setCustomerProfileId(customer.getAuthorizeNetCustomerProfileId());</span>
+            }
+
+            // Update transaction with results
+<span class="fc" id="L152">            updateTransactionFromResponse(transaction, paymentResponse, response);</span>
+<span class="fc" id="L153">            transactionRepository.save(transaction);</span>
+
+<span class="fc" id="L155">            log.info(&quot;Purchase transaction completed - TransactionId: {}, Status: {}, Success: {}&quot;, </span>
+<span class="fc" id="L156">                       transactionId, paymentResponse.getStatus(), paymentResponse.getSuccess());</span>
+
+            // Track metrics for successful completion
+<span class="fc" id="L159">            Duration processingTime = Duration.between(startTime, Instant.now());</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            PaymentStatus status = paymentResponse.getSuccess() ? PaymentStatus.SETTLED : PaymentStatus.FAILED;</span>
+<span class="fc" id="L161">            metricsService.recordPaymentCompletion(status, request.getAmount(), processingTime);</span>
+<span class="fc" id="L162">            metricsService.recordTransaction(TransactionType.PURCHASE, processingTime);</span>
+
+<span class="fc" id="L164">            return paymentResponse;</span>
+
+<span class="fc" id="L166">        } catch (Exception e) {</span>
+<span class="fc" id="L167">            log.error(&quot;Purchase transaction failed - TransactionId: {}, Error: {}&quot;, </span>
+<span class="fc" id="L168">                        transactionId, e.getMessage(), e);</span>
+            
+            // Track metrics for error
+<span class="fc" id="L171">            Duration processingTime = Duration.between(startTime, Instant.now());</span>
+<span class="fc" id="L172">            metricsService.recordPaymentCompletion(PaymentStatus.FAILED, request.getAmount(), processingTime);</span>
+<span class="fc" id="L173">            metricsService.recordPaymentError(&quot;processing_exception&quot;, e.getClass().getSimpleName());</span>
+            
+            // Update transaction status to failed
+<span class="fc" id="L176">            updateTransactionStatus(transactionId, PaymentStatus.FAILED, e.getMessage());</span>
+            
+<span class="fc" id="L178">            throw new PaymentProcessingException(&quot;Purchase transaction failed&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Processes an authorization-only transaction.
+     * 
+     * @param request Authorization request details
+     * @return Payment response with authorization results
+     * @throws PaymentProcessingException if authorization fails
+     */
+    public PaymentResponse processAuthorization(AuthorizeRequest request) {
+<span class="fc" id="L190">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="fc" id="L191">        String transactionId = mapper.generateTransactionId();</span>
+        
+<span class="fc" id="L193">        log.info(&quot;Processing authorization transaction - TransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L194">                   transactionId, request.getAmount(), correlationId);</span>
+
+        // Check for idempotency
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (request.getIdempotencyKey() != null) {</span>
+<span class="fc" id="L198">            Optional&lt;Transaction&gt; existingTransaction = transactionRepository</span>
+<span class="fc" id="L199">                .findByIdempotencyKey(request.getIdempotencyKey());</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (existingTransaction.isPresent()) {</span>
+<span class="fc" id="L201">                log.info(&quot;Returning existing transaction for idempotency key: {}&quot;, </span>
+<span class="fc" id="L202">                           request.getIdempotencyKey());</span>
+<span class="fc" id="L203">                return buildResponseFromTransaction(existingTransaction.get());</span>
+            }
+        }
+
+        try {
+            // Validate payment method
+<span class="fc" id="L209">            validatePaymentMethod(request.getPaymentMethod());</span>
+
+            // Create transaction entity
+<span class="fc" id="L212">            Transaction transaction = createTransactionEntity(request, transactionId, </span>
+                                                            TransactionType.AUTHORIZE, correlationId);
+<span class="fc" id="L214">            transaction = transactionRepository.save(transaction);</span>
+
+            // Map to Authorize.Net request
+<span class="fc" id="L217">            CreateTransactionRequest authNetRequest = mapper.mapToAuthorizeTransaction(request, merchant);</span>
+            
+            // Execute authorization
+<span class="fc" id="L220">            CreateTransactionController controller = new CreateTransactionController(authNetRequest);</span>
+<span class="fc" id="L221">            controller.execute();</span>
+<span class="fc" id="L222">            CreateTransactionResponse response = controller.getApiResponse();</span>
+
+            // Process response
+<span class="fc" id="L225">            PaymentResponse paymentResponse = mapper.mapToPaymentResponse(</span>
+<span class="fc" id="L226">                response, transactionId, &quot;AUTHORIZE&quot;, request.getPaymentMethod(), correlationId);</span>
+            
+            // Set the amount from the original request
+<span class="fc" id="L229">            paymentResponse.setAmount(request.getAmount());</span>
+
+            // Update transaction with results
+<span class="fc" id="L232">            updateTransactionFromResponse(transaction, paymentResponse, response);</span>
+<span class="fc" id="L233">            transactionRepository.save(transaction);</span>
+
+<span class="fc" id="L235">            log.info(&quot;Authorization transaction completed - TransactionId: {}, Status: {}, Success: {}&quot;, </span>
+<span class="fc" id="L236">                       transactionId, paymentResponse.getStatus(), paymentResponse.getSuccess());</span>
+
+<span class="fc" id="L238">            return paymentResponse;</span>
+
+<span class="fc" id="L240">        } catch (Exception e) {</span>
+<span class="fc" id="L241">            log.error(&quot;Authorization transaction failed - TransactionId: {}, Error: {}&quot;, </span>
+<span class="fc" id="L242">                        transactionId, e.getMessage(), e);</span>
+            
+            // Update transaction status to failed
+<span class="fc" id="L245">            updateTransactionStatus(transactionId, PaymentStatus.FAILED, e.getMessage());</span>
+            
+<span class="fc" id="L247">            throw new PaymentProcessingException(&quot;Authorization transaction failed&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Captures a previously authorized transaction.
+     * 
+     * @param request Capture request details
+     * @return Payment response with capture results
+     * @throws PaymentProcessingException if capture fails
+     */
+    public PaymentResponse processCapture(CaptureRequest request) {
+<span class="fc" id="L259">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="fc" id="L260">        String transactionId = mapper.generateTransactionId();</span>
+        
+<span class="fc" id="L262">        log.info(&quot;Processing capture request - AuthTransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L263">                   request.getTransactionId(), request.getAmount(), correlationId);</span>
+
+        // Find original authorization transaction
+<span class="fc" id="L266">        Optional&lt;Transaction&gt; originalTransaction = transactionRepository</span>
+<span class="fc" id="L267">            .findByTransactionId(request.getTransactionId());</span>
+        
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (originalTransaction.isEmpty()) {</span>
+<span class="fc" id="L270">            throw new PaymentProcessingException(&quot;Original authorization transaction not found: &quot; + </span>
+<span class="fc" id="L271">                                               request.getTransactionId(), correlationId);</span>
+        }
+
+<span class="fc" id="L274">        Transaction authTransaction = originalTransaction.get();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (authTransaction.getStatus() != PaymentStatus.AUTHORIZED) {</span>
+<span class="fc" id="L276">            throw new PaymentProcessingException(&quot;Transaction is not in authorized status: &quot; + </span>
+<span class="fc" id="L277">                                               authTransaction.getStatus(), correlationId);</span>
+        }
+
+        try {
+            // Create capture transaction entity
+<span class="fc" id="L282">            Transaction transaction = createBasicTransactionEntity(transactionId, TransactionType.CAPTURE, </span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                                                                 request.getAmount() != null ? request.getAmount() : authTransaction.getAmount(),</span>
+<span class="fc" id="L284">                                                                 correlationId, request.getIdempotencyKey());</span>
+<span class="fc" id="L285">            transaction.setParentTransaction(authTransaction);</span>
+<span class="fc" id="L286">            transaction.setOrder(authTransaction.getOrder());</span>
+<span class="fc" id="L287">            transaction.setCustomer(authTransaction.getCustomer());</span>
+<span class="fc" id="L288">            transaction.setPaymentMethod(authTransaction.getPaymentMethod());</span>
+<span class="fc" id="L289">            transaction = transactionRepository.save(transaction);</span>
+
+            // Map to Authorize.Net request
+<span class="fc" id="L292">            CreateTransactionRequest authNetRequest = mapper.mapToCaptureTransaction(</span>
+<span class="fc" id="L293">                request, authTransaction.getAuthnetTransactionId(), merchant);</span>
+            
+            // Execute capture
+<span class="fc" id="L296">            CreateTransactionController controller = new CreateTransactionController(authNetRequest);</span>
+<span class="fc" id="L297">            controller.execute();</span>
+<span class="fc" id="L298">            CreateTransactionResponse response = controller.getApiResponse();</span>
+
+            // Log detailed Authorize.Net response for debugging
+<span class="fc" id="L301">            log.info(&quot;Authorize.Net Capture Response - TransactionId: {}, ResultCode: {}, MessageCount: {}&quot;, </span>
+                       transactionId, 
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getResultCode() : &quot;NULL&quot;,</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getMessage().size() : 0);</span>
+            
+<span class="pc bpc" id="L306" title="2 of 4 branches missed.">            if (response.getMessages() != null &amp;&amp; response.getMessages().getMessage() != null) {</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                for (var message : response.getMessages().getMessage()) {</span>
+<span class="nc" id="L308">                    log.info(&quot;Authorize.Net Message - Code: {}, Text: {}&quot;, message.getCode(), message.getText());</span>
+<span class="nc" id="L309">                }</span>
+            }
+            
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            if (response.getTransactionResponse() != null) {</span>
+<span class="fc" id="L313">                log.info(&quot;Transaction Response - ResponseCode: {}, AuthCode: {}, TransId: {}&quot;, </span>
+<span class="fc" id="L314">                           response.getTransactionResponse().getResponseCode(),</span>
+<span class="fc" id="L315">                           response.getTransactionResponse().getAuthCode(),</span>
+<span class="fc" id="L316">                           response.getTransactionResponse().getTransId());</span>
+                
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                if (response.getTransactionResponse().getErrors() != null) {</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">                    for (var error : response.getTransactionResponse().getErrors().getError()) {</span>
+<span class="nc" id="L320">                        log.error(&quot;Transaction Error - Code: {}, Text: {}&quot;, error.getErrorCode(), error.getErrorText());</span>
+<span class="nc" id="L321">                    }</span>
+                }
+            }
+
+            // Process response
+<span class="fc" id="L326">            PaymentResponse paymentResponse = mapper.mapToPaymentResponse(</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                response, transactionId, &quot;CAPTURE&quot;, authTransaction.getPaymentMethod() != null ? </span>
+<span class="pc" id="L328">                    convertToPaymentMethodRequest(authTransaction.getPaymentMethod()) : null, correlationId);</span>
+            
+            // Set the amount from the capture request
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            paymentResponse.setAmount(request.getAmount() != null ? request.getAmount() : authTransaction.getAmount());</span>
+
+            // Update transaction with results
+<span class="fc" id="L334">            updateTransactionFromResponse(transaction, paymentResponse, response);</span>
+<span class="fc" id="L335">            transactionRepository.save(transaction);</span>
+
+            // Update original authorization status if capture was successful
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (paymentResponse.getSuccess()) {</span>
+<span class="fc" id="L339">                authTransaction.setStatus(PaymentStatus.CAPTURED);</span>
+<span class="fc" id="L340">                transactionRepository.save(authTransaction);</span>
+            }
+
+<span class="fc" id="L343">            log.info(&quot;Capture transaction completed - TransactionId: {}, Status: {}, Success: {}&quot;, </span>
+<span class="fc" id="L344">                       transactionId, paymentResponse.getStatus(), paymentResponse.getSuccess());</span>
+
+<span class="fc" id="L346">            return paymentResponse;</span>
+
+<span class="nc" id="L348">        } catch (Exception e) {</span>
+<span class="nc" id="L349">            log.error(&quot;Capture transaction failed - TransactionId: {}, Error: {}&quot;, </span>
+<span class="nc" id="L350">                        transactionId, e.getMessage(), e);</span>
+            
+            // Update transaction status to failed
+<span class="nc" id="L353">            updateTransactionStatus(transactionId, PaymentStatus.FAILED, e.getMessage());</span>
+            
+<span class="nc" id="L355">            throw new PaymentProcessingException(&quot;Capture transaction failed&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Processes a void transaction.
+     * 
+     * @param request Void request details
+     * @return Payment response with void results
+     * @throws PaymentProcessingException if void fails
+     */
+    public PaymentResponse processVoid(VoidRequest request) {
+<span class="fc" id="L367">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="fc" id="L368">        String transactionId = mapper.generateTransactionId();</span>
+        
+<span class="fc" id="L370">        log.info(&quot;Processing void request - OriginalTransactionId: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L371">                   request.getTransactionId(), correlationId);</span>
+
+        // Find original transaction
+<span class="fc" id="L374">        Optional&lt;Transaction&gt; originalTransaction = transactionRepository</span>
+<span class="fc" id="L375">            .findByTransactionId(request.getTransactionId());</span>
+        
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (originalTransaction.isEmpty()) {</span>
+<span class="fc" id="L378">            throw new PaymentProcessingException(&quot;Original transaction not found: &quot; + </span>
+<span class="fc" id="L379">                                               request.getTransactionId(), correlationId);</span>
+        }
+
+<span class="fc" id="L382">        Transaction origTransaction = originalTransaction.get();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (origTransaction.getStatus() != PaymentStatus.AUTHORIZED) {</span>
+<span class="fc" id="L384">            throw new PaymentProcessingException(&quot;Only authorized transactions can be voided: &quot; + </span>
+<span class="fc" id="L385">                                               origTransaction.getStatus(), correlationId);</span>
+        }
+
+        try {
+            // Create void transaction entity - use original amount since voids don't have separate amounts
+<span class="fc" id="L390">            Transaction transaction = createBasicTransactionEntity(transactionId, TransactionType.VOID, </span>
+<span class="fc" id="L391">                                                                 origTransaction.getAmount(), correlationId, request.getIdempotencyKey());</span>
+<span class="fc" id="L392">            transaction.setParentTransaction(origTransaction);</span>
+<span class="fc" id="L393">            transaction.setOrder(origTransaction.getOrder());</span>
+<span class="fc" id="L394">            transaction.setCustomer(origTransaction.getCustomer());</span>
+<span class="fc" id="L395">            transaction.setPaymentMethod(origTransaction.getPaymentMethod());</span>
+<span class="fc" id="L396">            transaction = transactionRepository.save(transaction);</span>
+
+            // Map to Authorize.Net request
+<span class="fc" id="L399">            CreateTransactionRequest authNetRequest = mapper.mapToVoidTransaction(</span>
+<span class="fc" id="L400">                request, origTransaction.getAuthnetTransactionId(), merchant);</span>
+            
+            // Execute void
+<span class="fc" id="L403">            CreateTransactionController controller = new CreateTransactionController(authNetRequest);</span>
+<span class="fc" id="L404">            controller.execute();</span>
+<span class="fc" id="L405">            CreateTransactionResponse response = controller.getApiResponse();</span>
+
+            // Log detailed Authorize.Net response for debugging
+<span class="fc" id="L408">            log.info(&quot;Authorize.Net Void Response - TransactionId: {}, ResultCode: {}, MessageCount: {}&quot;, </span>
+                       transactionId, 
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getResultCode() : &quot;NULL&quot;,</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getMessage().size() : 0);</span>
+            
+<span class="pc bpc" id="L413" title="2 of 4 branches missed.">            if (response.getMessages() != null &amp;&amp; response.getMessages().getMessage() != null) {</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                for (var message : response.getMessages().getMessage()) {</span>
+<span class="nc" id="L415">                    log.info(&quot;Authorize.Net Message - Code: {}, Text: {}&quot;, message.getCode(), message.getText());</span>
+<span class="nc" id="L416">                }</span>
+            }
+            
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (response.getTransactionResponse() != null) {</span>
+<span class="fc" id="L420">                log.info(&quot;Transaction Response - ResponseCode: {}, AuthCode: {}, TransId: {}&quot;, </span>
+<span class="fc" id="L421">                           response.getTransactionResponse().getResponseCode(),</span>
+<span class="fc" id="L422">                           response.getTransactionResponse().getAuthCode(),</span>
+<span class="fc" id="L423">                           response.getTransactionResponse().getTransId());</span>
+                
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                if (response.getTransactionResponse().getErrors() != null) {</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                    for (var error : response.getTransactionResponse().getErrors().getError()) {</span>
+<span class="nc" id="L427">                        log.error(&quot;Transaction Error - Code: {}, Text: {}&quot;, error.getErrorCode(), error.getErrorText());</span>
+<span class="nc" id="L428">                    }</span>
+                }
+            }
+
+            // Process response - void transactions don't need payment method details, pass null
+<span class="fc" id="L433">            PaymentResponse paymentResponse = mapper.mapToPaymentResponse(</span>
+                response, transactionId, &quot;VOID&quot;, null, correlationId);
+            
+            // Set original amount for void transactions (voids reference the original amount)
+<span class="fc" id="L437">            paymentResponse.setAmount(origTransaction.getAmount());</span>
+
+            // Update transaction with results
+<span class="fc" id="L440">            updateTransactionFromResponse(transaction, paymentResponse, response);</span>
+<span class="fc" id="L441">            transactionRepository.save(transaction);</span>
+
+            // Update original transaction status if void was successful
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">            if (paymentResponse.getSuccess()) {</span>
+<span class="fc" id="L445">                origTransaction.setStatus(PaymentStatus.VOIDED);</span>
+<span class="fc" id="L446">                transactionRepository.save(origTransaction);</span>
+            }
+
+<span class="fc" id="L449">            log.info(&quot;Void transaction completed - TransactionId: {}, Status: {}, Success: {}&quot;, </span>
+<span class="fc" id="L450">                       transactionId, paymentResponse.getStatus(), paymentResponse.getSuccess());</span>
+
+<span class="fc" id="L452">            return paymentResponse;</span>
+
+<span class="nc" id="L454">        } catch (Exception e) {</span>
+<span class="nc" id="L455">            log.error(&quot;Void transaction failed - TransactionId: {}, Error: {}&quot;, </span>
+<span class="nc" id="L456">                        transactionId, e.getMessage(), e);</span>
+            
+            // Update transaction status to failed
+<span class="nc" id="L459">            updateTransactionStatus(transactionId, PaymentStatus.FAILED, e.getMessage());</span>
+            
+<span class="nc" id="L461">            throw new PaymentProcessingException(&quot;Void transaction failed&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Processes a refund transaction (full or partial).
+     * 
+     * @param request Refund request details
+     * @return Payment response with refund results
+     * @throws PaymentProcessingException if refund fails
+     */
+    public PaymentResponse processRefund(RefundRequest request) {
+<span class="fc" id="L473">        String correlationId = getOrGenerateCorrelationId();</span>
+<span class="fc" id="L474">        String transactionId = mapper.generateTransactionId();</span>
+        
+<span class="fc" id="L476">        log.info(&quot;Processing refund request - OriginalTransactionId: {}, Amount: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L477">                   request.getTransactionId(), request.getAmount(), correlationId);</span>
+
+        // Check for idempotency
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (request.getIdempotencyKey() != null) {</span>
+<span class="fc" id="L481">            Optional&lt;Transaction&gt; existingTransaction = transactionRepository</span>
+<span class="fc" id="L482">                .findByIdempotencyKey(request.getIdempotencyKey());</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            if (existingTransaction.isPresent()) {</span>
+<span class="fc" id="L484">                log.info(&quot;Returning existing transaction for idempotency key: {}&quot;, </span>
+<span class="fc" id="L485">                           request.getIdempotencyKey());</span>
+<span class="fc" id="L486">                return buildResponseFromTransaction(existingTransaction.get());</span>
+            }
+        }
+
+        // Find original transaction with payment method eagerly loaded
+<span class="fc" id="L491">        Optional&lt;Transaction&gt; originalTransaction = transactionRepository</span>
+<span class="fc" id="L492">            .findByTransactionIdWithPaymentMethod(request.getTransactionId());</span>
+        
+<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (originalTransaction.isEmpty()) {</span>
+<span class="fc" id="L495">            throw new PaymentProcessingException(&quot;Original transaction not found: &quot; + </span>
+<span class="fc" id="L496">                                               request.getTransactionId(), correlationId);</span>
+        }
+
+<span class="fc" id="L499">        Transaction origTransaction = originalTransaction.get();</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (origTransaction.getStatus() != PaymentStatus.CAPTURED &amp;&amp; </span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">            origTransaction.getStatus() != PaymentStatus.SETTLED) {</span>
+<span class="fc" id="L502">            throw new PaymentProcessingException(&quot;Only captured/settled transactions can be refunded: &quot; + </span>
+<span class="fc" id="L503">                                               origTransaction.getStatus(), correlationId);</span>
+        }
+
+        // Determine refund amount (full refund if amount not specified)
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        BigDecimal refundAmount = request.getAmount() != null ? </span>
+<span class="fc" id="L508">            request.getAmount() : origTransaction.getAmount();</span>
+
+        // Validate refund amount
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        if (refundAmount.compareTo(origTransaction.getAmount()) &gt; 0) {</span>
+<span class="fc" id="L512">            throw new PaymentProcessingException(&quot;Refund amount cannot exceed original transaction amount&quot;, correlationId);</span>
+        }
+
+        try {
+            // Create refund transaction entity
+<span class="fc" id="L517">            Transaction transaction = createBasicTransactionEntity(transactionId, TransactionType.REFUND, </span>
+<span class="fc" id="L518">                                                                 refundAmount, correlationId, request.getIdempotencyKey());</span>
+<span class="fc" id="L519">            transaction.setParentTransaction(origTransaction);</span>
+<span class="fc" id="L520">            transaction.setOrder(origTransaction.getOrder());</span>
+<span class="fc" id="L521">            transaction.setCustomer(origTransaction.getCustomer());</span>
+<span class="fc" id="L522">            transaction.setPaymentMethod(origTransaction.getPaymentMethod());</span>
+            
+            // Add refund-specific data
+<span class="fc" id="L525">            transaction.getResponseData().put(&quot;refundReason&quot;, request.getReason());</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            if (request.getDescription() != null) {</span>
+<span class="nc" id="L527">                transaction.getResponseData().put(&quot;refundDescription&quot;, request.getDescription());</span>
+            }
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">            if (request.getReferenceNumber() != null) {</span>
+<span class="nc" id="L530">                transaction.getResponseData().put(&quot;refundReference&quot;, request.getReferenceNumber());</span>
+            }
+            
+<span class="fc" id="L533">            transaction = transactionRepository.save(transaction);</span>
+
+            // Log payment method details for debugging
+<span class="fc" id="L536">            log.info(&quot;Refund Debug - Original Transaction PaymentMethod: {}, AuthnetTransactionId: {}&quot;, </span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">                       origTransaction.getPaymentMethod() != null ? &quot;NOT NULL&quot; : &quot;NULL&quot;,</span>
+<span class="fc" id="L538">                       origTransaction.getAuthnetTransactionId());</span>
+            
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (origTransaction.getPaymentMethod() != null) {</span>
+<span class="fc" id="L541">                log.info(&quot;PaymentMethod Details - Type: {}, CardNumber: {}, LastFour: {}&quot;, </span>
+<span class="fc" id="L542">                           origTransaction.getPaymentMethod().getType(),</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">                           origTransaction.getPaymentMethod().getCardNumber() != null ? &quot;NOT NULL&quot; : &quot;NULL&quot;,</span>
+<span class="fc" id="L544">                           origTransaction.getPaymentMethod().getCardLastFour());</span>
+            }
+
+            // Map to Authorize.Net request
+<span class="fc" id="L548">            CreateTransactionRequest authNetRequest = mapper.mapToRefundTransaction(</span>
+<span class="fc" id="L549">                request, origTransaction.getAuthnetTransactionId(), origTransaction.getPaymentMethod(), merchant);</span>
+            
+            // Execute refund
+<span class="fc" id="L552">            CreateTransactionController controller = new CreateTransactionController(authNetRequest);</span>
+<span class="fc" id="L553">            controller.execute();</span>
+<span class="fc" id="L554">            CreateTransactionResponse response = controller.getApiResponse();</span>
+
+            // Log detailed Authorize.Net response for debugging
+<span class="fc" id="L557">            log.info(&quot;Authorize.Net Refund Response - TransactionId: {}, ResultCode: {}, MessageCount: {}&quot;, </span>
+                       transactionId, 
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getResultCode() : &quot;NULL&quot;,</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">                       response.getMessages() != null ? response.getMessages().getMessage().size() : 0);</span>
+            
+<span class="pc bpc" id="L562" title="2 of 4 branches missed.">            if (response.getMessages() != null &amp;&amp; response.getMessages().getMessage() != null) {</span>
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">                for (var message : response.getMessages().getMessage()) {</span>
+<span class="nc" id="L564">                    log.info(&quot;Authorize.Net Message - Code: {}, Text: {}&quot;, message.getCode(), message.getText());</span>
+<span class="nc" id="L565">                }</span>
+            }
+            
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">            if (response.getTransactionResponse() != null) {</span>
+<span class="fc" id="L569">                log.info(&quot;Transaction Response - ResponseCode: {}, AuthCode: {}, TransId: {}&quot;, </span>
+<span class="fc" id="L570">                           response.getTransactionResponse().getResponseCode(),</span>
+<span class="fc" id="L571">                           response.getTransactionResponse().getAuthCode(),</span>
+<span class="fc" id="L572">                           response.getTransactionResponse().getTransId());</span>
+                
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">                if (response.getTransactionResponse().getErrors() != null) {</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                    for (var error : response.getTransactionResponse().getErrors().getError()) {</span>
+<span class="nc" id="L576">                        log.error(&quot;Transaction Error - Code: {}, Text: {}&quot;, error.getErrorCode(), error.getErrorText());</span>
+<span class="nc" id="L577">                    }</span>
+                }
+            }
+
+            // Process response
+<span class="fc" id="L582">            PaymentResponse paymentResponse = mapper.mapToPaymentResponse(</span>
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">                response, transactionId, &quot;REFUND&quot;, origTransaction.getPaymentMethod() != null ? </span>
+<span class="pc" id="L584">                    convertToPaymentMethodRequest(origTransaction.getPaymentMethod()) : null, correlationId);</span>
+            
+            // Set the refund amount
+<span class="fc" id="L587">            paymentResponse.setAmount(refundAmount);</span>
+
+            // Update transaction with results
+<span class="fc" id="L590">            updateTransactionFromResponse(transaction, paymentResponse, response);</span>
+<span class="fc" id="L591">            transactionRepository.save(transaction);</span>
+
+            // Update original transaction status if refund was successful
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">            if (paymentResponse.getSuccess()) {</span>
+                // Check if this is a full refund
+<span class="fc bfc" id="L596" title="All 2 branches covered.">                if (refundAmount.compareTo(origTransaction.getAmount()) == 0) {</span>
+<span class="fc" id="L597">                    origTransaction.setStatus(PaymentStatus.REFUNDED);</span>
+                } else {
+<span class="fc" id="L599">                    origTransaction.setStatus(PaymentStatus.PARTIALLY_REFUNDED);</span>
+                }
+<span class="fc" id="L601">                transactionRepository.save(origTransaction);</span>
+            }
+
+<span class="fc" id="L604">            log.info(&quot;Refund transaction completed - TransactionId: {}, Status: {}, Success: {}, Amount: {}&quot;, </span>
+<span class="fc" id="L605">                       transactionId, paymentResponse.getStatus(), paymentResponse.getSuccess(), refundAmount);</span>
+
+<span class="fc" id="L607">            return paymentResponse;</span>
+
+<span class="nc" id="L609">        } catch (Exception e) {</span>
+<span class="nc" id="L610">            log.error(&quot;Refund transaction failed - TransactionId: {}, Error: {}&quot;, </span>
+<span class="nc" id="L611">                        transactionId, e.getMessage(), e);</span>
+            
+            // Update transaction status to failed
+<span class="nc" id="L614">            updateTransactionStatus(transactionId, PaymentStatus.FAILED, e.getMessage());</span>
+            
+<span class="nc" id="L616">            throw new PaymentProcessingException(&quot;Refund transaction failed&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Retrieves transaction status and details.
+     * 
+     * @param transactionId Internal transaction ID
+     * @return Payment response with current transaction status
+     * @throws PaymentProcessingException if transaction not found or inquiry fails
+     */
+    public PaymentResponse getTransactionStatus(String transactionId) {
+<span class="fc" id="L628">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L630">        log.info(&quot;Getting transaction status - TransactionId: {}, CorrelationId: {}&quot;, </span>
+                   transactionId, correlationId);
+
+        try {
+            // Find transaction in database
+<span class="fc" id="L635">            Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByTransactionId(transactionId);</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">            if (transactionOpt.isEmpty()) {</span>
+<span class="fc" id="L637">                throw new PaymentProcessingException(&quot;Transaction not found: &quot; + transactionId, correlationId);</span>
+            }
+
+<span class="fc" id="L640">            Transaction transaction = transactionOpt.get();</span>
+            
+            // Build response from stored transaction data
+<span class="fc" id="L643">            PaymentResponse response = buildResponseFromTransaction(transaction);</span>
+            
+            // If transaction has been processed through Authorize.Net, we could optionally
+            // query their API for the latest status, but for now we'll use our stored data
+            
+<span class="fc" id="L648">            log.info(&quot;Transaction status retrieved - TransactionId: {}, Status: {}&quot;, </span>
+<span class="fc" id="L649">                       transactionId, response.getStatus());</span>
+
+<span class="fc" id="L651">            return response;</span>
+
+<span class="fc" id="L653">        } catch (Exception e) {</span>
+<span class="fc" id="L654">            log.error(&quot;Failed to get transaction status - TransactionId: {}, Error: {}&quot;, </span>
+<span class="fc" id="L655">                        transactionId, e.getMessage(), e);</span>
+            
+<span class="fc bfc" id="L657" title="All 2 branches covered.">            if (e instanceof PaymentProcessingException) {</span>
+<span class="fc" id="L658">                throw e;</span>
+            }
+<span class="fc" id="L660">            throw new PaymentProcessingException(&quot;Failed to retrieve transaction status&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Retrieves transaction details directly from Authorize.Net API.
+     * This confirms that transactions are actually reaching Authorize.Net.
+     * 
+     * @param authnetTransactionId Authorize.Net transaction ID
+     * @return Payment response with details from Authorize.Net
+     * @throws PaymentProcessingException if transaction not found or inquiry fails
+     */
+    public PaymentResponse getAuthNetTransactionDetails(String authnetTransactionId) {
+<span class="fc" id="L673">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L675">        log.info(&quot;Querying Authorize.Net directly - AuthNet TransactionId: {}, CorrelationId: {}&quot;, </span>
+                   authnetTransactionId, correlationId);
+
+        try {
+            // Create transaction details request
+<span class="fc" id="L680">            GetTransactionDetailsRequest request = new GetTransactionDetailsRequest();</span>
+<span class="fc" id="L681">            request.setMerchantAuthentication(merchant);</span>
+<span class="fc" id="L682">            request.setTransId(authnetTransactionId);</span>
+
+            // Execute the request
+<span class="fc" id="L685">            GetTransactionDetailsController controller = new GetTransactionDetailsController(request);</span>
+<span class="fc" id="L686">            controller.execute();</span>
+<span class="fc" id="L687">            GetTransactionDetailsResponse response = controller.getApiResponse();</span>
+
+<span class="fc bfc" id="L689" title="All 2 branches covered.">            if (response == null) {</span>
+<span class="fc" id="L690">                throw new PaymentProcessingException(&quot;No response from Authorize.Net for transaction: &quot; + authnetTransactionId, correlationId);</span>
+            }
+
+<span class="fc bfc" id="L693" title="All 2 branches covered.">            if (response.getMessages().getResultCode() != MessageTypeEnum.OK) {</span>
+<span class="fc" id="L694">                String errorMessage = response.getMessages().getMessage().get(0).getText();</span>
+<span class="fc" id="L695">                throw new PaymentProcessingException(&quot;Authorize.Net error: &quot; + errorMessage, correlationId);</span>
+            }
+
+            // Map the response
+<span class="fc" id="L699">            PaymentResponse paymentResponse = mapAuthNetDetailsToPaymentResponse(response, correlationId);</span>
+            
+<span class="fc" id="L701">            log.info(&quot;Successfully retrieved transaction from Authorize.Net - AuthNet ID: {}, Status: {}, Amount: {}&quot;, </span>
+<span class="fc" id="L702">                       authnetTransactionId, paymentResponse.getStatus(), paymentResponse.getAmount());</span>
+
+<span class="fc" id="L704">            return paymentResponse;</span>
+
+<span class="fc" id="L706">        } catch (Exception e) {</span>
+<span class="fc" id="L707">            log.error(&quot;Failed to retrieve transaction from Authorize.Net - AuthNet ID: {}, Error: {}&quot;, </span>
+<span class="fc" id="L708">                        authnetTransactionId, e.getMessage(), e);</span>
+            
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            if (e instanceof PaymentProcessingException) {</span>
+<span class="fc" id="L711">                throw e;</span>
+            }
+<span class="fc" id="L713">            throw new PaymentProcessingException(&quot;Failed to retrieve transaction from Authorize.Net&quot;, e, correlationId);</span>
+        }
+    }
+
+    /**
+     * Validates payment method information before processing.
+        
+// Execute refund
+CreateTransactionController controller = new CreateTransactionController(authNetRequest);
+controller.execute();
+CreateTransactionResponse response = controller.getApiResponse();
+
+// Log detailed Authorize.Net response for debugging
+log.info(&quot;Authorize.Net Refund Response - TransactionId: {}, ResultCode: {}, MessageCount: {}&quot;, 
+           transactionId, 
+           response.getMessages() != null ? response.getMessages().getResultCode() : &quot;NULL&quot;,
+           response.getMessages() != null ? response.getMessages().getMessage().size() : 0);
+            }
+
+            // Credit card validation
+            if (&quot;CREDIT_CARD&quot;.equals(paymentMethod.getType())) {
+                if (paymentMethod.getCardNumber() == null || paymentMethod.getCardNumber().trim().isEmpty()) {
+                    throw new PaymentProcessingException(&quot;Card number is required&quot;, correlationId);
+                }
+                
+                if (paymentMethod.getExpiryMonth() == null || paymentMethod.getExpiryYear() == null) {
+                    throw new PaymentProcessingException(&quot;Card expiry date is required&quot;, correlationId);
+                }
+                
+                if (paymentMethod.getCvv() == null || paymentMethod.getCvv().trim().isEmpty()) {
+                    throw new PaymentProcessingException(&quot;CVV is required&quot;, correlationId);
+                }
+
+                // Basic card number validation (Luhn algorithm would be implemented in validator)
+                String cardNumber = paymentMethod.getCardNumber().replaceAll(&quot;\\s+&quot;, &quot;&quot;);
+                if (cardNumber.length() &lt; 13 || cardNumber.length() &gt; 19) {
+                    throw new PaymentProcessingException(&quot;Invalid card number length&quot;, correlationId);
+                }
+
+                // CVV validation
+                String cvv = paymentMethod.getCvv();
+                if (cvv.length() &lt; 3 || cvv.length() &gt; 4) {
+                    throw new PaymentProcessingException(&quot;Invalid CVV length&quot;, correlationId);
+                }
+
+                // Expiry date validation
+                int currentYear = java.time.Year.now().getValue();
+                int currentMonth = java.time.MonthDay.now().getMonthValue();
+                
+                try {
+                    int cardYear = Integer.parseInt(paymentMethod.getExpiryYear());
+                    int cardMonth = Integer.parseInt(paymentMethod.getExpiryMonth());
+                    
+                    if (cardYear &lt; currentYear || (cardYear == currentYear &amp;&amp; cardMonth &lt; currentMonth)) {
+                        throw new PaymentProcessingException(&quot;Card has expired&quot;, correlationId);
+                    }
+                } catch (NumberFormatException e) {
+                    throw new PaymentProcessingException(&quot;Invalid expiry date format&quot;, correlationId);
+                }
+            }
+
+            log.debug(&quot;Payment method validation successful - Type: {}, CorrelationId: {}&quot;, 
+                        paymentMethod.getType(), correlationId);
+
+        } catch (Exception e) {
+            log.error(&quot;Payment method validation failed - Error: {}, CorrelationId: {}&quot;, 
+                        e.getMessage(), correlationId);
+            
+            if (e instanceof PaymentProcessingException) {
+                throw e;
+            }
+            throw new PaymentProcessingException(&quot;Payment method validation failed&quot;, e, correlationId);
+        }
+    }
+
+    // Helper methods
+
+    private Transaction createTransactionEntity(PaymentRequest request, String transactionId, 
+                                          TransactionType type, String correlationId) {
+        log.error(&quot;🚨 CREATE TRANSACTION ENTITY CALLED - TransactionId: {}, Type: {}&quot;, transactionId, type);
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId(transactionId);
+        transaction.setTransactionType(type);
+        transaction.setAmount(request.getAmount());
+        transaction.setCurrency(request.getCurrency());
+        transaction.setStatus(PaymentStatus.PENDING);
+        transaction.setCorrelationId(correlationId);
+        
+        if (request.getIdempotencyKey() != null) {
+            transaction.setIdempotencyKey(request.getIdempotencyKey());
+        }
+        
+        // Create or find customer for the transaction
+        log.info(&quot;🔍 ABOUT TO CALL findOrCreateCustomer - Email: {}, CorrelationId: {}&quot;, 
+                   request.getCustomer() != null ? request.getCustomer().getEmail() : &quot;null&quot;, correlationId);
+        Customer customer = findOrCreateCustomer(request.getCustomer());
+        log.info(&quot;🔍 RETURNED FROM findOrCreateCustomer - Customer ID: {}, AuthNet Profile ID: {}&quot;, 
+                   customer.getCustomerId(), customer.getAuthorizeNetCustomerProfileId());
+        transaction.setCustomer(customer);
+        
+        // Set order reference if available
+        if (request.getOrderNumber() != null) {
+            Optional&lt;Order&gt; order = orderRepository.findByOrderNumber(request.getOrderNumber());
+            order.ifPresent(o -&gt; transaction.setOrder(o));
+        }
+        
+        // Create and associate payment method
+        if (request.getPaymentMethod() != null) {
+            PaymentMethod paymentMethod = findOrCreatePaymentMethod(request.getPaymentMethod(), customer);
+            transaction.setPaymentMethod(paymentMethod);
+        }
+        
+        return transaction;
+    }
+
+    private Transaction createBasicTransactionEntity(String transactionId, TransactionType type, 
+                                                   BigDecimal amount, String correlationId, String idempotencyKey) {
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId(transactionId);
+        transaction.setTransactionType(type);
+        transaction.setAmount(amount);
+        transaction.setCurrency(&quot;USD&quot;);
+        transaction.setStatus(PaymentStatus.PENDING);
+        transaction.setCorrelationId(correlationId);
+        
+        if (idempotencyKey != null) {
+            transaction.setIdempotencyKey(idempotencyKey);
+        }
+        
+        return transaction;
+    }
+
+    private void updateTransactionFromResponse(Transaction transaction, PaymentResponse response, 
+                                             CreateTransactionResponse authNetResponse) {
+        transaction.setStatus(PaymentStatus.valueOf(response.getStatus()));
+        
+        if (response.getSuccess()) {
+            transaction.setAuthnetTransactionId(response.getAuthnetTransactionId());
+            transaction.setAuthnetAuthCode(response.getAuthorizationCode());
+            transaction.setAuthnetResponseCode(response.getResponseCode());
+            transaction.setAuthnetResponseReason(response.getResponseReasonText());
+            transaction.setAuthnetAvsResult(response.getAvsResult());
+            transaction.setAuthnetCvvResult(response.getCvvResult());
+        } else {
+            // Store error details in response data
+            transaction.getResponseData().put(&quot;errorMessage&quot;, response.getError().getMessage());
+            transaction.getResponseData().put(&quot;errorCode&quot;, response.getError().getCode());
+        }
+        
+        transaction.setProcessedAt(ZonedDateTime.now());
+    }
+
+    private void updateTransactionStatus(String transactionId, PaymentStatus status, String errorMessage) {
+        try {
+            Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByTransactionId(transactionId);
+            if (transactionOpt.isPresent()) {
+                Transaction transaction = transactionOpt.get();
+                transaction.setStatus(status);
+                if (errorMessage != null) {
+                    transaction.getResponseData().put(&quot;errorMessage&quot;, errorMessage);
+                }
+                transaction.setProcessedAt(ZonedDateTime.now());
+                transactionRepository.save(transaction);
+            }
+        } catch (Exception e) {
+            log.error(&quot;Failed to update transaction status - TransactionId: {}, Status: {}, Error: {}&quot;, 
+                        transactionId, status, e.getMessage());
+        }
+    }
+
+    private PaymentResponse buildResponseFromTransaction(Transaction transaction) {
+        PaymentResponse response = new PaymentResponse();
+        response.setTransactionId(transaction.getTransactionId());
+        response.setAuthnetTransactionId(transaction.getAuthnetTransactionId());
+        response.setStatus(transaction.getStatus().name());
+        response.setTransactionType(transaction.getTransactionType().name());
+        response.setAmount(transaction.getAmount());
+        response.setCurrency(transaction.getCurrency());
+        response.setAuthorizationCode(transaction.getAuthnetAuthCode());
+        response.setResponseCode(transaction.getAuthnetResponseCode());
+        response.setResponseReasonText(transaction.getAuthnetResponseReason());
+        response.setSuccess(transaction.getStatus() != PaymentStatus.FAILED);
+        response.setCreatedAt(transaction.getCreatedAt().atZone(java.time.ZoneId.systemDefault()));
+        response.setCorrelationId(transaction.getCorrelationId());
+        return response;
+    }
+
+    private String getOrGenerateCorrelationId() {
+        String correlationId = MDC.get(&quot;correlationId&quot;);
+        if (correlationId == null) {
+            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);
+            MDC.put(&quot;correlationId&quot;, correlationId);
+        }
+        return correlationId;
+    }
+
+    /**
+     * Converts PaymentMethod entity to PaymentMethodRequest DTO for mapper.
+     */
+    private PaymentMethodRequest convertToPaymentMethodRequest(PaymentMethod paymentMethod) {
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (paymentMethod == null) {</span>
+<span class="nc" id="L914">            return null;</span>
+        }
+        
+<span class="fc" id="L917">        PaymentMethodRequest request = new PaymentMethodRequest();</span>
+<span class="fc" id="L918">        request.setType(paymentMethod.getType());</span>
+<span class="fc" id="L919">        request.setCardNumber(paymentMethod.getCardNumber());</span>
+<span class="fc" id="L920">        request.setExpiryMonth(paymentMethod.getExpiryMonth());</span>
+<span class="fc" id="L921">        request.setExpiryYear(paymentMethod.getExpiryYear());</span>
+<span class="fc" id="L922">        request.setCardholderName(paymentMethod.getCardholderName());</span>
+        
+<span class="fc" id="L924">        return request;</span>
+    }
+
+    /**
+     * Finds an existing payment method or creates a new one.
+     */
+    private PaymentMethod findOrCreatePaymentMethod(PaymentMethodRequest request, Customer customer) {
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L932">            return null;</span>
+        }
+        
+        // Create new payment method (simplified approach for now)
+<span class="fc" id="L936">        PaymentMethod paymentMethod = new PaymentMethod();</span>
+<span class="fc" id="L937">        paymentMethod.setCustomer(customer);</span>
+<span class="fc" id="L938">        paymentMethod.setPaymentType(request.getType());</span>
+<span class="fc" id="L939">        paymentMethod.setPaymentToken(&quot;token_&quot; + UUID.randomUUID().toString().substring(0, 8));</span>
+<span class="fc" id="L940">        paymentMethod.setCardNumber(request.getCardNumber()); // Store full number for sandbox</span>
+<span class="pc bpc" id="L941" title="1 of 2 branches missed.">        paymentMethod.setCardLastFour(request.getCardNumber().length() &gt;= 4 ? </span>
+<span class="fc" id="L942">            request.getCardNumber().substring(request.getCardNumber().length() - 4) : </span>
+<span class="nc" id="L943">            request.getCardNumber());</span>
+<span class="fc" id="L944">        paymentMethod.setExpiryMonth(request.getExpiryMonth());</span>
+<span class="fc" id="L945">        paymentMethod.setExpiryYear(request.getExpiryYear());</span>
+<span class="fc" id="L946">        paymentMethod.setCardholderName(request.getCardholderName());</span>
+        
+        // Set card expiry as integers
+        try {
+<span class="fc" id="L950">            paymentMethod.setCardExpiryMonth(Integer.parseInt(request.getExpiryMonth()));</span>
+<span class="fc" id="L951">            paymentMethod.setCardExpiryYear(Integer.parseInt(request.getExpiryYear()));</span>
+<span class="nc" id="L952">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L953">            log.warn(&quot;Invalid expiry date format: {}/{}&quot;, request.getExpiryMonth(), request.getExpiryYear());</span>
+<span class="fc" id="L954">        }</span>
+        
+<span class="fc" id="L956">        return paymentMethodRepository.save(paymentMethod);</span>
+    }
+
+    /**
+     * Finds an existing customer by email or creates a new one.
+     * 
+     * @param customerRequest Customer information from the payment request
+     * @return Customer entity (existing or newly created)
+     */
+    private Customer findOrCreateCustomer(CustomerRequest customerRequest) {
+<span class="fc" id="L966">        log.error(&quot;🚨 FINDORCREATE CUSTOMER METHOD CALLED - Email: {}&quot;, </span>
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">                    customerRequest != null ? customerRequest.getEmail() : &quot;NULL_REQUEST&quot;);</span>
+        
+<span class="pc bpc" id="L969" title="2 of 4 branches missed.">        if (customerRequest == null || customerRequest.getEmail() == null) {</span>
+<span class="nc" id="L970">            throw new PaymentProcessingException(&quot;Customer information is required for payment processing&quot;, getOrGenerateCorrelationId());</span>
+        }
+
+        // Try to find existing customer by email
+<span class="fc" id="L974">        Optional&lt;Customer&gt; existingCustomer = customerRepository.findByEmailIgnoreCase(customerRequest.getEmail());</span>
+        
+<span class="fc bfc" id="L976" title="All 2 branches covered.">        if (existingCustomer.isPresent()) {</span>
+<span class="fc" id="L977">            Customer customer = existingCustomer.get();</span>
+<span class="fc" id="L978">            log.info(&quot;Found existing customer - Email: {}, Customer ID: {}, AuthNet Profile ID: {}&quot;, </span>
+<span class="fc" id="L979">                       customerRequest.getEmail(), </span>
+<span class="fc" id="L980">                       customer.getCustomerId(),</span>
+<span class="fc" id="L981">                       customer.getAuthorizeNetCustomerProfileId());</span>
+            
+            // Check if existing customer needs Authorize.Net profile creation
+<span class="pc bpc" id="L984" title="2 of 4 branches missed.">            if (customer.getAuthorizeNetCustomerProfileId() == null || customer.getAuthorizeNetCustomerProfileId().trim().isEmpty()) {</span>
+<span class="nc" id="L985">                log.info(&quot;🔧 EXISTING CUSTOMER MISSING AUTHNET PROFILE - Creating CIM profile for: {}&quot;, customer.getEmail());</span>
+                try {
+<span class="nc" id="L987">                    String customerProfileId = authorizeNetCustomerService.createCustomerProfile(customer, customerRequest);</span>
+<span class="nc" id="L988">                    customer.setAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="nc" id="L989">                    customer = customerRepository.save(customer);</span>
+<span class="nc" id="L990">                    log.info(&quot;✅ CIM PROFILE CREATED for existing customer - Profile ID: {}, Customer ID: {}&quot;, </span>
+<span class="nc" id="L991">                               customerProfileId, customer.getCustomerId());</span>
+<span class="nc" id="L992">                } catch (Exception e) {</span>
+<span class="nc" id="L993">                    log.error(&quot;❌ Failed to create CIM profile for existing customer: {} - Error: {}&quot;, </span>
+<span class="nc" id="L994">                                customer.getCustomerId(), e.getMessage(), e);</span>
+<span class="nc" id="L995">                }</span>
+            }
+            
+<span class="fc" id="L998">            return customer;</span>
+        }
+
+        // Create new customer
+<span class="fc" id="L1002">        Customer customer = new Customer();</span>
+<span class="fc" id="L1003">        customer.setEmail(customerRequest.getEmail());</span>
+<span class="fc" id="L1004">        customer.setFirstName(customerRequest.getFirstName());</span>
+<span class="fc" id="L1005">        customer.setLastName(customerRequest.getLastName());</span>
+<span class="fc" id="L1006">        customer.setPhone(customerRequest.getPhone());</span>
+        
+        // Auto-generate customer reference if not provided
+<span class="fc" id="L1009">        String customerReference = customerRequest.getCustomerReference();</span>
+<span class="pc bpc" id="L1010" title="3 of 4 branches missed.">        if (customerReference == null || customerReference.trim().isEmpty()) {</span>
+<span class="fc" id="L1011">            customerReference = &quot;CUST_&quot; + UUID.randomUUID().toString().substring(0, 8).toUpperCase();</span>
+<span class="fc" id="L1012">            log.info(&quot;🔧 Auto-generated customer reference: {}&quot;, customerReference);</span>
+        }
+<span class="fc" id="L1014">        customer.setCustomerReference(customerReference);</span>
+        
+        // Set billing address if provided
+<span class="fc bfc" id="L1017" title="All 2 branches covered.">        if (customerRequest.getBillingAddress() != null) {</span>
+<span class="fc" id="L1018">            AddressRequest addr = customerRequest.getBillingAddress();</span>
+<span class="fc" id="L1019">            customer.setBillingAddressLine1(addr.getAddress1());</span>
+<span class="fc" id="L1020">            customer.setBillingAddressLine2(addr.getAddress2());</span>
+<span class="fc" id="L1021">            customer.setBillingCity(addr.getCity());</span>
+<span class="fc" id="L1022">            customer.setBillingState(addr.getState());</span>
+<span class="fc" id="L1023">            customer.setBillingPostalCode(addr.getZipCode());</span>
+<span class="fc" id="L1024">            customer.setBillingCountry(addr.getCountry());</span>
+        }
+
+<span class="fc" id="L1027">        customer = customerRepository.save(customer);</span>
+<span class="fc" id="L1028">        log.info(&quot;🆕 CREATING NEW CUSTOMER - ID: {}, Email: {}, About to create AuthNet profile...&quot;, customer.getId(), customer.getEmail());</span>
+        
+        // Create Authorize.Net customer profile - THIS IS THE CRITICAL FIX
+        // This makes customers appear in the Authorize.Net portal for subscription management
+        try {
+<span class="fc" id="L1033">            String customerProfileId = authorizeNetCustomerService.createCustomerProfile(customer, customerRequest);</span>
+<span class="fc" id="L1034">            customer.setAuthorizeNetCustomerProfileId(customerProfileId);</span>
+<span class="fc" id="L1035">            customer = customerRepository.save(customer);</span>
+<span class="fc" id="L1036">            log.info(&quot;🎯 SOLUTION IMPLEMENTED: Customer profile created in Authorize.Net - Profile ID: {}, Customer ID: {}&quot;, </span>
+<span class="fc" id="L1037">                       customerProfileId, customer.getCustomerId());</span>
+<span class="nc" id="L1038">        } catch (Exception e) {</span>
+<span class="nc" id="L1039">            log.error(&quot;⚠️ Failed to create Authorize.Net customer profile for customer: {} - Error: {}&quot;, </span>
+<span class="nc" id="L1040">                        customer.getCustomerId(), e.getMessage(), e);</span>
+            // Continue without failing the payment - customer profile creation is optional for basic payments
+            // but required for subscriptions to appear in portal
+<span class="fc" id="L1043">        }</span>
+        
+<span class="fc" id="L1045">        return customer;</span>
+    }
+
+    /**
+     * Maps Authorize.Net GetTransactionDetailsResponse to PaymentResponse.
+     */
+    private PaymentResponse mapAuthNetDetailsToPaymentResponse(GetTransactionDetailsResponse authNetResponse, String correlationId) {
+<span class="fc" id="L1052">        TransactionDetailsType transaction = authNetResponse.getTransaction();</span>
+        
+<span class="fc" id="L1054">        PaymentResponse response = new PaymentResponse();</span>
+<span class="fc" id="L1055">        response.setAuthnetTransactionId(transaction.getTransId());</span>
+<span class="fc" id="L1056">        response.setCorrelationId(correlationId);</span>
+<span class="fc" id="L1057">        response.setCreatedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L1058">        response.setSuccess(true);</span>
+        
+        // Map basic transaction details
+<span class="fc" id="L1061">        response.setAmount(transaction.getAuthAmount());</span>
+<span class="fc" id="L1062">        response.setCurrency(&quot;USD&quot;); // Authorize.Net primarily uses USD</span>
+<span class="fc" id="L1063">        response.setResponseCode(String.valueOf(transaction.getResponseCode()));</span>
+<span class="fc" id="L1064">        response.setResponseReasonCode(String.valueOf(transaction.getResponseReasonCode()));</span>
+<span class="fc" id="L1065">        response.setResponseReasonText(transaction.getResponseReasonDescription());</span>
+        
+        // Map authorization details
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">        if (transaction.getAuthCode() != null) {</span>
+<span class="fc" id="L1069">            response.setAuthorizationCode(transaction.getAuthCode());</span>
+        }
+        
+        // Map AVS and CVV results
+<span class="pc bpc" id="L1073" title="1 of 2 branches missed.">        if (transaction.getAVSResponse() != null) {</span>
+<span class="nc" id="L1074">            response.setAvsResult(transaction.getAVSResponse());</span>
+        }
+<span class="pc bpc" id="L1076" title="1 of 2 branches missed.">        if (transaction.getCardCodeResponse() != null) {</span>
+<span class="nc" id="L1077">            response.setCvvResult(transaction.getCardCodeResponse());</span>
+        }
+        
+        // Determine transaction status based on response code and settlement state
+<span class="pc bpc" id="L1081" title="1 of 2 branches missed.">        if (Integer.valueOf(1).equals(transaction.getResponseCode())) {</span>
+<span class="pc bpc" id="L1082" title="3 of 4 branches missed.">            if (transaction.getSettleAmount() != null &amp;&amp; transaction.getSettleAmount().compareTo(BigDecimal.ZERO) &gt; 0) {</span>
+<span class="nc" id="L1083">                response.setStatus(&quot;CAPTURED&quot;);</span>
+<span class="nc" id="L1084">                response.setTransactionType(&quot;PURCHASE&quot;);</span>
+            } else {
+<span class="fc" id="L1086">                response.setStatus(&quot;AUTHORIZED&quot;);</span>
+<span class="fc" id="L1087">                response.setTransactionType(&quot;AUTHORIZE&quot;);</span>
+            }
+        } else {
+<span class="nc" id="L1090">            response.setStatus(&quot;FAILED&quot;);</span>
+<span class="nc" id="L1091">            response.setSuccess(false);</span>
+        }
+        
+        // Map payment method details if available
+<span class="pc bpc" id="L1095" title="3 of 4 branches missed.">        if (transaction.getPayment() != null &amp;&amp; transaction.getPayment().getCreditCard() != null) {</span>
+<span class="nc" id="L1096">            PaymentMethodResponse pmResponse = new PaymentMethodResponse();</span>
+<span class="nc" id="L1097">            pmResponse.setType(&quot;CREDIT_CARD&quot;);</span>
+<span class="nc" id="L1098">            pmResponse.setMaskedCardNumber(transaction.getPayment().getCreditCard().getCardNumber());</span>
+<span class="nc" id="L1099">            pmResponse.setExpiryMonth(transaction.getPayment().getCreditCard().getExpirationDate().substring(0, 2));</span>
+<span class="nc" id="L1100">            pmResponse.setExpiryYear(&quot;20&quot; + transaction.getPayment().getCreditCard().getExpirationDate().substring(2, 4));</span>
+<span class="nc" id="L1101">            response.setPaymentMethod(pmResponse);</span>
+        }
+        
+        // Set test mode (always true for sandbox)
+<span class="fc" id="L1105">        response.setTestMode(false);</span>
+        
+<span class="fc" id="L1107">        return response;</span>
+    }
+
+    private String getOrGenerateCorrelationId() {
+<span class="fc" id="L1111">        String correlationId = MDC.get(&quot;correlationId&quot;);</span>
+<span class="pc bpc" id="L1112" title="1 of 2 branches missed.">        if (correlationId == null) {</span>
+<span class="nc" id="L1113">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().substring(0, 8);</span>
+<span class="nc" id="L1114">            MDC.put(&quot;correlationId&quot;, correlationId);</span>
+        }
+<span class="fc" id="L1116">        return correlationId;</span>
+    }
+
+    private PaymentResponse buildResponseFromTransaction(Transaction transaction) {
+<span class="fc" id="L1120">        PaymentResponse response = new PaymentResponse();</span>
+<span class="fc" id="L1121">        response.setTransactionId(transaction.getTransactionId());</span>
+<span class="fc" id="L1122">        response.setAuthnetTransactionId(transaction.getAuthnetTransactionId());</span>
+<span class="fc" id="L1123">        response.setStatus(transaction.getStatus().name());</span>
+<span class="fc" id="L1124">        response.setTransactionType(transaction.getTransactionType().name());</span>
+<span class="fc" id="L1125">        response.setAmount(transaction.getAmount());</span>
+<span class="fc" id="L1126">        response.setCurrency(transaction.getCurrency());</span>
+<span class="fc" id="L1127">        response.setAuthorizationCode(transaction.getAuthnetAuthCode());</span>
+<span class="fc" id="L1128">        response.setResponseCode(transaction.getAuthnetResponseCode());</span>
+<span class="fc" id="L1129">        response.setResponseReasonText(transaction.getAuthnetResponseReason());</span>
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">        response.setSuccess(transaction.getStatus() != PaymentStatus.FAILED);</span>
+<span class="fc" id="L1131">        response.setCreatedAt(transaction.getCreatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+<span class="fc" id="L1132">        response.setCorrelationId(transaction.getCorrelationId());</span>
+<span class="fc" id="L1133">        return response;</span>
+    }
+
+    public void validatePaymentMethod(PaymentMethodRequest paymentMethod) {
+<span class="fc" id="L1137">        String correlationId = getOrGenerateCorrelationId();</span>
+        
+<span class="fc" id="L1139">        log.debug(&quot;Validating payment method - Type: {}, CorrelationId: {}&quot;, </span>
+<span class="fc bfc" id="L1140" title="All 2 branches covered.">                    paymentMethod != null ? paymentMethod.getType() : &quot;NULL&quot;, correlationId);</span>
+
+        try {
+            // Basic validation
+<span class="fc bfc" id="L1144" title="All 2 branches covered.">            if (paymentMethod == null) {</span>
+<span class="fc" id="L1145">                throw new PaymentProcessingException(&quot;Payment method is required&quot;, correlationId);</span>
+            }
+
+<span class="pc bpc" id="L1148" title="2 of 4 branches missed.">            if (paymentMethod.getType() == null || paymentMethod.getType().trim().isEmpty()) {</span>
+<span class="nc" id="L1149">                throw new PaymentProcessingException(&quot;Payment method type is required&quot;, correlationId);</span>
+            }
+
+            // Credit card validation
+<span class="pc bpc" id="L1153" title="1 of 2 branches missed.">            if (&quot;CREDIT_CARD&quot;.equals(paymentMethod.getType())) {</span>
+<span class="fc bfc" id="L1154" title="All 4 branches covered.">                if (paymentMethod.getCardNumber() == null || paymentMethod.getCardNumber().trim().isEmpty()) {</span>
+<span class="fc" id="L1155">                    throw new PaymentProcessingException(&quot;Card number is required&quot;, correlationId);</span>
+                }
+                
+                // Validate card number length (13-19 digits after removing spaces)
+<span class="fc" id="L1159">                String cardNumberDigits = paymentMethod.getCardNumber().replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L1160" title="1 of 4 branches missed.">                if (cardNumberDigits.length() &lt; 13 || cardNumberDigits.length() &gt; 19) {</span>
+<span class="fc" id="L1161">                    throw new PaymentProcessingException(&quot;Invalid card number length&quot;, correlationId);</span>
+                }
+                
+<span class="pc bpc" id="L1164" title="1 of 4 branches missed.">                if (paymentMethod.getExpiryMonth() == null || paymentMethod.getExpiryYear() == null) {</span>
+<span class="fc" id="L1165">                    throw new PaymentProcessingException(&quot;Card expiry date is required&quot;, correlationId);</span>
+                }
+                
+                // Validate expiry date format (must be numeric)
+                try {
+<span class="fc" id="L1170">                    Integer.parseInt(paymentMethod.getExpiryMonth());</span>
+<span class="fc" id="L1171">                    Integer.parseInt(paymentMethod.getExpiryYear());</span>
+<span class="fc" id="L1172">                } catch (NumberFormatException e) {</span>
+<span class="fc" id="L1173">                    throw new PaymentProcessingException(&quot;Invalid expiry date format&quot;, correlationId);</span>
+<span class="fc" id="L1174">                }</span>
+                
+                // Validate card has not expired
+<span class="fc" id="L1177">                int expiryMonth = Integer.parseInt(paymentMethod.getExpiryMonth());</span>
+<span class="fc" id="L1178">                int expiryYear = Integer.parseInt(paymentMethod.getExpiryYear());</span>
+                
+                // Handle 2-digit years
+<span class="pc bpc" id="L1181" title="1 of 2 branches missed.">                if (expiryYear &lt; 100) {</span>
+<span class="nc" id="L1182">                    expiryYear += 2000;</span>
+                }
+                
+<span class="fc" id="L1185">                java.time.YearMonth expiryYearMonth = java.time.YearMonth.of(expiryYear, expiryMonth);</span>
+<span class="fc" id="L1186">                java.time.YearMonth currentYearMonth = java.time.YearMonth.now();</span>
+                
+<span class="fc bfc" id="L1188" title="All 2 branches covered.">                if (expiryYearMonth.isBefore(currentYearMonth)) {</span>
+<span class="fc" id="L1189">                    throw new PaymentProcessingException(&quot;Card has expired&quot;, correlationId);</span>
+                }
+                
+<span class="fc bfc" id="L1192" title="All 4 branches covered.">                if (paymentMethod.getCvv() == null || paymentMethod.getCvv().trim().isEmpty()) {</span>
+<span class="fc" id="L1193">                    throw new PaymentProcessingException(&quot;CVV is required&quot;, correlationId);</span>
+                }
+                
+                // Validate CVV length (3-4 digits)
+<span class="fc" id="L1197">                String cvv = paymentMethod.getCvv().trim();</span>
+<span class="pc bpc" id="L1198" title="1 of 4 branches missed.">                if (cvv.length() &lt; 3 || cvv.length() &gt; 4) {</span>
+<span class="fc" id="L1199">                    throw new PaymentProcessingException(&quot;Invalid CVV length&quot;, correlationId);</span>
+                }
+                
+<span class="pc bpc" id="L1202" title="2 of 4 branches missed.">                if (paymentMethod.getCardholderName() == null || paymentMethod.getCardholderName().trim().isEmpty()) {</span>
+<span class="nc" id="L1203">                    throw new PaymentProcessingException(&quot;Cardholder name is required&quot;, correlationId);</span>
+                }
+            }
+
+<span class="fc" id="L1207">            log.debug(&quot;Payment method validation successful - Type: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L1208">                        paymentMethod.getType(), correlationId);</span>
+
+<span class="fc" id="L1210">        } catch (Exception e) {</span>
+<span class="fc" id="L1211">            log.error(&quot;Payment method validation failed - Error: {}, CorrelationId: {}&quot;, </span>
+<span class="fc" id="L1212">                        e.getMessage(), correlationId);</span>
+            
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">            if (e instanceof PaymentProcessingException) {</span>
+<span class="fc" id="L1215">                throw e;</span>
+            }
+<span class="nc" id="L1217">            throw new PaymentProcessingException(&quot;Payment method validation failed&quot;, e, correlationId);</span>
+<span class="fc" id="L1218">        }</span>
+<span class="fc" id="L1219">    }</span>
+
+    private Transaction createTransactionEntity(PaymentRequest request, String transactionId, 
+                                          TransactionType type, String correlationId) {
+<span class="fc" id="L1223">        Transaction transaction = new Transaction();</span>
+<span class="fc" id="L1224">        transaction.setTransactionId(transactionId);</span>
+<span class="fc" id="L1225">        transaction.setTransactionType(type);</span>
+<span class="fc" id="L1226">        transaction.setAmount(request.getAmount());</span>
+<span class="fc" id="L1227">        transaction.setCurrency(request.getCurrency());</span>
+<span class="fc" id="L1228">        transaction.setStatus(PaymentStatus.PENDING);</span>
+<span class="fc" id="L1229">        transaction.setCorrelationId(correlationId);</span>
+        
+        // Find or create customer
+<span class="fc" id="L1232">        Customer customer = findOrCreateCustomer(request.getCustomer());</span>
+<span class="fc" id="L1233">        transaction.setCustomer(customer);</span>
+        
+        // Set order reference if available
+<span class="fc bfc" id="L1236" title="All 2 branches covered.">        if (request.getOrderNumber() != null) {</span>
+<span class="fc" id="L1237">            Optional&lt;Order&gt; order = orderRepository.findByOrderNumber(request.getOrderNumber());</span>
+<span class="fc" id="L1238">            order.ifPresent(o -&gt; transaction.setOrder(o));</span>
+        }
+        
+        // Create and associate payment method
+<span class="pc bpc" id="L1242" title="1 of 2 branches missed.">        if (request.getPaymentMethod() != null) {</span>
+<span class="fc" id="L1243">            PaymentMethod paymentMethod = findOrCreatePaymentMethod(request.getPaymentMethod(), customer);</span>
+<span class="fc" id="L1244">            transaction.setPaymentMethod(paymentMethod);</span>
+        }
+        
+<span class="fc" id="L1247">        return transaction;</span>
+    }
+
+    private Transaction createBasicTransactionEntity(String transactionId, TransactionType type, 
+                                               BigDecimal amount, String correlationId, String idempotencyKey) {
+<span class="fc" id="L1252">        Transaction transaction = new Transaction();</span>
+<span class="fc" id="L1253">        transaction.setTransactionId(transactionId);</span>
+<span class="fc" id="L1254">        transaction.setTransactionType(type);</span>
+<span class="fc" id="L1255">        transaction.setAmount(amount);</span>
+<span class="fc" id="L1256">        transaction.setCurrency(&quot;USD&quot;);</span>
+<span class="fc" id="L1257">        transaction.setStatus(PaymentStatus.PENDING);</span>
+<span class="fc" id="L1258">        transaction.setCorrelationId(correlationId);</span>
+        
+<span class="pc bpc" id="L1260" title="1 of 2 branches missed.">        if (idempotencyKey != null) {</span>
+<span class="nc" id="L1261">            transaction.setIdempotencyKey(idempotencyKey);</span>
+        }
+        
+<span class="fc" id="L1264">        return transaction;</span>
+    }
+
+    private void updateTransactionFromResponse(Transaction transaction, PaymentResponse response, 
+                                         CreateTransactionResponse authNetResponse) {
+<span class="fc" id="L1269">        transaction.setStatus(PaymentStatus.valueOf(response.getStatus()));</span>
+        
+<span class="pc bpc" id="L1271" title="1 of 2 branches missed.">        if (response.getSuccess()) {</span>
+<span class="fc" id="L1272">            transaction.setAuthnetTransactionId(response.getAuthnetTransactionId());</span>
+<span class="fc" id="L1273">            transaction.setAuthnetAuthCode(response.getAuthorizationCode());</span>
+<span class="fc" id="L1274">            transaction.setAuthnetResponseCode(response.getResponseCode());</span>
+<span class="fc" id="L1275">            transaction.setAuthnetResponseReason(response.getResponseReasonText());</span>
+<span class="fc" id="L1276">            transaction.setAuthnetAvsResult(response.getAvsResult());</span>
+<span class="fc" id="L1277">            transaction.setAuthnetCvvResult(response.getCvvResult());</span>
+        } else {
+            // Store error details in response data
+<span class="nc" id="L1280">            transaction.getResponseData().put(&quot;errorMessage&quot;, response.getError().getMessage());</span>
+<span class="nc" id="L1281">            transaction.getResponseData().put(&quot;errorCode&quot;, response.getError().getCode());</span>
+        }
+        
+<span class="fc" id="L1284">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L1285">    }</span>
+
+    private void updateTransactionStatus(String transactionId, PaymentStatus status, String errorMessage) {
+        try {
+<span class="fc" id="L1289">            Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByTransactionId(transactionId);</span>
+<span class="pc bpc" id="L1290" title="1 of 2 branches missed.">            if (transactionOpt.isPresent()) {</span>
+<span class="nc" id="L1291">                Transaction transaction = transactionOpt.get();</span>
+<span class="nc" id="L1292">                transaction.setStatus(status);</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">                if (errorMessage != null) {</span>
+<span class="nc" id="L1294">                    transaction.getResponseData().put(&quot;errorMessage&quot;, errorMessage);</span>
+                }
+<span class="nc" id="L1296">                transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="nc" id="L1297">                transactionRepository.save(transaction);</span>
+            }
+<span class="nc" id="L1299">        } catch (Exception e) {</span>
+<span class="nc" id="L1300">            log.error(&quot;Failed to update transaction status - TransactionId: {}, Status: {}, Error: {}&quot;, </span>
+<span class="nc" id="L1301">                        transactionId, status, e.getMessage());</span>
+<span class="fc" id="L1302">        }</span>
+<span class="fc" id="L1303">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

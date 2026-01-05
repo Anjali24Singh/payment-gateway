@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentErrorHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">PaymentErrorHandler.java</span></div><h1>PaymentErrorHandler.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.payment.PaymentResponse;
+import com.talentica.paymentgateway.entity.PaymentStatus;
+import com.talentica.paymentgateway.entity.Transaction;
+import net.authorize.api.contract.v1.TransactionResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Service for handling various payment error scenarios and providing
+ * comprehensive error responses with appropriate retry strategies.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L20">@Slf4j</span>
+@Service
+<span class="fc" id="L22">public class PaymentErrorHandler {</span>
+
+    // Authorize.Net response codes mapping
+<span class="fc" id="L25">    private static final Map&lt;String, ErrorInfo&gt; ERROR_CODE_MAPPING = new HashMap&lt;&gt;();</span>
+    
+    static {
+        // Card declined scenarios
+<span class="fc" id="L29">        ERROR_CODE_MAPPING.put(&quot;2&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Card was declined by the issuing bank&quot;, true, &quot;Try a different payment method&quot;));</span>
+<span class="fc" id="L30">        ERROR_CODE_MAPPING.put(&quot;3&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Card has expired&quot;, false, &quot;Please use a valid card with future expiry date&quot;));</span>
+<span class="fc" id="L31">        ERROR_CODE_MAPPING.put(&quot;4&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Card number is invalid&quot;, false, &quot;Please check the card number and try again&quot;));</span>
+<span class="fc" id="L32">        ERROR_CODE_MAPPING.put(&quot;5&quot;, new ErrorInfo(&quot;INSUFFICIENT_FUNDS&quot;, &quot;Insufficient funds&quot;, true, &quot;Please ensure sufficient funds or try another card&quot;));</span>
+<span class="fc" id="L33">        ERROR_CODE_MAPPING.put(&quot;6&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Credit card number is invalid&quot;, false, &quot;Please verify the card number&quot;));</span>
+<span class="fc" id="L34">        ERROR_CODE_MAPPING.put(&quot;7&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Credit card expiration date is invalid&quot;, false, &quot;Please check the expiration date&quot;));</span>
+<span class="fc" id="L35">        ERROR_CODE_MAPPING.put(&quot;8&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Credit card has expired&quot;, false, &quot;Please use a valid card&quot;));</span>
+        
+        // Security and fraud scenarios
+<span class="fc" id="L38">        ERROR_CODE_MAPPING.put(&quot;27&quot;, new ErrorInfo(&quot;AVS_MISMATCH&quot;, &quot;Address verification failed&quot;, true, &quot;Please verify billing address&quot;));</span>
+<span class="fc" id="L39">        ERROR_CODE_MAPPING.put(&quot;28&quot;, new ErrorInfo(&quot;CARD_DECLINED&quot;, &quot;Merchant does not accept this type of credit card&quot;, false, &quot;Please try a different card type&quot;));</span>
+<span class="fc" id="L40">        ERROR_CODE_MAPPING.put(&quot;37&quot;, new ErrorInfo(&quot;CVV_MISMATCH&quot;, &quot;CVV verification failed&quot;, true, &quot;Please check the CVV code&quot;));</span>
+<span class="fc" id="L41">        ERROR_CODE_MAPPING.put(&quot;44&quot;, new ErrorInfo(&quot;CVV_MISMATCH&quot;, &quot;Card code is required&quot;, true, &quot;Please provide the CVV code&quot;));</span>
+<span class="fc" id="L42">        ERROR_CODE_MAPPING.put(&quot;45&quot;, new ErrorInfo(&quot;CVV_MISMATCH&quot;, &quot;Card code verification failed&quot;, true, &quot;Please verify the CVV code&quot;));</span>
+        
+        // System and processing errors
+<span class="fc" id="L45">        ERROR_CODE_MAPPING.put(&quot;11&quot;, new ErrorInfo(&quot;DUPLICATE_TRANSACTION&quot;, &quot;Duplicate transaction detected&quot;, false, &quot;Transaction already processed&quot;));</span>
+<span class="fc" id="L46">        ERROR_CODE_MAPPING.put(&quot;13&quot;, new ErrorInfo(&quot;INVALID_MERCHANT&quot;, &quot;Merchant login ID is invalid&quot;, false, &quot;Please contact support&quot;));</span>
+<span class="fc" id="L47">        ERROR_CODE_MAPPING.put(&quot;16&quot;, new ErrorInfo(&quot;INVALID_TRANSACTION&quot;, &quot;Transaction ID is invalid&quot;, false, &quot;Please retry the transaction&quot;));</span>
+<span class="fc" id="L48">        ERROR_CODE_MAPPING.put(&quot;17&quot;, new ErrorInfo(&quot;INVALID_MERCHANT&quot;, &quot;Merchant does not accept this type of credit card&quot;, false, &quot;Card type not supported&quot;));</span>
+<span class="fc" id="L49">        ERROR_CODE_MAPPING.put(&quot;19&quot;, new ErrorInfo(&quot;PROCESSING_ERROR&quot;, &quot;Error occurred during processing&quot;, true, &quot;Please try again later&quot;));</span>
+<span class="fc" id="L50">        ERROR_CODE_MAPPING.put(&quot;20&quot;, new ErrorInfo(&quot;PROCESSING_ERROR&quot;, &quot;Error occurred during processing&quot;, true, &quot;Please try again later&quot;));</span>
+        
+        // Amount and currency errors
+<span class="fc" id="L53">        ERROR_CODE_MAPPING.put(&quot;33&quot;, new ErrorInfo(&quot;INVALID_AMOUNT&quot;, &quot;Amount is invalid&quot;, false, &quot;Please check the transaction amount&quot;));</span>
+<span class="fc" id="L54">        ERROR_CODE_MAPPING.put(&quot;78&quot;, new ErrorInfo(&quot;INVALID_AMOUNT&quot;, &quot;Card/account number is invalid&quot;, false, &quot;Please verify the card number&quot;));</span>
+<span class="fc" id="L55">        ERROR_CODE_MAPPING.put(&quot;92&quot;, new ErrorInfo(&quot;PROCESSING_ERROR&quot;, &quot;Gateway timed out&quot;, true, &quot;Please retry the transaction&quot;));</span>
+        
+        // Velocity and limits
+<span class="fc" id="L58">        ERROR_CODE_MAPPING.put(&quot;141&quot;, new ErrorInfo(&quot;VELOCITY_LIMIT&quot;, &quot;Transaction velocity limit exceeded&quot;, true, &quot;Please wait before retrying&quot;));</span>
+<span class="fc" id="L59">        ERROR_CODE_MAPPING.put(&quot;165&quot;, new ErrorInfo(&quot;PROCESSING_ERROR&quot;, &quot;Processor failure&quot;, true, &quot;Please try again later&quot;));</span>
+<span class="fc" id="L60">        ERROR_CODE_MAPPING.put(&quot;200&quot;, new ErrorInfo(&quot;RISK_MANAGEMENT&quot;, &quot;Transaction blocked by risk management&quot;, false, &quot;Transaction flagged for review&quot;));</span>
+<span class="fc" id="L61">        ERROR_CODE_MAPPING.put(&quot;201&quot;, new ErrorInfo(&quot;RISK_MANAGEMENT&quot;, &quot;Transaction blocked by risk management&quot;, false, &quot;Transaction requires verification&quot;));</span>
+        
+        // Network and connectivity
+<span class="fc" id="L64">        ERROR_CODE_MAPPING.put(&quot;250&quot;, new ErrorInfo(&quot;NETWORK_ERROR&quot;, &quot;Network connection error&quot;, true, &quot;Please check connection and retry&quot;));</span>
+<span class="fc" id="L65">        ERROR_CODE_MAPPING.put(&quot;251&quot;, new ErrorInfo(&quot;NETWORK_ERROR&quot;, &quot;Network timeout&quot;, true, &quot;Please retry the transaction&quot;));</span>
+<span class="fc" id="L66">        ERROR_CODE_MAPPING.put(&quot;252&quot;, new ErrorInfo(&quot;PROCESSING_ERROR&quot;, &quot;Processor unavailable&quot;, true, &quot;Service temporarily unavailable&quot;));</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Handle Authorize.Net transaction response and create appropriate error response.
+     */
+    public PaymentResponse handleAuthorizeNetError(TransactionResponse response, Transaction transaction) {
+<span class="fc" id="L73">        String responseCode = response.getResponseCode();</span>
+<span class="fc" id="L74">        String reasonCode = response.getMessages().getMessage().get(0).getCode();</span>
+<span class="fc" id="L75">        String reasonText = response.getMessages().getMessage().get(0).getDescription();</span>
+        
+<span class="fc" id="L77">        log.warn(&quot;Payment failed - Response Code: {}, Reason Code: {}, Reason: {}&quot;, </span>
+                   responseCode, reasonCode, reasonText);
+        
+<span class="fc" id="L80">        ErrorInfo errorInfo = ERROR_CODE_MAPPING.getOrDefault(reasonCode, </span>
+            new ErrorInfo(&quot;PAYMENT_FAILED&quot;, reasonText, true, &quot;Please try again or contact support&quot;));
+        
+        // Update transaction status based on error type
+<span class="fc" id="L84">        PaymentStatus status = determineTransactionStatus(errorInfo.category);</span>
+<span class="fc" id="L85">        transaction.setStatus(status);</span>
+        
+<span class="fc" id="L87">        return createErrorResponse(transaction, errorInfo, reasonCode, reasonText);</span>
+    }
+
+    /**
+     * Handle general payment processing errors.
+     */
+    public PaymentResponse handleGeneralError(Exception exception, Transaction transaction, String operation) {
+<span class="fc" id="L94">        log.error(&quot;Payment processing error during {}: {}&quot;, operation, exception.getMessage(), exception);</span>
+        
+<span class="fc" id="L96">        String errorCategory = categorizeException(exception);</span>
+<span class="fc" id="L97">        ErrorInfo errorInfo = getErrorInfoForCategory(errorCategory);</span>
+        
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (transaction != null) {</span>
+<span class="fc" id="L100">            transaction.setStatus(PaymentStatus.FAILED);</span>
+        }
+        
+<span class="fc" id="L103">        return createErrorResponse(transaction, errorInfo, &quot;SYSTEM_ERROR&quot;, exception.getMessage());</span>
+    }
+
+    /**
+     * Handle network and connectivity errors.
+     */
+    public PaymentResponse handleNetworkError(Exception exception, Transaction transaction) {
+<span class="fc" id="L110">        log.error(&quot;Network error during payment processing: {}&quot;, exception.getMessage(), exception);</span>
+        
+<span class="fc" id="L112">        ErrorInfo errorInfo = new ErrorInfo(&quot;NETWORK_ERROR&quot;, </span>
+            &quot;Network connection failed&quot;, true, &quot;Please check your connection and try again&quot;);
+        
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (transaction != null) {</span>
+<span class="fc" id="L116">            transaction.setStatus(PaymentStatus.FAILED);</span>
+        }
+        
+<span class="fc" id="L119">        return createErrorResponse(transaction, errorInfo, &quot;NETWORK_ERROR&quot;, exception.getMessage());</span>
+    }
+
+    /**
+     * Handle timeout errors with specific retry guidance.
+     */
+    public PaymentResponse handleTimeoutError(Transaction transaction, long timeoutMs) {
+<span class="fc" id="L126">        log.warn(&quot;Payment processing timeout after {}ms for transaction: {}&quot;, </span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                   timeoutMs, transaction != null ? transaction.getTransactionId() : &quot;null&quot;);</span>
+        
+<span class="fc" id="L129">        ErrorInfo errorInfo = new ErrorInfo(&quot;TIMEOUT_ERROR&quot;, </span>
+            &quot;Payment processing timed out&quot;, true, 
+            &quot;Transaction may still be processing. Please wait before retrying.&quot;);
+        
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (transaction != null) {</span>
+<span class="fc" id="L134">            transaction.setStatus(PaymentStatus.PENDING);</span>
+        }
+        
+<span class="fc" id="L137">        return createErrorResponse(transaction, errorInfo, &quot;TIMEOUT&quot;, </span>
+            &quot;Processing timeout after &quot; + timeoutMs + &quot;ms&quot;);
+    }
+
+    /**
+     * Handle validation errors with detailed field information.
+     */
+    public PaymentResponse handleValidationError(String field, String message, Transaction transaction) {
+<span class="fc" id="L145">        log.warn(&quot;Validation error for field {}: {}&quot;, field, message);</span>
+        
+<span class="fc" id="L147">        ErrorInfo errorInfo = new ErrorInfo(&quot;VALIDATION_ERROR&quot;, </span>
+            &quot;Request validation failed&quot;, false, &quot;Please correct the highlighted fields&quot;);
+        
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (transaction != null) {</span>
+<span class="fc" id="L151">            transaction.setStatus(PaymentStatus.FAILED);</span>
+        }
+        
+<span class="fc" id="L154">        PaymentResponse response = createErrorResponse(transaction, errorInfo, &quot;VALIDATION_ERROR&quot;, message);</span>
+<span class="fc" id="L155">        response.addValidationError(field, message);</span>
+        
+<span class="fc" id="L157">        return response;</span>
+    }
+
+    /**
+     * Create standardized error response.
+     */
+    private PaymentResponse createErrorResponse(Transaction transaction, ErrorInfo errorInfo, 
+                                              String errorCode, String errorMessage) {
+<span class="fc" id="L165">        PaymentResponse response = new PaymentResponse();</span>
+        
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (transaction != null) {</span>
+<span class="fc" id="L168">            response.setTransactionId(transaction.getTransactionId());</span>
+<span class="fc" id="L169">            response.setAmount(transaction.getAmount());</span>
+<span class="fc" id="L170">            response.setCurrency(transaction.getCurrency());</span>
+<span class="fc" id="L171">            response.setStatus(transaction.getStatus().name());</span>
+<span class="fc" id="L172">            response.setTransactionType(transaction.getTransactionType().name());</span>
+<span class="fc" id="L173">            response.setCreatedAt(transaction.getCreatedAt().atZone(java.time.ZoneId.systemDefault()));</span>
+        }
+        
+<span class="fc" id="L176">        response.setSuccess(false);</span>
+<span class="fc" id="L177">        response.setErrorCode(errorCode);</span>
+<span class="fc" id="L178">        response.setErrorMessage(errorInfo.message);</span>
+<span class="fc" id="L179">        response.setErrorCategory(errorInfo.category);</span>
+<span class="fc" id="L180">        response.setRetryable(errorInfo.retryable);</span>
+<span class="fc" id="L181">        response.setSuggestedAction(errorInfo.suggestedAction);</span>
+<span class="fc" id="L182">        response.setDetailedError(errorMessage);</span>
+        
+        // Add retry guidance
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (errorInfo.retryable) {</span>
+<span class="fc" id="L186">            response.setRetryAfterSeconds(calculateRetryDelay(errorInfo.category));</span>
+<span class="fc" id="L187">            response.setMaxRetryAttempts(getMaxRetryAttempts(errorInfo.category));</span>
+        }
+        
+<span class="fc" id="L190">        return response;</span>
+    }
+
+    /**
+     * Determine transaction status based on error category.
+     */
+    private PaymentStatus determineTransactionStatus(String category) {
+<span class="fc bfc" id="L197" title="All 3 branches covered.">        switch (category) {</span>
+            case &quot;NETWORK_ERROR&quot;:
+            case &quot;TIMEOUT_ERROR&quot;:
+            case &quot;PROCESSING_ERROR&quot;:
+<span class="fc" id="L201">                return PaymentStatus.PENDING;</span>
+            case &quot;DUPLICATE_TRANSACTION&quot;:
+<span class="fc" id="L203">                return PaymentStatus.FAILED;</span>
+            default:
+<span class="fc" id="L205">                return PaymentStatus.FAILED;</span>
+        }
+    }
+
+    /**
+     * Categorize exception types for appropriate error handling.
+     */
+    private String categorizeException(Exception exception) {
+<span class="fc" id="L213">        String message = exception.getMessage().toLowerCase();</span>
+        
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (message.contains(&quot;timeout&quot;) || message.contains(&quot;timed out&quot;)) {</span>
+<span class="fc" id="L216">            return &quot;TIMEOUT_ERROR&quot;;</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">        } else if (message.contains(&quot;connection&quot;) || message.contains(&quot;network&quot;)) {</span>
+<span class="fc" id="L218">            return &quot;NETWORK_ERROR&quot;;</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">        } else if (message.contains(&quot;validation&quot;) || message.contains(&quot;invalid&quot;)) {</span>
+<span class="fc" id="L220">            return &quot;VALIDATION_ERROR&quot;;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        } else if (message.contains(&quot;duplicate&quot;)) {</span>
+<span class="fc" id="L222">            return &quot;DUPLICATE_TRANSACTION&quot;;</span>
+        } else {
+<span class="fc" id="L224">            return &quot;SYSTEM_ERROR&quot;;</span>
+        }
+    }
+
+    /**
+     * Get error info for general error categories.
+     */
+    private ErrorInfo getErrorInfoForCategory(String category) {
+<span class="fc bfc" id="L232" title="All 5 branches covered.">        switch (category) {</span>
+            case &quot;TIMEOUT_ERROR&quot;:
+<span class="fc" id="L234">                return new ErrorInfo(&quot;TIMEOUT_ERROR&quot;, &quot;Request timed out&quot;, true, &quot;Please try again&quot;);</span>
+            case &quot;NETWORK_ERROR&quot;:
+<span class="fc" id="L236">                return new ErrorInfo(&quot;NETWORK_ERROR&quot;, &quot;Network connection failed&quot;, true, &quot;Check connection and retry&quot;);</span>
+            case &quot;VALIDATION_ERROR&quot;:
+<span class="fc" id="L238">                return new ErrorInfo(&quot;VALIDATION_ERROR&quot;, &quot;Invalid request data&quot;, false, &quot;Please correct the data&quot;);</span>
+            case &quot;DUPLICATE_TRANSACTION&quot;:
+<span class="fc" id="L240">                return new ErrorInfo(&quot;DUPLICATE_TRANSACTION&quot;, &quot;Transaction already processed&quot;, false, &quot;Check transaction history&quot;);</span>
+            default:
+<span class="fc" id="L242">                return new ErrorInfo(&quot;SYSTEM_ERROR&quot;, &quot;Internal system error&quot;, true, &quot;Please contact support&quot;);</span>
+        }
+    }
+
+    /**
+     * Calculate retry delay based on error category.
+     */
+    private int calculateRetryDelay(String category) {
+<span class="fc bfc" id="L250" title="All 4 branches covered.">        switch (category) {</span>
+            case &quot;NETWORK_ERROR&quot;:
+            case &quot;TIMEOUT_ERROR&quot;:
+<span class="fc" id="L253">                return 30; // 30 seconds</span>
+            case &quot;PROCESSING_ERROR&quot;:
+<span class="fc" id="L255">                return 60; // 1 minute</span>
+            case &quot;VELOCITY_LIMIT&quot;:
+<span class="fc" id="L257">                return 300; // 5 minutes</span>
+            default:
+<span class="fc" id="L259">                return 10; // 10 seconds</span>
+        }
+    }
+
+    /**
+     * Get maximum retry attempts for error category.
+     */
+    private int getMaxRetryAttempts(String category) {
+<span class="fc bfc" id="L267" title="All 4 branches covered.">        switch (category) {</span>
+            case &quot;NETWORK_ERROR&quot;:
+            case &quot;TIMEOUT_ERROR&quot;:
+<span class="fc" id="L270">                return 3;</span>
+            case &quot;PROCESSING_ERROR&quot;:
+<span class="fc" id="L272">                return 2;</span>
+            case &quot;VELOCITY_LIMIT&quot;:
+<span class="fc" id="L274">                return 1;</span>
+            default:
+<span class="fc" id="L276">                return 1;</span>
+        }
+    }
+
+    /**
+     * Inner class to hold error information.
+     */
+    private static class ErrorInfo {
+        final String category;
+        final String message;
+        final boolean retryable;
+        final String suggestedAction;
+
+<span class="fc" id="L289">        ErrorInfo(String category, String message, boolean retryable, String suggestedAction) {</span>
+<span class="fc" id="L290">            this.category = category;</span>
+<span class="fc" id="L291">            this.message = message;</span>
+<span class="fc" id="L292">            this.retryable = retryable;</span>
+<span class="fc" id="L293">            this.suggestedAction = suggestedAction;</span>
+<span class="fc" id="L294">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

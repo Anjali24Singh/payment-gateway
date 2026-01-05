@@ -1,0 +1,95 @@
+# No Docker Configuration - Uses H2 Database and Embedded Cache
+
+spring:
+  # H2 In-Memory Database
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 20000
+
+  # JPA Configuration for H2
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # H2 Console (for debugging)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Disable Flyway (we'll use JPA DDL)
+  flyway:
+    enabled: false
+
+  # Use Simple Cache instead of Redis
+  cache:
+    type: simple
+  
+  # Disable Redis auto-configuration and related features
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+# Server Configuration
+server:
+  port: 8080
+
+# Management Endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      validate-group-membership: false
+  health:
+    redis:
+      enabled: false
+
+# Logging Configuration
+logging:
+  level:
+    com.talentica.paymentgateway: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type: TRACE
+
+# Application Configuration
+app:
+  environment: no-docker
+  features:
+    redis-cache: false
+    database-monitoring: false
+    analytics: false
+  
+  # Sample Authorize.Net configuration (for development/testing)
+  # DO NOT use these values in production!
+  authorize-net:
+    api-login-id: "test_api_login_id"
+    transaction-key: "test_transaction_key" 
+    base-url: "https://apitest.authorize.net/xml/v1/request.api"
+    environment: SANDBOX
+    timeout: 30000
+    retry-attempts: 3
+    retry-delay: 1000
+    
+  # JWT Configuration for development
+  jwt:
+    secret: "dev-jwt-secret-key-for-testing-only-do-not-use-in-production"
+    expiration: 86400
+    rate-limiting: false
+    distributed-cache: false

@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.webhook</a> &gt; <span class="el_source">WebhookResponse.java</span></div><h1>WebhookResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.webhook;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.time.ZonedDateTime;
+
+/**
+ * DTO for webhook response.
+ * Represents the response sent back to webhook callers.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class WebhookResponse {
+    
+    @JsonProperty(&quot;status&quot;)
+    private String status;
+    
+    @JsonProperty(&quot;message&quot;)
+    private String message;
+    
+    @JsonProperty(&quot;eventId&quot;)
+    private String eventId;
+    
+    @JsonProperty(&quot;processedAt&quot;)
+    private ZonedDateTime processedAt;
+    
+    @JsonProperty(&quot;correlationId&quot;)
+    private String correlationId;
+    
+    @JsonProperty(&quot;error&quot;)
+    private WebhookError error;
+    
+    // Default constructor
+<span class="fc" id="L37">    public WebhookResponse() {</span>
+<span class="fc" id="L38">        this.processedAt = ZonedDateTime.now();</span>
+<span class="fc" id="L39">    }</span>
+    
+    // Success constructor
+    public WebhookResponse(String eventId, String correlationId) {
+<span class="fc" id="L43">        this();</span>
+<span class="fc" id="L44">        this.status = &quot;success&quot;;</span>
+<span class="fc" id="L45">        this.message = &quot;Webhook processed successfully&quot;;</span>
+<span class="fc" id="L46">        this.eventId = eventId;</span>
+<span class="fc" id="L47">        this.correlationId = correlationId;</span>
+<span class="fc" id="L48">    }</span>
+    
+    // Error constructor
+    public WebhookResponse(String status, String message, String eventId, 
+                          String correlationId, WebhookError error) {
+<span class="fc" id="L53">        this();</span>
+<span class="fc" id="L54">        this.status = status;</span>
+<span class="fc" id="L55">        this.message = message;</span>
+<span class="fc" id="L56">        this.eventId = eventId;</span>
+<span class="fc" id="L57">        this.correlationId = correlationId;</span>
+<span class="fc" id="L58">        this.error = error;</span>
+<span class="fc" id="L59">    }</span>
+    
+    // Static factory methods
+    public static WebhookResponse success(String eventId, String correlationId) {
+<span class="fc" id="L63">        return new WebhookResponse(eventId, correlationId);</span>
+    }
+    
+    public static WebhookResponse success(String eventId, String correlationId, String message) {
+<span class="fc" id="L67">        WebhookResponse response = new WebhookResponse(eventId, correlationId);</span>
+<span class="fc" id="L68">        response.setMessage(message);</span>
+<span class="fc" id="L69">        return response;</span>
+    }
+    
+    public static WebhookResponse error(String eventId, String correlationId, String message) {
+<span class="fc" id="L73">        return new WebhookResponse(&quot;error&quot;, message, eventId, correlationId, null);</span>
+    }
+    
+    public static WebhookResponse error(String eventId, String correlationId, 
+                                      String message, WebhookError error) {
+<span class="fc" id="L78">        return new WebhookResponse(&quot;error&quot;, message, eventId, correlationId, error);</span>
+    }
+    
+    public static WebhookResponse validationError(String eventId, String correlationId, 
+                                                String message, WebhookError error) {
+<span class="fc" id="L83">        return new WebhookResponse(&quot;validation_error&quot;, message, eventId, correlationId, error);</span>
+    }
+    
+    public static WebhookResponse duplicateEvent(String eventId, String correlationId) {
+<span class="fc" id="L87">        return new WebhookResponse(&quot;duplicate&quot;, &quot;Event already processed&quot;, eventId, correlationId, null);</span>
+    }
+    
+    public static WebhookResponse signatureError(String eventId, String correlationId) {
+<span class="fc" id="L91">        WebhookError error = new WebhookError(&quot;SIGNATURE_INVALID&quot;, </span>
+                                            &quot;Webhook signature verification failed&quot;, 
+                                            &quot;Verify webhook signature configuration&quot;);
+<span class="fc" id="L94">        return new WebhookResponse(&quot;signature_error&quot;, &quot;Invalid signature&quot;, </span>
+                                 eventId, correlationId, error);
+    }
+    
+    public static WebhookResponse processingError(String eventId, String correlationId, 
+                                                String message, Exception exception) {
+<span class="fc" id="L100">        WebhookError error = new WebhookError(&quot;PROCESSING_ERROR&quot;, </span>
+<span class="fc" id="L101">                                            exception.getMessage(), </span>
+                                            &quot;Check application logs for details&quot;);
+<span class="fc" id="L103">        return new WebhookResponse(&quot;processing_error&quot;, message, eventId, correlationId, error);</span>
+    }
+    
+    // Getters and Setters
+    public String getStatus() {
+<span class="fc" id="L108">        return status;</span>
+    }
+    
+    public void setStatus(String status) {
+<span class="fc" id="L112">        this.status = status;</span>
+<span class="fc" id="L113">    }</span>
+    
+    public String getMessage() {
+<span class="fc" id="L116">        return message;</span>
+    }
+    
+    public void setMessage(String message) {
+<span class="fc" id="L120">        this.message = message;</span>
+<span class="fc" id="L121">    }</span>
+    
+    public String getEventId() {
+<span class="fc" id="L124">        return eventId;</span>
+    }
+    
+    public void setEventId(String eventId) {
+<span class="fc" id="L128">        this.eventId = eventId;</span>
+<span class="fc" id="L129">    }</span>
+    
+    public ZonedDateTime getProcessedAt() {
+<span class="fc" id="L132">        return processedAt;</span>
+    }
+    
+    public void setProcessedAt(ZonedDateTime processedAt) {
+<span class="fc" id="L136">        this.processedAt = processedAt;</span>
+<span class="fc" id="L137">    }</span>
+    
+    public String getCorrelationId() {
+<span class="fc" id="L140">        return correlationId;</span>
+    }
+    
+    public void setCorrelationId(String correlationId) {
+<span class="fc" id="L144">        this.correlationId = correlationId;</span>
+<span class="fc" id="L145">    }</span>
+    
+    public WebhookError getError() {
+<span class="fc" id="L148">        return error;</span>
+    }
+    
+    public void setError(WebhookError error) {
+<span class="fc" id="L152">        this.error = error;</span>
+<span class="fc" id="L153">    }</span>
+    
+    // Utility methods
+    public boolean isSuccess() {
+<span class="fc" id="L157">        return &quot;success&quot;.equals(status);</span>
+    }
+    
+    public boolean isError() {
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">        return status != null &amp;&amp; status.contains(&quot;error&quot;);</span>
+    }
+    
+    public boolean isDuplicate() {
+<span class="fc" id="L165">        return &quot;duplicate&quot;.equals(status);</span>
+    }
+    
+    @Override
+    public String toString() {
+<span class="fc" id="L170">        return &quot;WebhookResponse{&quot; +</span>
+               &quot;status='&quot; + status + '\'' +
+               &quot;, message='&quot; + message + '\'' +
+               &quot;, eventId='&quot; + eventId + '\'' +
+               &quot;, correlationId='&quot; + correlationId + '\'' +
+               &quot;, processedAt=&quot; + processedAt +
+               '}';
+    }
+    
+    /**
+     * Nested class representing webhook error details.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WebhookError {
+        
+        @JsonProperty(&quot;code&quot;)
+        private String code;
+        
+        @JsonProperty(&quot;description&quot;)
+        private String description;
+        
+        @JsonProperty(&quot;suggestion&quot;)
+        private String suggestion;
+        
+        @JsonProperty(&quot;timestamp&quot;)
+        private ZonedDateTime timestamp;
+        
+        // Default constructor
+<span class="fc" id="L198">        public WebhookError() {</span>
+<span class="fc" id="L199">            this.timestamp = ZonedDateTime.now();</span>
+<span class="fc" id="L200">        }</span>
+        
+        // Parameterized constructor
+        public WebhookError(String code, String description, String suggestion) {
+<span class="fc" id="L204">            this();</span>
+<span class="fc" id="L205">            this.code = code;</span>
+<span class="fc" id="L206">            this.description = description;</span>
+<span class="fc" id="L207">            this.suggestion = suggestion;</span>
+<span class="fc" id="L208">        }</span>
+        
+        // Getters and Setters
+        public String getCode() {
+<span class="fc" id="L212">            return code;</span>
+        }
+        
+        public void setCode(String code) {
+<span class="fc" id="L216">            this.code = code;</span>
+<span class="fc" id="L217">        }</span>
+        
+        public String getDescription() {
+<span class="fc" id="L220">            return description;</span>
+        }
+        
+        public void setDescription(String description) {
+<span class="fc" id="L224">            this.description = description;</span>
+<span class="fc" id="L225">        }</span>
+        
+        public String getSuggestion() {
+<span class="fc" id="L228">            return suggestion;</span>
+        }
+        
+        public void setSuggestion(String suggestion) {
+<span class="fc" id="L232">            this.suggestion = suggestion;</span>
+<span class="fc" id="L233">        }</span>
+        
+        public ZonedDateTime getTimestamp() {
+<span class="fc" id="L236">            return timestamp;</span>
+        }
+        
+        public void setTimestamp(ZonedDateTime timestamp) {
+<span class="fc" id="L240">            this.timestamp = timestamp;</span>
+<span class="fc" id="L241">        }</span>
+        
+        @Override
+        public String toString() {
+<span class="fc" id="L245">            return &quot;WebhookError{&quot; +</span>
+                   &quot;code='&quot; + code + '\'' +
+                   &quot;, description='&quot; + description + '\'' +
+                   &quot;, timestamp=&quot; + timestamp +
+                   '}';
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

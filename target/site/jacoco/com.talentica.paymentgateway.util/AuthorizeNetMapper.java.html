@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthorizeNetMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.util</a> &gt; <span class="el_source">AuthorizeNetMapper.java</span></div><h1>AuthorizeNetMapper.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.util;
+
+import com.talentica.paymentgateway.dto.payment.*;
+import com.talentica.paymentgateway.entity.*;
+import net.authorize.api.contract.v1.*;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.UUID;
+
+/**
+ * Utility class for mapping between payment DTOs and Authorize.Net SDK objects.
+ * Handles the conversion between our internal models and Authorize.Net API structures.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Component
+<span class="fc" id="L20">public class AuthorizeNetMapper {</span>
+
+    /**
+     * Maps a PaymentRequest to Authorize.Net CreateTransactionRequest for purchase.
+     */
+    public CreateTransactionRequest mapToPurchaseTransaction(PaymentRequest request, 
+                                                           MerchantAuthenticationType merchant) {
+<span class="fc" id="L27">        CreateTransactionRequest apiRequest = new CreateTransactionRequest();</span>
+<span class="fc" id="L28">        apiRequest.setMerchantAuthentication(merchant);</span>
+
+<span class="fc" id="L30">        TransactionRequestType transactionRequest = new TransactionRequestType();</span>
+<span class="fc" id="L31">        transactionRequest.setTransactionType(TransactionTypeEnum.AUTH_CAPTURE_TRANSACTION.value());</span>
+<span class="fc" id="L32">        transactionRequest.setAmount(request.getAmount());</span>
+
+        // Set payment method
+<span class="fc" id="L35">        PaymentType payment = mapToPaymentType(request.getPaymentMethod());</span>
+<span class="fc" id="L36">        transactionRequest.setPayment(payment);</span>
+
+        // Set order information
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">        if (request.getOrderNumber() != null || request.getDescription() != null) {</span>
+<span class="fc" id="L40">            OrderType order = new OrderType();</span>
+<span class="fc" id="L41">            order.setInvoiceNumber(request.getInvoiceNumber());</span>
+<span class="fc" id="L42">            order.setDescription(request.getDescription());</span>
+<span class="fc" id="L43">            transactionRequest.setOrder(order);</span>
+        }
+
+        // Set billing address
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (request.getBillingAddress() != null) {</span>
+<span class="nc" id="L48">            CustomerAddressType billTo = mapToCustomerAddress(request.getBillingAddress());</span>
+<span class="nc" id="L49">            transactionRequest.setBillTo(billTo);</span>
+        }
+
+        // Set shipping address
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (request.getShippingAddress() != null) {</span>
+<span class="nc" id="L54">            CustomerAddressType shipTo = mapToCustomerAddress(request.getShippingAddress());</span>
+<span class="nc" id="L55">            transactionRequest.setShipTo(shipTo);</span>
+        }
+
+        // Set customer information
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (request.getCustomerId() != null) {</span>
+<span class="nc" id="L60">            CustomerDataType customer = new CustomerDataType();</span>
+<span class="nc" id="L61">            customer.setId(request.getCustomerId());</span>
+<span class="nc" id="L62">            transactionRequest.setCustomer(customer);</span>
+        }
+
+        // Set solution ID for tracking
+<span class="fc" id="L66">        SolutionType solution = new SolutionType();</span>
+<span class="fc" id="L67">        solution.setId(&quot;A1000010&quot;); // Authorize.Net assigned solution ID</span>
+<span class="fc" id="L68">        transactionRequest.setSolution(solution);</span>
+
+<span class="fc" id="L70">        apiRequest.setTransactionRequest(transactionRequest);</span>
+<span class="fc" id="L71">        return apiRequest;</span>
+    }
+
+    /**
+     * Maps a PaymentRequest to Authorize.Net CreateTransactionRequest for authorization only.
+     */
+    public CreateTransactionRequest mapToAuthorizeTransaction(AuthorizeRequest request, 
+                                                            MerchantAuthenticationType merchant) {
+<span class="fc" id="L79">        CreateTransactionRequest apiRequest = new CreateTransactionRequest();</span>
+<span class="fc" id="L80">        apiRequest.setMerchantAuthentication(merchant);</span>
+
+<span class="fc" id="L82">        TransactionRequestType transactionRequest = new TransactionRequestType();</span>
+<span class="fc" id="L83">        transactionRequest.setTransactionType(TransactionTypeEnum.AUTH_ONLY_TRANSACTION.value());</span>
+<span class="fc" id="L84">        transactionRequest.setAmount(request.getAmount());</span>
+
+        // Set payment method
+<span class="fc" id="L87">        PaymentType payment = mapToPaymentType(request.getPaymentMethod());</span>
+<span class="fc" id="L88">        transactionRequest.setPayment(payment);</span>
+
+        // Set order information
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        if (request.getOrderNumber() != null || request.getDescription() != null) {</span>
+<span class="nc" id="L92">            OrderType order = new OrderType();</span>
+<span class="nc" id="L93">            order.setInvoiceNumber(request.getInvoiceNumber());</span>
+<span class="nc" id="L94">            order.setDescription(request.getDescription());</span>
+<span class="nc" id="L95">            transactionRequest.setOrder(order);</span>
+        }
+
+        // Set billing address
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (request.getBillingAddress() != null) {</span>
+<span class="nc" id="L100">            CustomerAddressType billTo = mapToCustomerAddress(request.getBillingAddress());</span>
+<span class="nc" id="L101">            transactionRequest.setBillTo(billTo);</span>
+        }
+
+        // Set shipping address
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (request.getShippingAddress() != null) {</span>
+<span class="nc" id="L106">            CustomerAddressType shipTo = mapToCustomerAddress(request.getShippingAddress());</span>
+<span class="nc" id="L107">            transactionRequest.setShipTo(shipTo);</span>
+        }
+
+        // Set customer information
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (request.getCustomerId() != null) {</span>
+<span class="nc" id="L112">            CustomerDataType customer = new CustomerDataType();</span>
+<span class="nc" id="L113">            customer.setId(request.getCustomerId());</span>
+<span class="nc" id="L114">            transactionRequest.setCustomer(customer);</span>
+        }
+
+<span class="fc" id="L117">        apiRequest.setTransactionRequest(transactionRequest);</span>
+<span class="fc" id="L118">        return apiRequest;</span>
+    }
+
+    /**
+     * Maps a CaptureRequest to Authorize.Net CreateTransactionRequest for prior auth capture.
+     */
+    public CreateTransactionRequest mapToCaptureTransaction(CaptureRequest request,
+                                                          String authnetTransactionId,
+                                                          MerchantAuthenticationType merchant) {
+<span class="fc" id="L127">        CreateTransactionRequest apiRequest = new CreateTransactionRequest();</span>
+<span class="fc" id="L128">        apiRequest.setMerchantAuthentication(merchant);</span>
+
+<span class="fc" id="L130">        TransactionRequestType transactionRequest = new TransactionRequestType();</span>
+<span class="fc" id="L131">        transactionRequest.setTransactionType(TransactionTypeEnum.PRIOR_AUTH_CAPTURE_TRANSACTION.value());</span>
+        
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (request.getAmount() != null) {</span>
+<span class="fc" id="L134">            transactionRequest.setAmount(request.getAmount());</span>
+        }
+
+        // Set reference to original authorization
+<span class="fc" id="L138">        transactionRequest.setRefTransId(authnetTransactionId);</span>
+
+        // Set order information
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        if (request.getInvoiceNumber() != null || request.getDescription() != null) {</span>
+<span class="nc" id="L142">            OrderType order = new OrderType();</span>
+<span class="nc" id="L143">            order.setInvoiceNumber(request.getInvoiceNumber());</span>
+<span class="nc" id="L144">            order.setDescription(request.getDescription());</span>
+<span class="nc" id="L145">            transactionRequest.setOrder(order);</span>
+        }
+
+<span class="fc" id="L148">        apiRequest.setTransactionRequest(transactionRequest);</span>
+<span class="fc" id="L149">        return apiRequest;</span>
+    }
+
+    /**
+     * Maps a RefundRequest to Authorize.Net CreateTransactionRequest for refund.
+     */
+    public CreateTransactionRequest mapToRefundTransaction(RefundRequest request,
+                                                         String authnetTransactionId,
+                                                         PaymentMethod paymentMethod,
+                                                         MerchantAuthenticationType merchant) {
+<span class="fc" id="L159">        CreateTransactionRequest apiRequest = new CreateTransactionRequest();</span>
+<span class="fc" id="L160">        apiRequest.setMerchantAuthentication(merchant);</span>
+
+<span class="fc" id="L162">        TransactionRequestType transactionRequest = new TransactionRequestType();</span>
+<span class="fc" id="L163">        transactionRequest.setTransactionType(TransactionTypeEnum.REFUND_TRANSACTION.value());</span>
+        
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (request.getAmount() != null) {</span>
+<span class="nc" id="L166">            transactionRequest.setAmount(request.getAmount());</span>
+        }
+
+        // Set reference to original transaction
+<span class="fc" id="L170">        transactionRequest.setRefTransId(authnetTransactionId);</span>
+
+        // Set payment method for refund (required for refunds)
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (paymentMethod != null) {</span>
+<span class="fc" id="L174">            PaymentType payment = new PaymentType();</span>
+<span class="fc" id="L175">            CreditCardType creditCard = new CreditCardType();</span>
+            // For sandbox testing, use the full card number if available, otherwise use last 4
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            String cardNumber = paymentMethod.getCardNumber() != null ? </span>
+<span class="nc" id="L178">                paymentMethod.getCardNumber() : </span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                (paymentMethod.getCardLastFour() != null ? paymentMethod.getCardLastFour() : &quot;XXXX&quot;);</span>
+<span class="fc" id="L180">            creditCard.setCardNumber(cardNumber);</span>
+<span class="fc" id="L181">            creditCard.setExpirationDate(&quot;XXXX&quot;); // Masked expiration for refunds</span>
+<span class="fc" id="L182">            payment.setCreditCard(creditCard);</span>
+<span class="fc" id="L183">            transactionRequest.setPayment(payment);</span>
+        }
+
+        // Set order information
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (request.getReferenceNumber() != null || request.getDescription() != null) {</span>
+<span class="fc" id="L188">            OrderType order = new OrderType();</span>
+<span class="fc" id="L189">            order.setInvoiceNumber(request.getReferenceNumber());</span>
+<span class="fc" id="L190">            order.setDescription(request.getDescription());</span>
+<span class="fc" id="L191">            transactionRequest.setOrder(order);</span>
+        }
+
+<span class="fc" id="L194">        apiRequest.setTransactionRequest(transactionRequest);</span>
+<span class="fc" id="L195">        return apiRequest;</span>
+    }
+
+    /**
+     * Maps a VoidRequest to Authorize.Net CreateTransactionRequest for void.
+     */
+    public CreateTransactionRequest mapToVoidTransaction(VoidRequest request,
+                                                       String authnetTransactionId,
+                                                       MerchantAuthenticationType merchant) {
+<span class="fc" id="L204">        CreateTransactionRequest apiRequest = new CreateTransactionRequest();</span>
+<span class="fc" id="L205">        apiRequest.setMerchantAuthentication(merchant);</span>
+
+<span class="fc" id="L207">        TransactionRequestType transactionRequest = new TransactionRequestType();</span>
+<span class="fc" id="L208">        transactionRequest.setTransactionType(TransactionTypeEnum.VOID_TRANSACTION.value());</span>
+
+        // Set reference to original transaction
+<span class="fc" id="L211">        transactionRequest.setRefTransId(authnetTransactionId);</span>
+
+        // Set order information
+<span class="pc bpc" id="L214" title="2 of 4 branches missed.">        if (request.getReferenceNumber() != null || request.getDescription() != null) {</span>
+<span class="fc" id="L215">            OrderType order = new OrderType();</span>
+<span class="fc" id="L216">            order.setInvoiceNumber(request.getReferenceNumber());</span>
+<span class="fc" id="L217">            order.setDescription(request.getDescription());</span>
+<span class="fc" id="L218">            transactionRequest.setOrder(order);</span>
+        }
+
+<span class="fc" id="L221">        apiRequest.setTransactionRequest(transactionRequest);</span>
+<span class="fc" id="L222">        return apiRequest;</span>
+    }
+
+    /**
+     * Maps PaymentMethodRequest to Authorize.Net PaymentType.
+     */
+    private PaymentType mapToPaymentType(PaymentMethodRequest paymentMethod) {
+<span class="fc" id="L229">        PaymentType payment = new PaymentType();</span>
+
+<span class="pc bpc" id="L231" title="3 of 4 branches missed.">        switch (paymentMethod.getType()) {</span>
+            case &quot;CREDIT_CARD&quot;:
+<span class="fc" id="L233">                CreditCardType creditCard = new CreditCardType();</span>
+<span class="fc" id="L234">                creditCard.setCardNumber(paymentMethod.getCardNumber());</span>
+<span class="fc" id="L235">                creditCard.setExpirationDate(formatExpirationDate(paymentMethod.getExpiryMonth(), </span>
+<span class="fc" id="L236">                                                                 paymentMethod.getExpiryYear()));</span>
+<span class="fc" id="L237">                creditCard.setCardCode(paymentMethod.getCvv());</span>
+<span class="fc" id="L238">                payment.setCreditCard(creditCard);</span>
+<span class="fc" id="L239">                break;</span>
+
+            case &quot;TOKEN&quot;:
+                // For tokenized payments, we would typically use customer profile references
+                // This is a simplified implementation
+<span class="nc" id="L244">                throw new UnsupportedOperationException(&quot;Token payments require customer profiles implementation&quot;);</span>
+
+            case &quot;BANK_ACCOUNT&quot;:
+<span class="nc" id="L247">                BankAccountType bankAccount = new BankAccountType();</span>
+<span class="nc" id="L248">                bankAccount.setAccountNumber(paymentMethod.getAccountNumber());</span>
+<span class="nc" id="L249">                bankAccount.setRoutingNumber(paymentMethod.getRoutingNumber());</span>
+<span class="nc" id="L250">                bankAccount.setAccountType(BankAccountTypeEnum.fromValue(paymentMethod.getAccountType().toLowerCase()));</span>
+<span class="nc" id="L251">                bankAccount.setNameOnAccount(paymentMethod.getAccountHolderName());</span>
+<span class="nc" id="L252">                bankAccount.setBankName(paymentMethod.getBankName());</span>
+<span class="nc" id="L253">                payment.setBankAccount(bankAccount);</span>
+<span class="nc" id="L254">                break;</span>
+
+            default:
+<span class="nc" id="L257">                throw new IllegalArgumentException(&quot;Unsupported payment method type: &quot; + paymentMethod.getType());</span>
+        }
+
+<span class="fc" id="L260">        return payment;</span>
+    }
+
+    /**
+     * Maps AddressRequest to Authorize.Net CustomerAddressType.
+     */
+    private CustomerAddressType mapToCustomerAddress(AddressRequest address) {
+<span class="nc" id="L267">        CustomerAddressType customerAddress = new CustomerAddressType();</span>
+<span class="nc" id="L268">        customerAddress.setFirstName(address.getFirstName());</span>
+<span class="nc" id="L269">        customerAddress.setLastName(address.getLastName());</span>
+<span class="nc" id="L270">        customerAddress.setCompany(address.getCompany());</span>
+<span class="nc" id="L271">        customerAddress.setAddress(address.getAddress1());</span>
+<span class="nc" id="L272">        customerAddress.setCity(address.getCity());</span>
+<span class="nc" id="L273">        customerAddress.setState(address.getState());</span>
+<span class="nc" id="L274">        customerAddress.setZip(address.getZipCode());</span>
+<span class="nc" id="L275">        customerAddress.setCountry(address.getCountry());</span>
+<span class="nc" id="L276">        customerAddress.setPhoneNumber(address.getPhoneNumber());</span>
+<span class="nc" id="L277">        return customerAddress;</span>
+    }
+
+    /**
+     * Maps Authorize.Net CreateTransactionResponse to PaymentResponse.
+     */
+    public PaymentResponse mapToPaymentResponse(CreateTransactionResponse authNetResponse, 
+                                              String internalTransactionId,
+                                              String transactionType,
+                                              PaymentMethodRequest paymentMethod,
+                                              String correlationId) {
+<span class="fc" id="L288">        PaymentResponse response = new PaymentResponse();</span>
+<span class="fc" id="L289">        response.setTransactionId(internalTransactionId);</span>
+<span class="fc" id="L290">        response.setTransactionType(transactionType);</span>
+<span class="fc" id="L291">        response.setCorrelationId(correlationId);</span>
+<span class="fc" id="L292">        response.setCreatedAt(ZonedDateTime.now());</span>
+
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (authNetResponse.getMessages().getResultCode() == MessageTypeEnum.OK) {</span>
+            // Successful transaction
+<span class="fc" id="L296">            TransactionResponse transactionResponse = authNetResponse.getTransactionResponse();</span>
+            
+<span class="fc" id="L298">            response.setSuccess(true);</span>
+<span class="fc" id="L299">            response.setAuthnetTransactionId(transactionResponse.getTransId());</span>
+<span class="fc" id="L300">            response.setAuthorizationCode(transactionResponse.getAuthCode());</span>
+<span class="fc" id="L301">            response.setResponseCode(transactionResponse.getResponseCode());</span>
+<span class="fc" id="L302">            response.setResponseReasonCode(transactionResponse.getMessages().getMessage().get(0).getCode());</span>
+<span class="fc" id="L303">            response.setResponseReasonText(transactionResponse.getMessages().getMessage().get(0).getDescription());</span>
+            
+            // Set status based on transaction type
+<span class="fc" id="L306">            response.setStatus(mapTransactionStatus(transactionType, transactionResponse));</span>
+            
+            // Set amounts - we'll use the amount from the original request as TransactionResponse doesn't expose amount directly
+            // The amount can be retrieved from the original request context
+<span class="fc" id="L310">            response.setAmount(null); // Will be set by the calling service with the original amount</span>
+<span class="fc" id="L311">            response.setCurrency(&quot;USD&quot;); // Authorize.Net primarily handles USD</span>
+            
+            // Set AVS and CVV results
+<span class="fc" id="L314">            response.setAvsResult(transactionResponse.getAvsResultCode());</span>
+<span class="fc" id="L315">            response.setCvvResult(transactionResponse.getCvvResultCode());</span>
+            
+            // Set test mode
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            response.setTestMode(transactionResponse.getTestRequest() != null &amp;&amp; </span>
+<span class="pc bnc" id="L319" title="All 2 branches missed.">                               &quot;1&quot;.equals(transactionResponse.getTestRequest()));</span>
+            
+            // Map payment method for response
+<span class="fc" id="L322">            response.setPaymentMethod(mapToPaymentMethodResponse(paymentMethod, transactionResponse));</span>
+            
+<span class="fc" id="L324">        } else {</span>
+            // Failed transaction
+<span class="fc" id="L326">            response.setSuccess(false);</span>
+<span class="fc" id="L327">            response.setStatus(&quot;FAILED&quot;);</span>
+            
+<span class="fc" id="L329">            PaymentErrorResponse error = mapToPaymentError(authNetResponse, correlationId);</span>
+<span class="fc" id="L330">            response.setError(error);</span>
+        }
+
+<span class="fc" id="L333">        return response;</span>
+    }
+
+    /**
+     * Maps transaction type and response to appropriate status.
+     */
+    private String mapTransactionStatus(String transactionType, TransactionResponse transactionResponse) {
+<span class="pc bpc" id="L340" title="5 of 6 branches missed.">        switch (transactionType.toUpperCase()) {</span>
+            case &quot;PURCHASE&quot;:
+<span class="fc" id="L342">                return &quot;CAPTURED&quot;;</span>
+            case &quot;AUTHORIZE&quot;:
+<span class="nc" id="L344">                return &quot;AUTHORIZED&quot;;</span>
+            case &quot;CAPTURE&quot;:
+<span class="nc" id="L346">                return &quot;CAPTURED&quot;;</span>
+            case &quot;REFUND&quot;:
+<span class="nc" id="L348">                return &quot;REFUNDED&quot;;</span>
+            case &quot;VOID&quot;:
+<span class="nc" id="L350">                return &quot;VOIDED&quot;;</span>
+            default:
+<span class="nc" id="L352">                return &quot;PENDING&quot;;</span>
+        }
+    }
+
+    /**
+     * Maps PaymentMethodRequest to PaymentMethodResponse for response.
+     */
+    private PaymentMethodResponse mapToPaymentMethodResponse(PaymentMethodRequest request, 
+                                                           TransactionResponse transactionResponse) {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L362">            return new PaymentMethodResponse(); // Return empty response for null requests (e.g., void transactions)</span>
+        }
+        
+<span class="pc bpc" id="L365" title="3 of 4 branches missed.">        switch (request.getType()) {</span>
+            case &quot;CREDIT_CARD&quot;:
+<span class="fc" id="L367">                return PaymentMethodResponse.fromCreditCard(</span>
+<span class="fc" id="L368">                    request.getCardNumber(),</span>
+<span class="fc" id="L369">                    detectCardBrand(request.getCardNumber()),</span>
+<span class="fc" id="L370">                    request.getExpiryMonth(),</span>
+<span class="fc" id="L371">                    request.getExpiryYear(),</span>
+<span class="fc" id="L372">                    request.getCardholderName()</span>
+                );
+            case &quot;TOKEN&quot;:
+<span class="nc" id="L375">                return PaymentMethodResponse.fromToken(request.getToken());</span>
+            case &quot;BANK_ACCOUNT&quot;:
+<span class="nc" id="L377">                return PaymentMethodResponse.fromBankAccount(</span>
+<span class="nc" id="L378">                    request.getAccountNumber(),</span>
+<span class="nc" id="L379">                    request.getRoutingNumber(),</span>
+<span class="nc" id="L380">                    request.getAccountType(),</span>
+<span class="nc" id="L381">                    request.getBankName(),</span>
+<span class="nc" id="L382">                    request.getAccountHolderName()</span>
+                );
+            default:
+<span class="nc" id="L385">                return new PaymentMethodResponse();</span>
+        }
+    }
+
+    /**
+     * Maps Authorize.Net error response to PaymentErrorResponse.
+     */
+    private PaymentErrorResponse mapToPaymentError(CreateTransactionResponse authNetResponse, 
+                                                 String correlationId) {
+        PaymentErrorResponse error;
+        
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (authNetResponse.getTransactionResponse() != null &amp;&amp; </span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">            authNetResponse.getTransactionResponse().getErrors() != null &amp;&amp;</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">            !authNetResponse.getTransactionResponse().getErrors().getError().isEmpty()) {</span>
+            
+            // Transaction-level error
+<span class="nc" id="L401">            TransactionResponse.Errors.Error transactionError = </span>
+<span class="nc" id="L402">                authNetResponse.getTransactionResponse().getErrors().getError().get(0);</span>
+            
+<span class="nc" id="L404">            error = new PaymentErrorResponse(</span>
+<span class="nc" id="L405">                mapErrorCode(transactionError.getErrorCode()),</span>
+<span class="nc" id="L406">                transactionError.getErrorText(),</span>
+<span class="nc" id="L407">                transactionError.getErrorText(),</span>
+                &quot;TRANSACTION_ERROR&quot;,
+                correlationId
+            );
+            
+<span class="nc" id="L412">            error.setGatewayCode(authNetResponse.getTransactionResponse().getResponseCode());</span>
+<span class="nc" id="L413">            error.setGatewayReasonCode(transactionError.getErrorCode());</span>
+<span class="nc" id="L414">            error.setGatewayReasonText(transactionError.getErrorText());</span>
+            
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        } else if (authNetResponse.getMessages() != null &amp;&amp; </span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                   !authNetResponse.getMessages().getMessage().isEmpty()) {</span>
+            
+            // API-level error
+<span class="fc" id="L420">            MessagesType.Message message = authNetResponse.getMessages().getMessage().get(0);</span>
+            
+<span class="fc" id="L422">            error = new PaymentErrorResponse(</span>
+<span class="fc" id="L423">                mapErrorCode(message.getCode()),</span>
+<span class="fc" id="L424">                message.getText(),</span>
+<span class="fc" id="L425">                message.getText(),</span>
+                &quot;API_ERROR&quot;,
+                correlationId
+            );
+            
+<span class="fc" id="L430">            error.setGatewayReasonCode(message.getCode());</span>
+<span class="fc" id="L431">            error.setGatewayReasonText(message.getText());</span>
+<span class="fc" id="L432">        } else {</span>
+            // Unknown error
+<span class="nc" id="L434">            error = PaymentErrorResponse.processingError(&quot;Unknown payment processing error&quot;, correlationId);</span>
+        }
+        
+<span class="fc" id="L437">        return error;</span>
+    }
+
+    /**
+     * Maps Authorize.Net error codes to our standard error codes.
+     */
+    private String mapErrorCode(String authNetErrorCode) {
+<span class="pc bpc" id="L444" title="10 of 11 branches missed.">        switch (authNetErrorCode) {</span>
+            case &quot;2&quot;:
+            case &quot;3&quot;:
+<span class="fc" id="L447">                return &quot;CARD_DECLINED&quot;;</span>
+            case &quot;4&quot;:
+<span class="nc" id="L449">                return &quot;PROCESSING_ERROR&quot;;</span>
+            case &quot;5&quot;:
+<span class="nc" id="L451">                return &quot;INVALID_AMOUNT&quot;;</span>
+            case &quot;6&quot;:
+<span class="nc" id="L453">                return &quot;INVALID_CARD&quot;;</span>
+            case &quot;7&quot;:
+<span class="nc" id="L455">                return &quot;INVALID_EXPIRY&quot;;</span>
+            case &quot;8&quot;:
+<span class="nc" id="L457">                return &quot;INVALID_AUTH_CODE&quot;;</span>
+            case &quot;27&quot;:
+<span class="nc" id="L459">                return &quot;AVS_MISMATCH&quot;;</span>
+            case &quot;28&quot;:
+<span class="nc" id="L461">                return &quot;MERCHANT_NOT_CONFIGURED&quot;;</span>
+            case &quot;44&quot;:
+<span class="nc" id="L463">                return &quot;CARD_TYPE_NOT_ACCEPTED&quot;;</span>
+            case &quot;45&quot;:
+<span class="nc" id="L465">                return &quot;INSUFFICIENT_FUNDS&quot;;</span>
+            default:
+<span class="nc" id="L467">                return &quot;PROCESSING_ERROR&quot;;</span>
+        }
+    }
+
+    /**
+     * Detects card brand from card number.
+     */
+    private String detectCardBrand(String cardNumber) {
+<span class="pc bpc" id="L475" title="2 of 4 branches missed.">        if (cardNumber == null || cardNumber.length() &lt; 4) {</span>
+<span class="nc" id="L476">            return &quot;UNKNOWN&quot;;</span>
+        }
+        
+<span class="fc" id="L479">        String firstFour = cardNumber.substring(0, Math.min(4, cardNumber.length()));</span>
+        
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        if (firstFour.startsWith(&quot;4&quot;)) {</span>
+<span class="fc" id="L482">            return &quot;VISA&quot;;</span>
+<span class="nc bnc" id="L483" title="All 4 branches missed.">        } else if (firstFour.startsWith(&quot;5&quot;) || firstFour.startsWith(&quot;2&quot;)) {</span>
+<span class="nc" id="L484">            return &quot;MASTERCARD&quot;;</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">        } else if (firstFour.startsWith(&quot;3&quot;)) {</span>
+<span class="nc" id="L486">            return &quot;AMEX&quot;;</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        } else if (firstFour.startsWith(&quot;6&quot;)) {</span>
+<span class="nc" id="L488">            return &quot;DISCOVER&quot;;</span>
+        } else {
+<span class="nc" id="L490">            return &quot;UNKNOWN&quot;;</span>
+        }
+    }
+
+    /**
+     * Formats expiration date for Authorize.Net (MMYY format).
+     */
+    private String formatExpirationDate(String month, String year) {
+<span class="pc bpc" id="L498" title="2 of 4 branches missed.">        if (month == null || year == null) {</span>
+<span class="nc" id="L499">            return null;</span>
+        }
+        
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        String formattedMonth = month.length() == 1 ? &quot;0&quot; + month : month;</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        String formattedYear = year.length() == 4 ? year.substring(2) : year;</span>
+        
+<span class="fc" id="L505">        return formattedMonth + formattedYear;</span>
+    }
+
+    /**
+     * Generates a unique transaction ID.
+     */
+    public String generateTransactionId() {
+<span class="fc" id="L512">        return &quot;txn_&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 16);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

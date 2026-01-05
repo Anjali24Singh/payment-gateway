@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebhookProcessingService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">WebhookProcessingService.java</span></div><h1>WebhookProcessingService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.webhook.AuthorizeNetWebhookRequest;
+import com.talentica.paymentgateway.dto.webhook.WebhookResponse;
+import com.talentica.paymentgateway.entity.*;
+import com.talentica.paymentgateway.repository.TransactionRepository;
+import com.talentica.paymentgateway.repository.WebhookRepository;
+import com.talentica.paymentgateway.util.CorrelationIdUtil;
+import com.talentica.paymentgateway.util.WebhookSignatureVerifier;
+
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Service for processing webhook events asynchronously.
+ * Handles Authorize.Net webhook events including payment status updates,
+ * fraud checks, and transaction state changes.
+ * 
+ * Features:
+ * - Asynchronous processing with thread pools
+ * - Duplicate event detection and prevention
+ * - Retry mechanism with exponential backoff
+ * - Transaction status synchronization
+ * - Comprehensive logging and metrics
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L42">@Slf4j</span>
+@Service
+@Transactional
+<span class="fc" id="L45">public class WebhookProcessingService {</span>
+    
+    @Autowired
+    private WebhookRepository webhookRepository;
+    
+    @Autowired
+    private TransactionRepository transactionRepository;
+    
+    @Autowired
+    private WebhookSignatureVerifier signatureVerifier;
+    
+    @Autowired
+    private MetricsService metricsService;
+    
+    @Value(&quot;${app.webhook.duplicate-detection.enabled:true}&quot;)
+    private boolean duplicateDetectionEnabled;
+    
+    @Value(&quot;${app.webhook.duplicate-detection.window-minutes:60}&quot;)
+    private int duplicateDetectionWindowMinutes;
+    
+    @Value(&quot;${app.webhook.processing.timeout-seconds:30}&quot;)
+    private int processingTimeoutSeconds;
+    
+    // Event type constants for Authorize.Net webhooks
+    private static final String EVENT_PAYMENT_AUTHCAPTURE_CREATED = &quot;net.authorize.payment.authcapture.created&quot;;
+    private static final String EVENT_PAYMENT_AUTHORIZATION_CREATED = &quot;net.authorize.payment.authorization.created&quot;;
+    private static final String EVENT_PAYMENT_CAPTURE_CREATED = &quot;net.authorize.payment.capture.created&quot;;
+    private static final String EVENT_PAYMENT_REFUND_CREATED = &quot;net.authorize.payment.refund.created&quot;;
+    private static final String EVENT_PAYMENT_VOID_CREATED = &quot;net.authorize.payment.void.created&quot;;
+    private static final String EVENT_PAYMENT_FRAUD_APPROVED = &quot;net.authorize.payment.fraud.approved&quot;;
+    private static final String EVENT_PAYMENT_FRAUD_DECLINED = &quot;net.authorize.payment.fraud.declined&quot;;
+    private static final String EVENT_PAYMENT_FRAUD_HELD = &quot;net.authorize.payment.fraud.held&quot;;
+    
+    /**
+     * Processes webhook request asynchronously.
+     * 
+     * @param webhookRequest Incoming webhook request
+     * @param headers HTTP headers for signature verification
+     * @param rawPayload Raw webhook payload for signature verification
+     * @return CompletableFuture with webhook response
+     */
+    @Async(&quot;taskExecutor&quot;)
+    public CompletableFuture&lt;WebhookResponse&gt; processWebhookAsync(
+            AuthorizeNetWebhookRequest webhookRequest, 
+            Map&lt;String, String&gt; headers,
+            String rawPayload) {
+        
+<span class="fc" id="L92">        String correlationId = CorrelationIdUtil.getOrGenerate();</span>
+<span class="fc" id="L93">        String eventId = webhookRequest.getNotificationId();</span>
+        
+        try {
+            // Set correlation ID for this processing thread
+<span class="fc" id="L97">            MDC.put(&quot;correlationId&quot;, correlationId);</span>
+            
+<span class="fc" id="L99">            log.info(&quot;Starting async webhook processing - EventID: {}, Type: {}, TransactionID: {}&quot;, </span>
+<span class="fc" id="L100">                       eventId, webhookRequest.getEventType(), webhookRequest.getTransactionId());</span>
+            
+            // Verify webhook signature
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (!signatureVerifier.verifySignature(headers, rawPayload)) {</span>
+<span class="fc" id="L104">                log.error(&quot;Webhook signature verification failed - EventID: {}&quot;, eventId);</span>
+<span class="fc" id="L105">                metricsService.incrementWebhookSignatureFailure();</span>
+<span class="fc" id="L106">                return CompletableFuture.completedFuture(</span>
+<span class="fc" id="L107">                    WebhookResponse.signatureError(eventId, correlationId));</span>
+            }
+            
+            // Check for duplicate events
+<span class="fc bfc" id="L111" title="All 4 branches covered.">            if (duplicateDetectionEnabled &amp;&amp; isDuplicateEvent(webhookRequest)) {</span>
+<span class="fc" id="L112">                log.warn(&quot;Duplicate webhook event detected - EventID: {}, Type: {}&quot;, </span>
+<span class="fc" id="L113">                           eventId, webhookRequest.getEventType());</span>
+<span class="fc" id="L114">                metricsService.incrementWebhookDuplicate(webhookRequest.getEventType());</span>
+<span class="fc" id="L115">                return CompletableFuture.completedFuture(</span>
+<span class="fc" id="L116">                    WebhookResponse.duplicateEvent(eventId, correlationId));</span>
+            }
+            
+            // Process the webhook event
+<span class="fc" id="L120">            WebhookResponse response = processWebhookEvent(webhookRequest, correlationId);</span>
+            
+            // Record successful processing
+<span class="fc" id="L123">            metricsService.incrementWebhookProcessed(webhookRequest.getEventType(), &quot;success&quot;);</span>
+            
+<span class="fc" id="L125">            log.info(&quot;Webhook processing completed successfully - EventID: {}, Type: {}&quot;, </span>
+<span class="fc" id="L126">                       eventId, webhookRequest.getEventType());</span>
+            
+<span class="fc" id="L128">            return CompletableFuture.completedFuture(response);</span>
+            
+<span class="fc" id="L130">        } catch (Exception e) {</span>
+<span class="fc" id="L131">            log.error(&quot;Error processing webhook - EventID: {}, Type: {}, Error: {}&quot;, </span>
+<span class="fc" id="L132">                        eventId, webhookRequest.getEventType(), e.getMessage(), e);</span>
+            
+<span class="fc" id="L134">            metricsService.incrementWebhookProcessed(webhookRequest.getEventType(), &quot;error&quot;);</span>
+            
+<span class="fc" id="L136">            return CompletableFuture.completedFuture(</span>
+<span class="fc" id="L137">                WebhookResponse.processingError(eventId, correlationId, </span>
+                                              &quot;Internal processing error&quot;, e));
+        } finally {
+<span class="fc" id="L140">            MDC.clear();</span>
+        }
+    }
+    
+    /**
+     * Processes a webhook event and updates transaction status.
+     * 
+     * @param webhookRequest Webhook request to process
+     * @param correlationId Correlation ID for tracking
+     * @return Webhook response
+     */
+    @Retryable(value = {Exception.class}, maxAttempts = 3, 
+               backoff = @Backoff(delay = 1000, multiplier = 2.0))
+    public WebhookResponse processWebhookEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L154">        String eventId = webhookRequest.getNotificationId();</span>
+<span class="fc" id="L155">        String eventType = webhookRequest.getEventType();</span>
+        
+        try {
+            // Create webhook record for audit trail
+<span class="fc" id="L159">            Webhook webhook = createWebhookRecord(webhookRequest, correlationId);</span>
+<span class="fc" id="L160">            webhook = webhookRepository.save(webhook);</span>
+            
+            // Process based on event type
+<span class="fc bfc" id="L163" title="All 7 branches covered.">            switch (eventType) {</span>
+                case EVENT_PAYMENT_AUTHCAPTURE_CREATED:
+<span class="fc" id="L165">                    return processAuthCaptureEvent(webhookRequest, correlationId);</span>
+                    
+                case EVENT_PAYMENT_AUTHORIZATION_CREATED:
+<span class="fc" id="L168">                    return processAuthorizationEvent(webhookRequest, correlationId);</span>
+                    
+                case EVENT_PAYMENT_CAPTURE_CREATED:
+<span class="fc" id="L171">                    return processCaptureEvent(webhookRequest, correlationId);</span>
+                    
+                case EVENT_PAYMENT_REFUND_CREATED:
+<span class="fc" id="L174">                    return processRefundEvent(webhookRequest, correlationId);</span>
+                    
+                case EVENT_PAYMENT_VOID_CREATED:
+<span class="fc" id="L177">                    return processVoidEvent(webhookRequest, correlationId);</span>
+                    
+                case EVENT_PAYMENT_FRAUD_APPROVED:
+                case EVENT_PAYMENT_FRAUD_DECLINED:
+                case EVENT_PAYMENT_FRAUD_HELD:
+<span class="fc" id="L182">                    return processFraudEvent(webhookRequest, correlationId);</span>
+                    
+                default:
+<span class="fc" id="L185">                    log.warn(&quot;Unsupported webhook event type: {} - EventID: {}&quot;, eventType, eventId);</span>
+<span class="fc" id="L186">                    return WebhookResponse.success(eventId, correlationId, </span>
+                                                 &quot;Event received but not processed (unsupported type)&quot;);
+            }
+            
+<span class="fc" id="L190">        } catch (Exception e) {</span>
+<span class="fc" id="L191">            log.error(&quot;Error processing webhook event - EventID: {}, Type: {}, Error: {}&quot;, </span>
+<span class="fc" id="L192">                        eventId, eventType, e.getMessage(), e);</span>
+<span class="fc" id="L193">            throw e; // Re-throw to trigger retry mechanism</span>
+        }
+    }
+    
+    /**
+     * Processes auth-capture (purchase) webhook events.
+     */
+    private WebhookResponse processAuthCaptureEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L201">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L202">        String eventId = webhookRequest.getNotificationId();</span>
+        
+<span class="fc" id="L204">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (transactionOpt.isEmpty()) {</span>
+<span class="fc" id="L206">            log.warn(&quot;Transaction not found for auth-capture webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="fc" id="L208">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L211">        Transaction transaction = transactionOpt.get();</span>
+<span class="fc" id="L212">        AuthorizeNetWebhookRequest.AuthorizeNetPayload payload = webhookRequest.getPayload();</span>
+        
+        // Update transaction status based on response code
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">        if (payload.getResponseCode() != null &amp;&amp; payload.getResponseCode() == 1) {</span>
+            // Approved
+<span class="fc" id="L217">            transaction.setStatus(PaymentStatus.SETTLED);</span>
+<span class="fc" id="L218">            transaction.setAuthnetAuthCode(payload.getAuthCode());</span>
+<span class="fc" id="L219">            transaction.setAuthnetAvsResult(payload.getAvsResponse());</span>
+<span class="fc" id="L220">            transaction.setAuthnetCvvResult(payload.getCardCodeResponse());</span>
+            
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (payload.getSettleAmount() != null) {</span>
+<span class="fc" id="L223">                transaction.setAmount(BigDecimal.valueOf(payload.getSettleAmount()));</span>
+            }
+            
+<span class="fc" id="L226">            log.info(&quot;Updated transaction status to SETTLED - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L227">                       transaction.getTransactionId(), transactionId);</span>
+        } else {
+            // Declined or error
+<span class="fc" id="L230">            transaction.setStatus(PaymentStatus.FAILED);</span>
+<span class="fc" id="L231">            log.info(&quot;Updated transaction status to FAILED - TransactionID: {}, AuthNetID: {}, ResponseCode: {}&quot;, </span>
+<span class="fc" id="L232">                       transaction.getTransactionId(), transactionId, payload.getResponseCode());</span>
+        }
+        
+<span class="fc" id="L235">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L236">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L238">        return WebhookResponse.success(eventId, correlationId, &quot;Auth-capture event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Processes authorization webhook events.
+     */
+    private WebhookResponse processAuthorizationEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L245">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L246">        String eventId = webhookRequest.getNotificationId();</span>
+        
+<span class="fc" id="L248">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (transactionOpt.isEmpty()) {</span>
+<span class="nc" id="L250">            log.warn(&quot;Transaction not found for authorization webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="nc" id="L252">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L255">        Transaction transaction = transactionOpt.get();</span>
+<span class="fc" id="L256">        AuthorizeNetWebhookRequest.AuthorizeNetPayload payload = webhookRequest.getPayload();</span>
+        
+        // Update transaction status
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (payload.getResponseCode() != null &amp;&amp; payload.getResponseCode() == 1) {</span>
+<span class="fc" id="L260">            transaction.setStatus(PaymentStatus.AUTHORIZED);</span>
+<span class="fc" id="L261">            transaction.setAuthnetAuthCode(payload.getAuthCode());</span>
+<span class="fc" id="L262">            transaction.setAuthnetAvsResult(payload.getAvsResponse());</span>
+<span class="fc" id="L263">            transaction.setAuthnetCvvResult(payload.getCardCodeResponse());</span>
+            
+<span class="fc" id="L265">            log.info(&quot;Updated transaction status to AUTHORIZED - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L266">                       transaction.getTransactionId(), transactionId);</span>
+        } else {
+<span class="nc" id="L268">            transaction.setStatus(PaymentStatus.FAILED);</span>
+<span class="nc" id="L269">            log.info(&quot;Updated transaction status to FAILED - TransactionID: {}, AuthNetID: {}, ResponseCode: {}&quot;, </span>
+<span class="nc" id="L270">                       transaction.getTransactionId(), transactionId, payload.getResponseCode());</span>
+        }
+        
+<span class="fc" id="L273">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L274">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L276">        return WebhookResponse.success(eventId, correlationId, &quot;Authorization event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Processes capture webhook events.
+     */
+    private WebhookResponse processCaptureEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L283">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L284">        String eventId = webhookRequest.getNotificationId();</span>
+        
+<span class="fc" id="L286">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (transactionOpt.isEmpty()) {</span>
+<span class="nc" id="L288">            log.warn(&quot;Transaction not found for capture webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="nc" id="L290">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L293">        Transaction transaction = transactionOpt.get();</span>
+<span class="fc" id="L294">        AuthorizeNetWebhookRequest.AuthorizeNetPayload payload = webhookRequest.getPayload();</span>
+        
+        // Update transaction status
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">        if (payload.getResponseCode() != null &amp;&amp; payload.getResponseCode() == 1) {</span>
+<span class="fc" id="L298">            transaction.setStatus(PaymentStatus.SETTLED);</span>
+            
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (payload.getSettleAmount() != null) {</span>
+<span class="fc" id="L301">                transaction.setAmount(BigDecimal.valueOf(payload.getSettleAmount()));</span>
+            }
+            
+<span class="fc" id="L304">            log.info(&quot;Updated transaction status to SETTLED - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L305">                       transaction.getTransactionId(), transactionId);</span>
+        } else {
+<span class="nc" id="L307">            transaction.setStatus(PaymentStatus.FAILED);</span>
+<span class="nc" id="L308">            log.info(&quot;Updated transaction status to FAILED - TransactionID: {}, AuthNetID: {}, ResponseCode: {}&quot;, </span>
+<span class="nc" id="L309">                       transaction.getTransactionId(), transactionId, payload.getResponseCode());</span>
+        }
+        
+<span class="fc" id="L312">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L313">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L315">        return WebhookResponse.success(eventId, correlationId, &quot;Capture event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Processes refund webhook events.
+     */
+    private WebhookResponse processRefundEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L322">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L323">        String eventId = webhookRequest.getNotificationId();</span>
+        
+<span class="fc" id="L325">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (transactionOpt.isEmpty()) {</span>
+<span class="nc" id="L327">            log.warn(&quot;Transaction not found for refund webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="nc" id="L329">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L332">        Transaction transaction = transactionOpt.get();</span>
+<span class="fc" id="L333">        AuthorizeNetWebhookRequest.AuthorizeNetPayload payload = webhookRequest.getPayload();</span>
+        
+        // Update transaction status
+<span class="pc bpc" id="L336" title="2 of 4 branches missed.">        if (payload.getResponseCode() != null &amp;&amp; payload.getResponseCode() == 1) {</span>
+            // Check if this is a full or partial refund
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            if (payload.getSettleAmount() != null) {</span>
+<span class="fc" id="L339">                BigDecimal refundAmount = BigDecimal.valueOf(payload.getSettleAmount());</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                if (refundAmount.compareTo(transaction.getAmount()) == 0) {</span>
+<span class="fc" id="L341">                    transaction.setStatus(PaymentStatus.REFUNDED);</span>
+                } else {
+<span class="fc" id="L343">                    transaction.setStatus(PaymentStatus.PARTIALLY_REFUNDED);</span>
+                }
+<span class="fc" id="L345">            } else {</span>
+<span class="fc" id="L346">                transaction.setStatus(PaymentStatus.REFUNDED);</span>
+            }
+            
+<span class="fc" id="L349">            log.info(&quot;Updated transaction status for refund - TransactionID: {}, AuthNetID: {}, Status: {}&quot;, </span>
+<span class="fc" id="L350">                       transaction.getTransactionId(), transactionId, transaction.getStatus());</span>
+        } else {
+<span class="nc" id="L352">            log.warn(&quot;Refund failed - TransactionID: {}, AuthNetID: {}, ResponseCode: {}&quot;, </span>
+<span class="nc" id="L353">                       transaction.getTransactionId(), transactionId, payload.getResponseCode());</span>
+        }
+        
+<span class="fc" id="L356">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L357">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L359">        return WebhookResponse.success(eventId, correlationId, &quot;Refund event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Processes void webhook events.
+     */
+    private WebhookResponse processVoidEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L366">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L367">        String eventId = webhookRequest.getNotificationId();</span>
+        
+<span class="fc" id="L369">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (transactionOpt.isEmpty()) {</span>
+<span class="nc" id="L371">            log.warn(&quot;Transaction not found for void webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="nc" id="L373">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L376">        Transaction transaction = transactionOpt.get();</span>
+<span class="fc" id="L377">        AuthorizeNetWebhookRequest.AuthorizeNetPayload payload = webhookRequest.getPayload();</span>
+        
+        // Update transaction status
+<span class="pc bpc" id="L380" title="2 of 4 branches missed.">        if (payload.getResponseCode() != null &amp;&amp; payload.getResponseCode() == 1) {</span>
+<span class="fc" id="L381">            transaction.setStatus(PaymentStatus.VOIDED);</span>
+<span class="fc" id="L382">            log.info(&quot;Updated transaction status to VOIDED - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L383">                       transaction.getTransactionId(), transactionId);</span>
+        } else {
+<span class="nc" id="L385">            log.warn(&quot;Void failed - TransactionID: {}, AuthNetID: {}, ResponseCode: {}&quot;, </span>
+<span class="nc" id="L386">                       transaction.getTransactionId(), transactionId, payload.getResponseCode());</span>
+        }
+        
+<span class="fc" id="L389">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L390">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L392">        return WebhookResponse.success(eventId, correlationId, &quot;Void event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Processes fraud review webhook events.
+     */
+    private WebhookResponse processFraudEvent(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L399">        String transactionId = webhookRequest.getTransactionId();</span>
+<span class="fc" id="L400">        String eventId = webhookRequest.getNotificationId();</span>
+<span class="fc" id="L401">        String eventType = webhookRequest.getEventType();</span>
+        
+<span class="fc" id="L403">        Optional&lt;Transaction&gt; transactionOpt = transactionRepository.findByAuthnetTransactionId(transactionId);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        if (transactionOpt.isEmpty()) {</span>
+<span class="nc" id="L405">            log.warn(&quot;Transaction not found for fraud webhook - AuthNetID: {}, EventID: {}&quot;, </span>
+                       transactionId, eventId);
+<span class="nc" id="L407">            return WebhookResponse.success(eventId, correlationId, &quot;Transaction not found in local database&quot;);</span>
+        }
+        
+<span class="fc" id="L410">        Transaction transaction = transactionOpt.get();</span>
+        
+        // Update transaction status based on fraud decision
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (eventType.contains(&quot;.fraud.approved&quot;)) {</span>
+<span class="fc" id="L414">            transaction.setStatus(PaymentStatus.SETTLED);</span>
+<span class="fc" id="L415">            log.info(&quot;Fraud review approved - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L416">                       transaction.getTransactionId(), transactionId);</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        } else if (eventType.contains(&quot;.fraud.declined&quot;)) {</span>
+<span class="fc" id="L418">            transaction.setStatus(PaymentStatus.FAILED);</span>
+<span class="fc" id="L419">            log.info(&quot;Fraud review declined - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L420">                       transaction.getTransactionId(), transactionId);</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        } else if (eventType.contains(&quot;.fraud.held&quot;)) {</span>
+<span class="fc" id="L422">            transaction.setStatus(PaymentStatus.PENDING_REVIEW);</span>
+<span class="fc" id="L423">            log.info(&quot;Transaction held for fraud review - TransactionID: {}, AuthNetID: {}&quot;, </span>
+<span class="fc" id="L424">                       transaction.getTransactionId(), transactionId);</span>
+        }
+        
+<span class="fc" id="L427">        transaction.setProcessedAt(ZonedDateTime.now());</span>
+<span class="fc" id="L428">        transactionRepository.save(transaction);</span>
+        
+<span class="fc" id="L430">        return WebhookResponse.success(eventId, correlationId, &quot;Fraud event processed successfully&quot;);</span>
+    }
+    
+    /**
+     * Creates a webhook record for audit trail.
+     */
+    private Webhook createWebhookRecord(AuthorizeNetWebhookRequest webhookRequest, String correlationId) {
+<span class="fc" id="L437">        Webhook webhook = new Webhook();</span>
+<span class="fc" id="L438">        webhook.setWebhookId(UUID.randomUUID().toString());</span>
+<span class="fc" id="L439">        webhook.setEventType(webhookRequest.getEventType());</span>
+<span class="fc" id="L440">        webhook.setEventId(webhookRequest.getNotificationId());</span>
+<span class="fc" id="L441">        webhook.setEndpointUrl(&quot;/api/v1/webhooks/authorize-net&quot;);</span>
+<span class="fc" id="L442">        webhook.setCorrelationId(correlationId);</span>
+<span class="fc" id="L443">        webhook.setStatus(WebhookStatus.PROCESSING);</span>
+        
+        // Store request payload
+<span class="fc" id="L446">        Map&lt;String, Object&gt; requestBody = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L447">        requestBody.put(&quot;notificationId&quot;, webhookRequest.getNotificationId());</span>
+<span class="fc" id="L448">        requestBody.put(&quot;eventType&quot;, webhookRequest.getEventType());</span>
+<span class="fc" id="L449">        requestBody.put(&quot;eventDate&quot;, webhookRequest.getEventDate());</span>
+<span class="fc" id="L450">        requestBody.put(&quot;webhookId&quot;, webhookRequest.getWebhookId());</span>
+<span class="fc" id="L451">        requestBody.put(&quot;payload&quot;, webhookRequest.getPayload());</span>
+<span class="fc" id="L452">        webhook.setRequestBody(requestBody);</span>
+        
+<span class="fc" id="L454">        webhook.setStandardHeaders();</span>
+<span class="fc" id="L455">        webhook.setScheduledAt(ZonedDateTime.now());</span>
+        
+<span class="fc" id="L457">        return webhook;</span>
+    }
+    
+    /**
+     * Checks if the webhook event is a duplicate.
+     */
+    private boolean isDuplicateEvent(AuthorizeNetWebhookRequest webhookRequest) {
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">        if (!duplicateDetectionEnabled) {</span>
+<span class="nc" id="L465">            return false;</span>
+        }
+        
+<span class="fc" id="L468">        String eventId = webhookRequest.getNotificationId();</span>
+<span class="fc" id="L469">        String eventType = webhookRequest.getEventType();</span>
+        
+        // Check for duplicate events within the detection window
+<span class="fc" id="L472">        ZonedDateTime cutoffTime = ZonedDateTime.now().minusMinutes(duplicateDetectionWindowMinutes);</span>
+        
+<span class="fc" id="L474">        List&lt;Webhook&gt; recentWebhooks = webhookRepository.findByEventIdAndEventTypeAndCreatedAtAfter(</span>
+            eventId, eventType, cutoffTime);
+        
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        boolean isDuplicate = !recentWebhooks.isEmpty();</span>
+        
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (isDuplicate) {</span>
+<span class="fc" id="L480">            log.warn(&quot;Duplicate webhook event detected - EventID: {}, Type: {}, Previous events: {}&quot;, </span>
+<span class="fc" id="L481">                       eventId, eventType, recentWebhooks.size());</span>
+        }
+        
+<span class="fc" id="L484">        return isDuplicate;</span>
+    }
+    
+    /**
+     * Gets processing statistics for monitoring.
+     */
+    public Map&lt;String, Object&gt; getProcessingStatistics() {
+<span class="fc" id="L491">        Map&lt;String, Object&gt; stats = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L493">        ZonedDateTime last24Hours = ZonedDateTime.now().minusHours(24);</span>
+        
+<span class="fc" id="L495">        stats.put(&quot;webhooksLast24Hours&quot;, webhookRepository.countWebhooksCreatedSince(last24Hours));</span>
+<span class="fc" id="L496">        stats.put(&quot;successfulDeliveries&quot;, webhookRepository.countByStatusAndCreatedAtAfter(</span>
+            WebhookStatus.DELIVERED, last24Hours));
+<span class="fc" id="L498">        stats.put(&quot;failedDeliveries&quot;, webhookRepository.countByStatusAndCreatedAtAfter(</span>
+            WebhookStatus.FAILED, last24Hours));
+<span class="fc" id="L500">        stats.put(&quot;pendingDeliveries&quot;, webhookRepository.countByStatus(WebhookStatus.PENDING));</span>
+<span class="fc" id="L501">        stats.put(&quot;retryingDeliveries&quot;, webhookRepository.countByStatus(WebhookStatus.RETRYING));</span>
+        
+<span class="fc" id="L503">        return stats;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,284 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disaster-recovery-scripts
+  labels:
+    app: payment-gateway
+    component: disaster-recovery
+data:
+  restore-database.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Disaster Recovery Database Restore Script
+    echo "=== Payment Gateway Database Disaster Recovery ==="
+    
+    if [ -z "$1" ]; then
+        echo "Usage: $0 <backup-file> [target-database]"
+        echo "Example: $0 payment_gateway_backup_20240910_020000.sql.gz"
+        exit 1
+    fi
+    
+    BACKUP_FILE=$1
+    TARGET_DB=${2:-payment-gateway}
+    
+    echo "Backup file: $BACKUP_FILE"
+    echo "Target database: $TARGET_DB"
+    
+    # Verify backup file exists
+    if [ ! -f "/backup/$BACKUP_FILE" ]; then
+        echo "Error: Backup file not found: /backup/$BACKUP_FILE"
+        exit 1
+    fi
+    
+    # Create database connection test
+    echo "Testing database connection..."
+    pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d postgres
+    
+    if [ $? -ne 0 ]; then
+        echo "Error: Cannot connect to database server"
+        exit 1
+    fi
+    
+    # Create target database if it doesn't exist
+    echo "Creating target database if not exists..."
+    createdb -h $DB_HOST -p $DB_PORT -U $DB_USERNAME $TARGET_DB || true
+    
+    # Backup current database before restore (safety measure)
+    if [ "$TARGET_DB" = "payment-gateway" ]; then
+        SAFETY_BACKUP="safety_backup_$(date +%Y%m%d_%H%M%S).sql"
+        echo "Creating safety backup: $SAFETY_BACKUP"
+        pg_dump -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $TARGET_DB > /backup/$SAFETY_BACKUP
+        gzip /backup/$SAFETY_BACKUP
+        echo "Safety backup created: /backup/$SAFETY_BACKUP.gz"
+    fi
+    
+    # Restore database
+    echo "Starting database restore..."
+    
+    if [[ $BACKUP_FILE == *.gz ]]; then
+        echo "Decompressing and restoring..."
+        gunzip -c /backup/$BACKUP_FILE | psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $TARGET_DB
+    elif [[ $BACKUP_FILE == *.backup ]]; then
+        echo "Restoring custom format backup..."
+        pg_restore -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $TARGET_DB --clean --if-exists /backup/$BACKUP_FILE
+    else
+        echo "Restoring SQL backup..."
+        psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $TARGET_DB < /backup/$BACKUP_FILE
+    fi
+    
+    # Verify restore
+    echo "Verifying restore..."
+    TABLE_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $TARGET_DB -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+    
+    if [ $TABLE_COUNT -gt 0 ]; then
+        echo "Restore successful! Found $TABLE_COUNT tables in restored database."
+    else
+        echo "Warning: Restore may have failed. No tables found in target database."
+        exit 1
+    fi
+    
+    echo "=== Database restore completed successfully ==="
+    
+  point-in-time-recovery.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Point-in-Time Recovery Script
+    echo "=== Point-in-Time Recovery ==="
+    
+    if [ -z "$1" ]; then
+        echo "Usage: $0 <recovery-timestamp> [backup-file]"
+        echo "Example: $0 '2024-09-10 14:30:00'"
+        exit 1
+    fi
+    
+    RECOVERY_TIMESTAMP="$1"
+    BASE_BACKUP=${2:-latest}
+    
+    echo "Recovery timestamp: $RECOVERY_TIMESTAMP"
+    echo "Base backup: $BASE_BACKUP"
+    
+    # This is a simplified PITR example
+    # In production, you would need WAL archiving and continuous backup
+    echo "Note: Point-in-time recovery requires WAL archiving to be configured"
+    echo "This script demonstrates the recovery process structure"
+    
+    # Stop the application
+    echo "Scaling down application..."
+    kubectl scale deployment payment-gateway --replicas=0
+    
+    # Restore base backup
+    if [ "$BASE_BACKUP" = "latest" ]; then
+        BACKUP_FILE=$(ls -t /backup/payment_gateway_backup_*.sql.gz | head -1)
+    else
+        BACKUP_FILE="$BASE_BACKUP"
+    fi
+    
+    echo "Restoring base backup: $BACKUP_FILE"
+    ./restore-database.sh "$BACKUP_FILE" payment-gateway-recovery
+    
+    # In a real PITR setup, you would:
+    # 1. Apply WAL files up to the recovery point
+    # 2. Set recovery target timestamp
+    # 3. Start PostgreSQL in recovery mode
+    # 4. Promote when recovery is complete
+    
+    echo "=== Point-in-time recovery simulation completed ==="
+    echo "Note: Implement WAL archiving for actual PITR capability"
+    
+  validate-backup.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Backup Validation Script
+    echo "=== Backup Validation ==="
+    
+    if [ -z "$1" ]; then
+        echo "Usage: $0 <backup-file>"
+        exit 1
+    fi
+    
+    BACKUP_FILE=$1
+    VALIDATION_DB="backup_validation_$(date +%Y%m%d_%H%M%S)"
+    
+    echo "Validating backup: $BACKUP_FILE"
+    echo "Validation database: $VALIDATION_DB"
+    
+    # Create validation database
+    createdb -h $DB_HOST -p $DB_PORT -U $DB_USERNAME $VALIDATION_DB
+    
+    # Restore backup to validation database
+    echo "Restoring backup for validation..."
+    
+    if [[ $BACKUP_FILE == *.gz ]]; then
+        gunzip -c /backup/$BACKUP_FILE | psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB
+    elif [[ $BACKUP_FILE == *.backup ]]; then
+        pg_restore -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB /backup/$BACKUP_FILE
+    else
+        psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB < /backup/$BACKUP_FILE
+    fi
+    
+    # Run validation queries
+    echo "Running validation queries..."
+    
+    # Check table count
+    TABLE_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+    echo "Tables found: $TABLE_COUNT"
+    
+    # Check key tables exist
+    REQUIRED_TABLES=("users" "customers" "orders" "transactions" "payment_methods")
+    
+    for table in "${REQUIRED_TABLES[@]}"; do
+        EXISTS=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB -t -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '$table');")
+        if [[ $EXISTS == *"t"* ]]; then
+            echo "✓ Table '$table' exists"
+        else
+            echo "✗ Table '$table' missing"
+            VALIDATION_FAILED=true
+        fi
+    done
+    
+    # Check data integrity
+    USER_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB -t -c "SELECT count(*) FROM users;" 2>/dev/null || echo "0")
+    TRANSACTION_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USERNAME -d $VALIDATION_DB -t -c "SELECT count(*) FROM transactions;" 2>/dev/null || echo "0")
+    
+    echo "Users: $USER_COUNT"
+    echo "Transactions: $TRANSACTION_COUNT"
+    
+    # Cleanup validation database
+    echo "Cleaning up validation database..."
+    dropdb -h $DB_HOST -p $DB_PORT -U $DB_USERNAME $VALIDATION_DB
+    
+    if [ "$VALIDATION_FAILED" = true ]; then
+        echo "✗ Backup validation failed!"
+        exit 1
+    else
+        echo "✓ Backup validation successful!"
+    fi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-validation
+  labels:
+    app: payment-gateway
+    component: backup-validation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: payment-gateway
+        component: backup-validation
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: payment-gateway-backup
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+      - name: backup-validator
+        image: postgres:15-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install required tools
+          apk add --no-cache bash
+          
+          # Make scripts executable
+          chmod +x /scripts/*.sh
+          
+          # Validate latest backup
+          LATEST_BACKUP=$(ls -t /backup/payment_gateway_backup_*.sql.gz 2>/dev/null | head -1)
+          
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "No backups found for validation"
+            exit 1
+          fi
+          
+          echo "Validating latest backup: $(basename $LATEST_BACKUP)"
+          /scripts/validate-backup.sh "$(basename $LATEST_BACKUP)"
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: password
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: port
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: payment-gateway-db
+              key: username
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: backup-storage
+          mountPath: /backup
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: scripts
+        configMap:
+          name: disaster-recovery-scripts
+          defaultMode: 0755
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: payment-gateway-backup

@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProrationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">ProrationService.java</span></div><h1>ProrationService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.dto.subscription.ProrationCalculation;
+import com.talentica.paymentgateway.entity.Subscription;
+import com.talentica.paymentgateway.entity.SubscriptionPlan;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+
+/**
+ * Service for calculating proration amounts for subscription changes.
+ * Handles plan upgrades, downgrades, and cancellation refunds with precise calculations.
+ * 
+ * Features:
+ * - Accurate daily proration calculations
+ * - Support for different billing intervals
+ * - Upgrade and downgrade scenarios
+ * - Cancellation refund calculations
+ * - Detailed calculation explanations
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L28">@Slf4j</span>
+@Service
+<span class="fc" id="L30">public class ProrationService {</span>
+
+    /**
+     * Calculates proration for a plan change.
+     * 
+     * @param subscription Current subscription
+     * @param newPlan Target plan
+     * @param changeDate When the change takes effect
+     * @return Proration calculation details
+     */
+    public ProrationCalculation calculateProration(Subscription subscription, 
+                                                 SubscriptionPlan newPlan, 
+                                                 ZonedDateTime changeDate) {
+        
+<span class="fc" id="L44">        log.debug(&quot;Calculating proration - Subscription: {}, New Plan: {}, Change Date: {}&quot;, </span>
+<span class="fc" id="L45">                    subscription.getSubscriptionId(), newPlan.getPlanCode(), changeDate);</span>
+
+<span class="fc" id="L47">        SubscriptionPlan currentPlan = subscription.getPlan();</span>
+        
+        // Check if proration applies
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!shouldApplyProration(subscription, changeDate)) {</span>
+<span class="fc" id="L51">            return new ProrationCalculation(&quot;Change occurs at period boundary, no proration needed&quot;);</span>
+        }
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (currentPlan.getAmount().compareTo(newPlan.getAmount()) == 0) {</span>
+<span class="fc" id="L55">            return new ProrationCalculation(&quot;Plans have same amount, no proration needed&quot;);</span>
+        }
+
+<span class="fc" id="L58">        ProrationCalculation calculation = new ProrationCalculation();</span>
+<span class="fc" id="L59">        calculation.setOriginalAmount(currentPlan.getAmount());</span>
+<span class="fc" id="L60">        calculation.setNewAmount(newPlan.getAmount());</span>
+<span class="fc" id="L61">        calculation.setCurrency(currentPlan.getCurrency());</span>
+<span class="fc" id="L62">        calculation.setPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L63">        calculation.setPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L64">        calculation.setChangeDate(changeDate);</span>
+<span class="fc" id="L65">        calculation.setProrationApplies(true);</span>
+
+        // Calculate days
+<span class="fc" id="L68">        calculateDays(calculation);</span>
+
+        // Calculate unused amount from current plan
+<span class="fc" id="L71">        BigDecimal dailyRate = currentPlan.getAmount().divide(</span>
+<span class="fc" id="L72">            BigDecimal.valueOf(calculation.getTotalDaysInPeriod()), 4, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L73">        calculation.setUnusedAmount(dailyRate.multiply(BigDecimal.valueOf(calculation.getDaysRemaining())));</span>
+
+        // Calculate prorated amount for new plan
+<span class="fc" id="L76">        BigDecimal newDailyRate = newPlan.getAmount().divide(</span>
+<span class="fc" id="L77">            BigDecimal.valueOf(calculation.getTotalDaysInPeriod()), 4, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L78">        calculation.setProratedAmount(newDailyRate.multiply(BigDecimal.valueOf(calculation.getDaysRemaining())));</span>
+
+        // Calculate net amount (positive = charge, negative = credit)
+<span class="fc" id="L81">        BigDecimal netAmount = calculation.getProratedAmount().subtract(calculation.getUnusedAmount());</span>
+<span class="fc" id="L82">        calculation.setNetAmount(netAmount.setScale(2, RoundingMode.HALF_UP));</span>
+
+        // Generate explanation
+<span class="fc" id="L85">        generateExplanation(calculation, currentPlan, newPlan);</span>
+
+<span class="fc" id="L87">        calculation.setProrationReason(&quot;Plan amount difference requires proration&quot;);</span>
+
+<span class="fc" id="L89">        log.debug(&quot;Proration calculated - Net Amount: {}, Type: {}&quot;, </span>
+<span class="fc" id="L90">                    calculation.getNetAmount(), calculation.getType());</span>
+
+<span class="fc" id="L92">        return calculation;</span>
+    }
+
+    /**
+     * Calculates proration for subscription cancellation refund.
+     * 
+     * @param subscription Subscription being cancelled
+     * @param cancellationDate When the cancellation takes effect
+     * @return Proration calculation for refund
+     */
+    public ProrationCalculation calculateRefundProration(Subscription subscription, 
+                                                       ZonedDateTime cancellationDate) {
+        
+<span class="fc" id="L105">        log.debug(&quot;Calculating refund proration - Subscription: {}, Cancellation Date: {}&quot;, </span>
+<span class="fc" id="L106">                    subscription.getSubscriptionId(), cancellationDate);</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!shouldApplyRefundProration(subscription, cancellationDate)) {</span>
+<span class="fc" id="L109">            return new ProrationCalculation(&quot;Cancellation at period boundary, no refund proration&quot;);</span>
+        }
+
+<span class="fc" id="L112">        SubscriptionPlan plan = subscription.getPlan();</span>
+        
+<span class="fc" id="L114">        ProrationCalculation calculation = new ProrationCalculation();</span>
+<span class="fc" id="L115">        calculation.setOriginalAmount(plan.getAmount());</span>
+<span class="fc" id="L116">        calculation.setNewAmount(BigDecimal.ZERO);</span>
+<span class="fc" id="L117">        calculation.setCurrency(plan.getCurrency());</span>
+<span class="fc" id="L118">        calculation.setPeriodStart(subscription.getCurrentPeriodStart());</span>
+<span class="fc" id="L119">        calculation.setPeriodEnd(subscription.getCurrentPeriodEnd());</span>
+<span class="fc" id="L120">        calculation.setChangeDate(cancellationDate);</span>
+<span class="fc" id="L121">        calculation.setProrationApplies(true);</span>
+
+        // Calculate days
+<span class="fc" id="L124">        calculateDays(calculation);</span>
+
+        // Calculate refund amount for unused days
+<span class="fc" id="L127">        BigDecimal dailyRate = plan.getAmount().divide(</span>
+<span class="fc" id="L128">            BigDecimal.valueOf(calculation.getTotalDaysInPeriod()), 4, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L129">        BigDecimal refundAmount = dailyRate.multiply(BigDecimal.valueOf(calculation.getDaysRemaining()));</span>
+        
+<span class="fc" id="L131">        calculation.setUnusedAmount(refundAmount);</span>
+<span class="fc" id="L132">        calculation.setProratedAmount(BigDecimal.ZERO);</span>
+<span class="fc" id="L133">        calculation.setNetAmount(refundAmount.negate().setScale(2, RoundingMode.HALF_UP)); // Negative for credit</span>
+
+        // Generate explanation
+<span class="fc" id="L136">        calculation.setExplanation(String.format(</span>
+            &quot;Refund for %d unused days out of %d total days in period. &quot; +
+            &quot;Daily rate: $%.4f × %d days = $%.2f refund&quot;,
+<span class="fc" id="L139">            calculation.getDaysRemaining(),</span>
+<span class="fc" id="L140">            calculation.getTotalDaysInPeriod(),</span>
+            dailyRate,
+<span class="fc" id="L142">            calculation.getDaysRemaining(),</span>
+            refundAmount
+        ));
+
+<span class="fc" id="L146">        calculation.setProrationReason(&quot;Cancellation before period end, refund for unused time&quot;);</span>
+
+<span class="fc" id="L148">        log.debug(&quot;Refund proration calculated - Refund Amount: {}&quot;, refundAmount);</span>
+
+<span class="fc" id="L150">        return calculation;</span>
+    }
+
+    /**
+     * Calculates proration for mid-cycle billing period adjustments.
+     * 
+     * @param subscription Current subscription
+     * @param adjustmentAmount Amount to prorate
+     * @param startDate Start of proration period
+     * @param endDate End of proration period
+     * @return Proration calculation
+     */
+    public ProrationCalculation calculateAdjustmentProration(Subscription subscription,
+                                                           BigDecimal adjustmentAmount,
+                                                           ZonedDateTime startDate,
+                                                           ZonedDateTime endDate) {
+        
+<span class="fc" id="L167">        log.debug(&quot;Calculating adjustment proration - Amount: {}, Period: {} to {}&quot;, </span>
+                    adjustmentAmount, startDate, endDate);
+
+<span class="fc" id="L170">        ProrationCalculation calculation = new ProrationCalculation();</span>
+<span class="fc" id="L171">        calculation.setOriginalAmount(BigDecimal.ZERO);</span>
+<span class="fc" id="L172">        calculation.setNewAmount(adjustmentAmount);</span>
+<span class="fc" id="L173">        calculation.setCurrency(subscription.getPlan().getCurrency());</span>
+<span class="fc" id="L174">        calculation.setPeriodStart(startDate);</span>
+<span class="fc" id="L175">        calculation.setPeriodEnd(endDate);</span>
+<span class="fc" id="L176">        calculation.setChangeDate(startDate);</span>
+<span class="fc" id="L177">        calculation.setProrationApplies(true);</span>
+
+        // Calculate days in adjustment period
+<span class="fc" id="L180">        long adjustmentDays = ChronoUnit.DAYS.between(startDate, endDate);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (adjustmentDays &lt;= 0) {</span>
+<span class="fc" id="L182">            return new ProrationCalculation(&quot;Invalid adjustment period&quot;);</span>
+        }
+
+<span class="fc" id="L185">        calculation.setTotalDaysInPeriod((int) adjustmentDays);</span>
+<span class="fc" id="L186">        calculation.setDaysUsed(0);</span>
+<span class="fc" id="L187">        calculation.setDaysRemaining((int) adjustmentDays);</span>
+
+        // Full adjustment amount applies
+<span class="fc" id="L190">        calculation.setProratedAmount(adjustmentAmount);</span>
+<span class="fc" id="L191">        calculation.setUnusedAmount(BigDecimal.ZERO);</span>
+<span class="fc" id="L192">        calculation.setNetAmount(adjustmentAmount.setScale(2, RoundingMode.HALF_UP));</span>
+
+<span class="fc" id="L194">        calculation.setExplanation(String.format(</span>
+            &quot;Adjustment amount $%.2f for %d days period&quot;,
+<span class="fc" id="L196">            adjustmentAmount, adjustmentDays</span>
+        ));
+
+<span class="fc" id="L199">        calculation.setProrationReason(&quot;Mid-cycle adjustment&quot;);</span>
+
+<span class="fc" id="L201">        return calculation;</span>
+    }
+
+    // Private helper methods
+
+    private boolean shouldApplyProration(Subscription subscription, ZonedDateTime changeDate) {
+<span class="pc bpc" id="L207" title="1 of 4 branches missed.">        if (subscription.getCurrentPeriodStart() == null || subscription.getCurrentPeriodEnd() == null) {</span>
+<span class="fc" id="L208">            return false;</span>
+        }
+
+        // Don't prorate if change is at period boundaries
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return !changeDate.isEqual(subscription.getCurrentPeriodStart()) &amp;&amp; </span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">               !changeDate.isEqual(subscription.getCurrentPeriodEnd());</span>
+    }
+
+    private boolean shouldApplyRefundProration(Subscription subscription, ZonedDateTime cancellationDate) {
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        if (subscription.getCurrentPeriodStart() == null || subscription.getCurrentPeriodEnd() == null) {</span>
+<span class="fc" id="L218">            return false;</span>
+        }
+
+        // Only refund if cancelling before period end with significant time remaining
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (cancellationDate.isAfter(subscription.getCurrentPeriodEnd())) {</span>
+<span class="fc" id="L223">            return false;</span>
+        }
+
+<span class="fc" id="L226">        long daysRemaining = ChronoUnit.DAYS.between(cancellationDate, subscription.getCurrentPeriodEnd());</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        return daysRemaining &gt; 0; // At least 1 day remaining</span>
+    }
+
+    private void calculateDays(ProrationCalculation calculation) {
+<span class="fc" id="L231">        long totalDays = ChronoUnit.DAYS.between(calculation.getPeriodStart(), calculation.getPeriodEnd());</span>
+<span class="fc" id="L232">        long usedDays = ChronoUnit.DAYS.between(calculation.getPeriodStart(), calculation.getChangeDate());</span>
+<span class="fc" id="L233">        long remainingDays = totalDays - usedDays;</span>
+
+<span class="fc" id="L235">        calculation.setTotalDaysInPeriod((int) totalDays);</span>
+<span class="fc" id="L236">        calculation.setDaysUsed((int) Math.max(0, usedDays));</span>
+<span class="fc" id="L237">        calculation.setDaysRemaining((int) Math.max(0, remainingDays));</span>
+<span class="fc" id="L238">    }</span>
+
+    private void generateExplanation(ProrationCalculation calculation, 
+                                   SubscriptionPlan currentPlan, 
+                                   SubscriptionPlan newPlan) {
+        
+<span class="fc" id="L244">        BigDecimal currentDaily = currentPlan.getAmount().divide(</span>
+<span class="fc" id="L245">            BigDecimal.valueOf(calculation.getTotalDaysInPeriod()), 4, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L246">        BigDecimal newDaily = newPlan.getAmount().divide(</span>
+<span class="fc" id="L247">            BigDecimal.valueOf(calculation.getTotalDaysInPeriod()), 4, RoundingMode.HALF_UP);</span>
+
+<span class="fc" id="L249">        String explanation = String.format(</span>
+            &quot;Plan change from %s ($%.2f) to %s ($%.2f) with %d days remaining in period. &quot; +
+            &quot;Unused amount: $%.4f/day × %d days = $%.2f. &quot; +
+            &quot;New plan amount: $%.4f/day × %d days = $%.2f. &quot; +
+            &quot;Net %s: $%.2f&quot;,
+<span class="fc" id="L254">            currentPlan.getName(), currentPlan.getAmount(),</span>
+<span class="fc" id="L255">            newPlan.getName(), newPlan.getAmount(),</span>
+<span class="fc" id="L256">            calculation.getDaysRemaining(),</span>
+<span class="fc" id="L257">            currentDaily, calculation.getDaysRemaining(), calculation.getUnusedAmount(),</span>
+<span class="fc" id="L258">            newDaily, calculation.getDaysRemaining(), calculation.getProratedAmount(),</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            calculation.isCharge() ? &quot;charge&quot; : &quot;credit&quot;,</span>
+<span class="fc" id="L260">            calculation.getNetAmount().abs()</span>
+        );
+
+<span class="fc" id="L263">        calculation.setExplanation(explanation);</span>
+<span class="fc" id="L264">    }</span>
+
+    /**
+     * Validates if a proration calculation is reasonable.
+     * 
+     * @param calculation Proration calculation to validate
+     * @return true if calculation is valid
+     */
+    public boolean validateProration(ProrationCalculation calculation) {
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (!calculation.getProrationApplies()) {</span>
+<span class="fc" id="L274">            return true;</span>
+        }
+
+        // Check for reasonable amounts
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (calculation.getNetAmount() != null &amp;&amp; </span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            calculation.getNetAmount().abs().compareTo(new BigDecimal(&quot;10000&quot;)) &gt; 0) {</span>
+<span class="fc" id="L280">            log.warn(&quot;Proration amount seems unreasonably high: {}&quot;, calculation.getNetAmount());</span>
+<span class="fc" id="L281">            return false;</span>
+        }
+
+        // Check for reasonable time periods
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (calculation.getTotalDaysInPeriod() != null &amp;&amp; </span>
+<span class="fc bfc" id="L286" title="All 4 branches covered.">            (calculation.getTotalDaysInPeriod() &lt; 1 || calculation.getTotalDaysInPeriod() &gt; 400)) {</span>
+<span class="fc" id="L287">            log.warn(&quot;Proration period seems unreasonable: {} days&quot;, calculation.getTotalDaysInPeriod());</span>
+<span class="fc" id="L288">            return false;</span>
+        }
+
+        // Check for negative days
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">        if (calculation.getDaysRemaining() != null &amp;&amp; calculation.getDaysRemaining() &lt; 0) {</span>
+<span class="fc" id="L293">            log.warn(&quot;Negative days remaining in proration: {}&quot;, calculation.getDaysRemaining());</span>
+<span class="fc" id="L294">            return false;</span>
+        }
+
+<span class="fc" id="L297">        return true;</span>
+    }
+
+    /**
+     * Formats a proration calculation for display.
+     * 
+     * @param calculation Proration calculation
+     * @return Formatted description
+     */
+    public String formatProrationSummary(ProrationCalculation calculation) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (!calculation.getProrationApplies()) {</span>
+<span class="fc" id="L308">            return &quot;No proration required: &quot; + calculation.getProrationReason();</span>
+        }
+
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (!calculation.hasAmount()) {</span>
+<span class="fc" id="L312">            return &quot;Proration calculated with no net amount due&quot;;</span>
+        }
+
+<span class="fc" id="L315">        return String.format(&quot;Proration %s of %s for %d remaining days in billing period&quot;,</span>
+<span class="fc" id="L316">            calculation.getType().toLowerCase(),</span>
+<span class="fc" id="L317">            calculation.getFormattedNetAmount(),</span>
+<span class="fc" id="L318">            calculation.getDaysRemaining());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

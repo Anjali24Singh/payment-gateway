@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RefundRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">RefundRequest.java</span></div><h1>RefundRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.talentica.paymentgateway.validation.ValidAmount;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+/**
+ * Refund request DTO for refunding captured transactions.
+ * Supports both full and partial refunds.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="pc bnc" id="L22" title="All 62 branches missed.">@Data</span>
+<span class="nc" id="L23">@Builder</span>
+<span class="fc" id="L24">@NoArgsConstructor</span>
+<span class="nc" id="L25">@AllArgsConstructor</span>
+@Schema(description = &quot;Refund request for returning funds to customer&quot;)
+public class RefundRequest {
+
+    @NotBlank(message = &quot;Transaction ID is required&quot;)
+    @Size(max = 255, message = &quot;Transaction ID must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Original transaction ID to refund&quot;, example = &quot;txn_1234567890&quot;, required = true)
+    @JsonProperty(&quot;transactionId&quot;)
+<span class="fc" id="L33">    private String transactionId;</span>
+
+    @ValidAmount
+    @Schema(description = &quot;Amount to refund (leave empty for full refund)&quot;, example = &quot;25.00&quot;)
+    @JsonProperty(&quot;amount&quot;)
+<span class="fc" id="L38">    private BigDecimal amount;</span>
+
+    @Size(max = 255, message = &quot;Reason must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Reason for the refund&quot;, example = &quot;Customer requested refund for damaged item&quot;)
+    @JsonProperty(&quot;reason&quot;)
+<span class="fc" id="L43">    private String reason;</span>
+
+    @Size(max = 255, message = &quot;Description must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Refund description&quot;, example = &quot;Partial refund for Order #12345&quot;)
+    @JsonProperty(&quot;description&quot;)
+<span class="fc" id="L48">    private String description;</span>
+
+    @Size(max = 25, message = &quot;Reference number must not exceed 25 characters&quot;)
+    @Schema(description = &quot;Internal reference number for the refund&quot;, example = &quot;REF-2024-001&quot;)
+    @JsonProperty(&quot;referenceNumber&quot;)
+<span class="fc" id="L53">    private String referenceNumber;</span>
+
+<span class="pc" id="L55">    @Schema(description = &quot;Notify customer about the refund&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;notifyCustomer&quot;)
+<span class="pc" id="L57">    private Boolean notifyCustomer = true;</span>
+
+    @Size(max = 255, message = &quot;Idempotency key must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Idempotency key to prevent duplicate refunds&quot;)
+    @JsonProperty(&quot;idempotencyKey&quot;)
+<span class="fc" id="L62">    private String idempotencyKey;</span>
+
+    // Backward compatibility methods
+    public String getOriginalTransactionId() {
+<span class="fc" id="L66">        return transactionId;</span>
+    }
+
+    public void setOriginalTransactionId(String originalTransactionId) {
+<span class="fc" id="L70">        this.transactionId = originalTransactionId;</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Determines if this is a full refund (no amount specified).
+     */
+    public boolean isFullRefund() {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return amount == null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

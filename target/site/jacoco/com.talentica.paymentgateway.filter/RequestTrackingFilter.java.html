@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestTrackingFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.filter</a> &gt; <span class="el_source">RequestTrackingFilter.java</span></div><h1>RequestTrackingFilter.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.filter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+/**
+ * Filter to automatically generate and manage request tracking headers.
+ * 
+ * Features:
+ * - Auto-generates X-Correlation-ID if not provided
+ * - Auto-generates Idempotency-Key for payment operations if not provided
+ * - Sets up MDC for structured logging
+ * - Adds headers to response for client tracking
+ */
+<span class="fc" id="L25">@Slf4j</span>
+@Component
+@Order(1)
+<span class="fc" id="L28">public class RequestTrackingFilter extends OncePerRequestFilter {</span>
+    
+    private static final String CORRELATION_ID_HEADER = &quot;X-Correlation-ID&quot;;
+    private static final String IDEMPOTENCY_KEY_HEADER = &quot;Idempotency-Key&quot;;
+    private static final String MDC_CORRELATION_ID = &quot;correlationId&quot;;
+    private static final String MDC_IDEMPOTENCY_KEY = &quot;idempotencyKey&quot;;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
+                                  FilterChain filterChain) throws ServletException, IOException {
+        
+        try {
+            // Generate or extract correlation ID
+<span class="fc" id="L41">            String correlationId = getOrGenerateCorrelationId(request);</span>
+            
+            // Generate or extract idempotency key for payment operations
+<span class="fc" id="L44">            String idempotencyKey = getOrGenerateIdempotencyKey(request);</span>
+            
+            // Set up MDC for structured logging
+<span class="fc" id="L47">            MDC.put(MDC_CORRELATION_ID, correlationId);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (idempotencyKey != null) {</span>
+<span class="nc" id="L49">                MDC.put(MDC_IDEMPOTENCY_KEY, idempotencyKey);</span>
+            }
+            
+            // Add headers to response
+<span class="fc" id="L53">            response.setHeader(CORRELATION_ID_HEADER, correlationId);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (idempotencyKey != null) {</span>
+<span class="nc" id="L55">                response.setHeader(IDEMPOTENCY_KEY_HEADER, idempotencyKey);</span>
+            }
+            
+            // Create wrapper to make headers available to controllers
+<span class="fc" id="L59">            RequestWrapper wrappedRequest = new RequestWrapper(request, correlationId, idempotencyKey);</span>
+            
+<span class="fc" id="L61">            log.debug(&quot;Request tracking setup - URI: {}, Method: {}, CorrelationId: {}, IdempotencyKey: {}&quot;, </span>
+<span class="fc" id="L62">                        request.getRequestURI(), request.getMethod(), correlationId, idempotencyKey);</span>
+            
+<span class="fc" id="L64">            filterChain.doFilter(wrappedRequest, response);</span>
+            
+        } finally {
+            // Clean up MDC
+<span class="fc" id="L68">            MDC.remove(MDC_CORRELATION_ID);</span>
+<span class="fc" id="L69">            MDC.remove(MDC_IDEMPOTENCY_KEY);</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Get existing correlation ID from request or generate a new one
+     */
+    private String getOrGenerateCorrelationId(HttpServletRequest request) {
+<span class="fc" id="L77">        String correlationId = request.getHeader(CORRELATION_ID_HEADER);</span>
+        
+<span class="pc bpc" id="L79" title="3 of 4 branches missed.">        if (correlationId == null || correlationId.trim().isEmpty()) {</span>
+<span class="fc" id="L80">            correlationId = &quot;corr-&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 16);</span>
+<span class="fc" id="L81">            log.debug(&quot;Generated new correlation ID: {}&quot;, correlationId);</span>
+        } else {
+<span class="nc" id="L83">            log.debug(&quot;Using provided correlation ID: {}&quot;, correlationId);</span>
+        }
+        
+<span class="fc" id="L86">        return correlationId;</span>
+    }
+
+    /**
+     * Get existing idempotency key from request or generate one for payment operations
+     */
+    private String getOrGenerateIdempotencyKey(HttpServletRequest request) {
+<span class="fc" id="L93">        String idempotencyKey = request.getHeader(IDEMPOTENCY_KEY_HEADER);</span>
+        
+        // Only generate idempotency key for payment operations
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (isPaymentOperation(request)) {</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">            if (idempotencyKey == null || idempotencyKey.trim().isEmpty()) {</span>
+<span class="nc" id="L98">                idempotencyKey = generateIdempotencyKey(request);</span>
+<span class="nc" id="L99">                log.debug(&quot;Generated new idempotency key: {}&quot;, idempotencyKey);</span>
+            } else {
+<span class="nc" id="L101">                log.debug(&quot;Using provided idempotency key: {}&quot;, idempotencyKey);</span>
+            }
+        }
+        
+<span class="fc" id="L105">        return idempotencyKey;</span>
+    }
+
+    /**
+     * Check if the request is a payment operation that requires idempotency
+     */
+    private boolean isPaymentOperation(HttpServletRequest request) {
+<span class="fc" id="L112">        String uri = request.getRequestURI();</span>
+<span class="fc" id="L113">        String method = request.getMethod();</span>
+        
+        // Payment operations that need idempotency
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        return (&quot;POST&quot;.equals(method) || &quot;PUT&quot;.equals(method)) &amp;&amp; (</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            uri.contains(&quot;/payments/&quot;) ||</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            uri.contains(&quot;/subscriptions&quot;) ||</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            uri.contains(&quot;/arb-subscriptions&quot;) ||</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            uri.contains(&quot;/customers/profiles&quot;)</span>
+        );
+    }
+
+    /**
+     * Generate a unique idempotency key based on request characteristics
+     */
+    private String generateIdempotencyKey(HttpServletRequest request) {
+<span class="nc" id="L128">        String uri = request.getRequestURI();</span>
+<span class="nc" id="L129">        String timestamp = String.valueOf(System.currentTimeMillis());</span>
+<span class="nc" id="L130">        String random = UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 8);</span>
+        
+<span class="nc" id="L132">        String operation = extractOperationType(uri);</span>
+<span class="nc" id="L133">        return String.format(&quot;%s_%s_%s&quot;, operation, timestamp, random);</span>
+    }
+
+    /**
+     * Extract operation type from URI for idempotency key prefix
+     */
+    private String extractOperationType(String uri) {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (uri.contains(&quot;/payments/purchase&quot;)) return &quot;purchase&quot;;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (uri.contains(&quot;/payments/authorize&quot;)) return &quot;authorize&quot;;</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (uri.contains(&quot;/payments/capture&quot;)) return &quot;capture&quot;;</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (uri.contains(&quot;/payments/refund&quot;)) return &quot;refund&quot;;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (uri.contains(&quot;/payments/void&quot;)) return &quot;void&quot;;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (uri.contains(&quot;/subscriptions&quot;)) return &quot;subscription&quot;;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (uri.contains(&quot;/arb-subscriptions&quot;)) return &quot;arb_sub&quot;;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (uri.contains(&quot;/customers/profiles&quot;)) return &quot;customer&quot;;</span>
+<span class="nc" id="L148">        return &quot;payment&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

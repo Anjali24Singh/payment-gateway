@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentErrorResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.payment</a> &gt; <span class="el_source">PaymentErrorResponse.java</span></div><h1>PaymentErrorResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.payment;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.time.ZonedDateTime;
+import java.util.List;
+
+/**
+ * Payment error response DTO for detailed error information.
+ * Provides comprehensive error details for failed payment transactions.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Error information for failed payment transactions&quot;)
+public class PaymentErrorResponse {
+
+    @Schema(description = &quot;Error code&quot;, example = &quot;PAYMENT_DECLINED&quot;)
+    @JsonProperty(&quot;code&quot;)
+    private String code;
+
+    @Schema(description = &quot;Error message&quot;, example = &quot;The credit card was declined&quot;)
+    @JsonProperty(&quot;message&quot;)
+    private String message;
+
+    @Schema(description = &quot;Detailed error description&quot;, example = &quot;The transaction was declined by the issuing bank&quot;)
+    @JsonProperty(&quot;description&quot;)
+    private String description;
+
+    @Schema(description = &quot;Error category&quot;, example = &quot;CARD_ERROR&quot;)
+    @JsonProperty(&quot;category&quot;)
+    private String category;
+
+    @Schema(description = &quot;Authorize.Net response code&quot;, example = &quot;2&quot;)
+    @JsonProperty(&quot;gatewayCode&quot;)
+    private String gatewayCode;
+
+    @Schema(description = &quot;Authorize.Net response reason code&quot;, example = &quot;27&quot;)
+    @JsonProperty(&quot;gatewayReasonCode&quot;)
+    private String gatewayReasonCode;
+
+    @Schema(description = &quot;Gateway response text&quot;, example = &quot;The transaction resulted in an AVS mismatch&quot;)
+    @JsonProperty(&quot;gatewayReasonText&quot;)
+    private String gatewayReasonText;
+
+    @Schema(description = &quot;Decline reason&quot;, example = &quot;INSUFFICIENT_FUNDS&quot;)
+    @JsonProperty(&quot;declineReason&quot;)
+    private String declineReason;
+
+    @Schema(description = &quot;Retry possible indicator&quot;, example = &quot;false&quot;)
+    @JsonProperty(&quot;retryable&quot;)
+    private Boolean retryable;
+
+    @Schema(description = &quot;Suggested action for merchant&quot;, example = &quot;Ask customer to use a different payment method&quot;)
+    @JsonProperty(&quot;suggestedAction&quot;)
+    private String suggestedAction;
+
+    @Schema(description = &quot;Correlation ID for error tracking&quot;, example = &quot;corr-123456789&quot;)
+    @JsonProperty(&quot;correlationId&quot;)
+    private String correlationId;
+
+    @Schema(description = &quot;Error timestamp&quot;)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = &quot;yyyy-MM-dd'T'HH:mm:ss.SSSXXX&quot;)
+    @JsonProperty(&quot;timestamp&quot;)
+    private ZonedDateTime timestamp;
+
+    @Schema(description = &quot;Additional error details&quot;)
+    @JsonProperty(&quot;details&quot;)
+    private List&lt;ErrorDetail&gt; details;
+
+    // Default constructor
+<span class="fc" id="L74">    public PaymentErrorResponse() {</span>
+<span class="fc" id="L75">        this.timestamp = ZonedDateTime.now();</span>
+<span class="fc" id="L76">    }</span>
+
+    // Constructor with basic error info
+    public PaymentErrorResponse(String code, String message) {
+<span class="nc" id="L80">        this();</span>
+<span class="nc" id="L81">        this.code = code;</span>
+<span class="nc" id="L82">        this.message = message;</span>
+<span class="nc" id="L83">    }</span>
+
+    // Constructor with detailed error info
+    public PaymentErrorResponse(String code, String message, String description, 
+                               String category, String correlationId) {
+<span class="fc" id="L88">        this();</span>
+<span class="fc" id="L89">        this.code = code;</span>
+<span class="fc" id="L90">        this.message = message;</span>
+<span class="fc" id="L91">        this.description = description;</span>
+<span class="fc" id="L92">        this.category = category;</span>
+<span class="fc" id="L93">        this.correlationId = correlationId;</span>
+<span class="fc" id="L94">    }</span>
+
+    // Static factory methods for common error types
+    public static PaymentErrorResponse cardDeclined(String gatewayReasonText, String correlationId) {
+<span class="fc" id="L98">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;CARD_DECLINED&quot;,
+            &quot;The credit card was declined&quot;,
+            gatewayReasonText,
+            &quot;CARD_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L105">        error.setRetryable(false);</span>
+<span class="fc" id="L106">        error.setSuggestedAction(&quot;Ask customer to use a different payment method&quot;);</span>
+<span class="fc" id="L107">        return error;</span>
+    }
+
+    public static PaymentErrorResponse insufficientFunds(String correlationId) {
+<span class="fc" id="L111">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;INSUFFICIENT_FUNDS&quot;,
+            &quot;Insufficient funds in the account&quot;,
+            &quot;The transaction was declined due to insufficient funds&quot;,
+            &quot;CARD_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L118">        error.setDeclineReason(&quot;INSUFFICIENT_FUNDS&quot;);</span>
+<span class="fc" id="L119">        error.setRetryable(false);</span>
+<span class="fc" id="L120">        error.setSuggestedAction(&quot;Ask customer to check account balance or use a different payment method&quot;);</span>
+<span class="fc" id="L121">        return error;</span>
+    }
+
+    public static PaymentErrorResponse invalidCard(String correlationId) {
+<span class="fc" id="L125">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;INVALID_CARD&quot;,
+            &quot;Invalid card information&quot;,
+            &quot;The credit card number or expiration date is invalid&quot;,
+            &quot;CARD_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L132">        error.setRetryable(true);</span>
+<span class="fc" id="L133">        error.setSuggestedAction(&quot;Verify card information and try again&quot;);</span>
+<span class="fc" id="L134">        return error;</span>
+    }
+
+    public static PaymentErrorResponse processingError(String message, String correlationId) {
+<span class="fc" id="L138">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;PROCESSING_ERROR&quot;,
+            &quot;Payment processing error&quot;,
+            message,
+            &quot;GATEWAY_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L145">        error.setRetryable(true);</span>
+<span class="fc" id="L146">        error.setSuggestedAction(&quot;Please try again later&quot;);</span>
+<span class="fc" id="L147">        return error;</span>
+    }
+
+    public static PaymentErrorResponse networkError(String correlationId) {
+<span class="fc" id="L151">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;NETWORK_ERROR&quot;,
+            &quot;Network communication error&quot;,
+            &quot;Unable to communicate with payment processor&quot;,
+            &quot;NETWORK_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L158">        error.setRetryable(true);</span>
+<span class="fc" id="L159">        error.setSuggestedAction(&quot;Please try again in a few minutes&quot;);</span>
+<span class="fc" id="L160">        return error;</span>
+    }
+
+    public static PaymentErrorResponse validationError(String message, String correlationId) {
+<span class="fc" id="L164">        PaymentErrorResponse error = new PaymentErrorResponse(</span>
+            &quot;VALIDATION_ERROR&quot;,
+            &quot;Request validation failed&quot;,
+            message,
+            &quot;VALIDATION_ERROR&quot;,
+            correlationId
+        );
+<span class="fc" id="L171">        error.setRetryable(true);</span>
+<span class="fc" id="L172">        error.setSuggestedAction(&quot;Please check the request data and try again&quot;);</span>
+<span class="fc" id="L173">        return error;</span>
+    }
+
+    // Getters and Setters
+    public String getCode() {
+<span class="fc" id="L178">        return code;</span>
+    }
+
+    public void setCode(String code) {
+<span class="fc" id="L182">        this.code = code;</span>
+<span class="fc" id="L183">    }</span>
+
+    public String getMessage() {
+<span class="fc" id="L186">        return message;</span>
+    }
+
+    public void setMessage(String message) {
+<span class="fc" id="L190">        this.message = message;</span>
+<span class="fc" id="L191">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L194">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L198">        this.description = description;</span>
+<span class="fc" id="L199">    }</span>
+
+    public String getCategory() {
+<span class="fc" id="L202">        return category;</span>
+    }
+
+    public void setCategory(String category) {
+<span class="fc" id="L206">        this.category = category;</span>
+<span class="fc" id="L207">    }</span>
+
+    public String getGatewayCode() {
+<span class="fc" id="L210">        return gatewayCode;</span>
+    }
+
+    public void setGatewayCode(String gatewayCode) {
+<span class="fc" id="L214">        this.gatewayCode = gatewayCode;</span>
+<span class="fc" id="L215">    }</span>
+
+    public String getGatewayReasonCode() {
+<span class="fc" id="L218">        return gatewayReasonCode;</span>
+    }
+
+    public void setGatewayReasonCode(String gatewayReasonCode) {
+<span class="fc" id="L222">        this.gatewayReasonCode = gatewayReasonCode;</span>
+<span class="fc" id="L223">    }</span>
+
+    public String getGatewayReasonText() {
+<span class="fc" id="L226">        return gatewayReasonText;</span>
+    }
+
+    public void setGatewayReasonText(String gatewayReasonText) {
+<span class="fc" id="L230">        this.gatewayReasonText = gatewayReasonText;</span>
+<span class="fc" id="L231">    }</span>
+
+    public String getDeclineReason() {
+<span class="fc" id="L234">        return declineReason;</span>
+    }
+
+    public void setDeclineReason(String declineReason) {
+<span class="fc" id="L238">        this.declineReason = declineReason;</span>
+<span class="fc" id="L239">    }</span>
+
+    public Boolean getRetryable() {
+<span class="fc" id="L242">        return retryable;</span>
+    }
+
+    public void setRetryable(Boolean retryable) {
+<span class="fc" id="L246">        this.retryable = retryable;</span>
+<span class="fc" id="L247">    }</span>
+
+    public String getSuggestedAction() {
+<span class="fc" id="L250">        return suggestedAction;</span>
+    }
+
+    public void setSuggestedAction(String suggestedAction) {
+<span class="fc" id="L254">        this.suggestedAction = suggestedAction;</span>
+<span class="fc" id="L255">    }</span>
+
+    public String getCorrelationId() {
+<span class="fc" id="L258">        return correlationId;</span>
+    }
+
+    public void setCorrelationId(String correlationId) {
+<span class="fc" id="L262">        this.correlationId = correlationId;</span>
+<span class="fc" id="L263">    }</span>
+
+    public ZonedDateTime getTimestamp() {
+<span class="fc" id="L266">        return timestamp;</span>
+    }
+
+    public void setTimestamp(ZonedDateTime timestamp) {
+<span class="fc" id="L270">        this.timestamp = timestamp;</span>
+<span class="fc" id="L271">    }</span>
+
+    public List&lt;ErrorDetail&gt; getDetails() {
+<span class="fc" id="L274">        return details;</span>
+    }
+
+    public void setDetails(List&lt;ErrorDetail&gt; details) {
+<span class="fc" id="L278">        this.details = details;</span>
+<span class="fc" id="L279">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L283">        return &quot;PaymentErrorResponse{&quot; +</span>
+                &quot;code='&quot; + code + '\'' +
+                &quot;, message='&quot; + message + '\'' +
+                &quot;, category='&quot; + category + '\'' +
+                &quot;, gatewayCode='&quot; + gatewayCode + '\'' +
+                &quot;, gatewayReasonCode='&quot; + gatewayReasonCode + '\'' +
+                &quot;, retryable=&quot; + retryable +
+                &quot;, correlationId='&quot; + correlationId + '\'' +
+                '}';
+    }
+
+    /**
+     * Additional error detail information.
+     */
+    @Schema(description = &quot;Additional error detail&quot;)
+    public static class ErrorDetail {
+        
+        @Schema(description = &quot;Detail field name&quot;, example = &quot;cardNumber&quot;)
+        @JsonProperty(&quot;field&quot;)
+        private String field;
+
+        @Schema(description = &quot;Detail error code&quot;, example = &quot;INVALID_FORMAT&quot;)
+        @JsonProperty(&quot;code&quot;)
+        private String code;
+
+        @Schema(description = &quot;Detail error message&quot;, example = &quot;Card number format is invalid&quot;)
+        @JsonProperty(&quot;message&quot;)
+        private String message;
+
+<span class="nc" id="L312">        public ErrorDetail() {}</span>
+
+<span class="fc" id="L314">        public ErrorDetail(String field, String code, String message) {</span>
+<span class="fc" id="L315">            this.field = field;</span>
+<span class="fc" id="L316">            this.code = code;</span>
+<span class="fc" id="L317">            this.message = message;</span>
+<span class="fc" id="L318">        }</span>
+
+        // Getters and Setters
+        public String getField() {
+<span class="fc" id="L322">            return field;</span>
+        }
+
+        public void setField(String field) {
+<span class="nc" id="L326">            this.field = field;</span>
+<span class="nc" id="L327">        }</span>
+
+        public String getCode() {
+<span class="fc" id="L330">            return code;</span>
+        }
+
+        public void setCode(String code) {
+<span class="nc" id="L334">            this.code = code;</span>
+<span class="nc" id="L335">        }</span>
+
+        public String getMessage() {
+<span class="fc" id="L338">            return message;</span>
+        }
+
+        public void setMessage(String message) {
+<span class="nc" id="L342">            this.message = message;</span>
+<span class="nc" id="L343">        }</span>
+
+        @Override
+        public String toString() {
+<span class="fc" id="L347">            return &quot;ErrorDetail{&quot; +</span>
+                    &quot;field='&quot; + field + '\'' +
+                    &quot;, code='&quot; + code + '\'' +
+                    &quot;, message='&quot; + message + '\'' +
+                    '}';
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

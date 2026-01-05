@@ -1,0 +1,83 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: payment-gateway-psp
+  labels:
+    app: payment-gateway
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 10001
+        max: 10001
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 10001
+        max: 10001
+  readOnlyRootFilesystem: true
+  seLinux:
+    rule: 'RunAsAny'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payment-gateway-psp
+  labels:
+    app: payment-gateway
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payment-gateway-psp
+  labels:
+    app: payment-gateway
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - payment-gateway-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-gateway-psp
+  labels:
+    app: payment-gateway
+roleRef:
+  kind: Role
+  name: payment-gateway-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: payment-gateway
+- kind: ServiceAccount
+  name: payment-gateway-psp
+---
+# Pod Security Standards (replacement for PSP in newer Kubernetes)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payment-gateway
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app: payment-gateway

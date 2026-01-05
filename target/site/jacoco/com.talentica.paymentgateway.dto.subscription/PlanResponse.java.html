@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlanResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">PlanResponse.java</span></div><h1>PlanResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Response DTO for subscription plan operations.
+ * Contains plan configuration and usage statistics.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Subscription plan details and statistics&quot;)
+public class PlanResponse {
+
+    @Schema(description = &quot;Plan identifier&quot;, example = &quot;premium_monthly&quot;)
+    @JsonProperty(&quot;planCode&quot;)
+    private String planCode;
+
+    @Schema(description = &quot;Plan display name&quot;, example = &quot;Premium Monthly Plan&quot;)
+    @JsonProperty(&quot;name&quot;)
+    private String name;
+
+    @Schema(description = &quot;Plan description&quot;, example = &quot;Premium features with monthly billing&quot;)
+    @JsonProperty(&quot;description&quot;)
+    private String description;
+
+    @Schema(description = &quot;Plan price&quot;, example = &quot;29.99&quot;)
+    @JsonProperty(&quot;amount&quot;)
+    private BigDecimal amount;
+
+    @Schema(description = &quot;Currency code&quot;, example = &quot;USD&quot;)
+    @JsonProperty(&quot;currency&quot;)
+    private String currency;
+
+    @Schema(description = &quot;Billing interval unit&quot;, example = &quot;MONTH&quot;)
+    @JsonProperty(&quot;intervalUnit&quot;)
+    private String intervalUnit;
+
+    @Schema(description = &quot;Number of interval units between billings&quot;, example = &quot;1&quot;)
+    @JsonProperty(&quot;intervalCount&quot;)
+    private Integer intervalCount;
+
+    @Schema(description = &quot;Trial period length in days&quot;, example = &quot;14&quot;)
+    @JsonProperty(&quot;trialPeriodDays&quot;)
+    private Integer trialPeriodDays;
+
+    @Schema(description = &quot;Whether the plan is active&quot;, example = &quot;true&quot;)
+    @JsonProperty(&quot;isActive&quot;)
+    private Boolean isActive;
+
+    @Schema(description = &quot;Plan creation date&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;createdAt&quot;)
+    private ZonedDateTime createdAt;
+
+    @Schema(description = &quot;Plan last update date&quot;, example = &quot;2024-01-01T12:00:00Z&quot;)
+    @JsonProperty(&quot;updatedAt&quot;)
+    private ZonedDateTime updatedAt;
+
+    @Schema(description = &quot;Additional plan metadata&quot;)
+    @JsonProperty(&quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata;
+
+    @Schema(description = &quot;Plan features list&quot;)
+    @JsonProperty(&quot;features&quot;)
+    private List&lt;String&gt; features;
+
+    @Schema(description = &quot;Setup fee for the plan&quot;, example = &quot;0.00&quot;)
+    @JsonProperty(&quot;setupFee&quot;)
+    private BigDecimal setupFee;
+
+    @Schema(description = &quot;Maximum number of subscribers allowed&quot;, example = &quot;1000&quot;)
+    @JsonProperty(&quot;maxSubscribers&quot;)
+    private Integer maxSubscribers;
+
+    @Schema(description = &quot;Plan category or type&quot;, example = &quot;Premium&quot;)
+    @JsonProperty(&quot;category&quot;)
+    private String category;
+
+    @Schema(description = &quot;Plan display order&quot;, example = &quot;1&quot;)
+    @JsonProperty(&quot;sortOrder&quot;)
+    private Integer sortOrder;
+
+    // Usage Statistics
+    @Schema(description = &quot;Number of active subscriptions&quot;, example = &quot;125&quot;)
+    @JsonProperty(&quot;activeSubscriptions&quot;)
+    private Long activeSubscriptions;
+
+    @Schema(description = &quot;Total number of subscriptions ever created&quot;, example = &quot;200&quot;)
+    @JsonProperty(&quot;totalSubscriptions&quot;)
+    private Long totalSubscriptions;
+
+    @Schema(description = &quot;Monthly recurring revenue from this plan&quot;, example = &quot;3749.75&quot;)
+    @JsonProperty(&quot;monthlyRecurringRevenue&quot;)
+    private BigDecimal monthlyRecurringRevenue;
+
+    @Schema(description = &quot;Formatted billing interval&quot;, example = &quot;Every month&quot;)
+    @JsonProperty(&quot;formattedInterval&quot;)
+    private String formattedInterval;
+
+    @Schema(description = &quot;Formatted price&quot;, example = &quot;$29.99&quot;)
+    @JsonProperty(&quot;formattedPrice&quot;)
+    private String formattedPrice;
+
+    @Schema(description = &quot;Display name with price and interval&quot;, example = &quot;Premium Monthly Plan ($29.99 every month)&quot;)
+    @JsonProperty(&quot;displayName&quot;)
+    private String displayName;
+
+    @Schema(description = &quot;Whether plan has trial period&quot;, example = &quot;true&quot;)
+    @JsonProperty(&quot;hasTrialPeriod&quot;)
+    private Boolean hasTrialPeriod;
+
+    @Schema(description = &quot;Whether plan has setup fee&quot;, example = &quot;false&quot;)
+    @JsonProperty(&quot;hasSetupFee&quot;)
+    private Boolean hasSetupFee;
+
+    @Schema(description = &quot;Whether plan is at subscriber limit&quot;, example = &quot;false&quot;)
+    @JsonProperty(&quot;atSubscriberLimit&quot;)
+    private Boolean atSubscriberLimit;
+
+    // Default constructor
+<span class="fc" id="L127">    public PlanResponse() {</span>
+<span class="fc" id="L128">    }</span>
+
+    // Getters and Setters
+    public String getPlanCode() {
+<span class="fc" id="L132">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L136">        this.planCode = planCode;</span>
+<span class="fc" id="L137">    }</span>
+
+    public String getName() {
+<span class="fc" id="L140">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L144">        this.name = name;</span>
+<span class="fc" id="L145">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L148">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L152">        this.description = description;</span>
+<span class="fc" id="L153">    }</span>
+
+    public BigDecimal getAmount() {
+<span class="fc" id="L156">        return amount;</span>
+    }
+
+    public void setAmount(BigDecimal amount) {
+<span class="fc" id="L160">        this.amount = amount;</span>
+<span class="fc" id="L161">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L164">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L168">        this.currency = currency;</span>
+<span class="fc" id="L169">    }</span>
+
+    public String getIntervalUnit() {
+<span class="fc" id="L172">        return intervalUnit;</span>
+    }
+
+    public void setIntervalUnit(String intervalUnit) {
+<span class="fc" id="L176">        this.intervalUnit = intervalUnit;</span>
+<span class="fc" id="L177">    }</span>
+
+    public Integer getIntervalCount() {
+<span class="fc" id="L180">        return intervalCount;</span>
+    }
+
+    public void setIntervalCount(Integer intervalCount) {
+<span class="fc" id="L184">        this.intervalCount = intervalCount;</span>
+<span class="fc" id="L185">    }</span>
+
+    public Integer getTrialPeriodDays() {
+<span class="fc" id="L188">        return trialPeriodDays;</span>
+    }
+
+    public void setTrialPeriodDays(Integer trialPeriodDays) {
+<span class="fc" id="L192">        this.trialPeriodDays = trialPeriodDays;</span>
+<span class="fc" id="L193">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L196">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L200">        this.isActive = isActive;</span>
+<span class="fc" id="L201">    }</span>
+
+    public ZonedDateTime getCreatedAt() {
+<span class="fc" id="L204">        return createdAt;</span>
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+<span class="fc" id="L208">        this.createdAt = createdAt;</span>
+<span class="fc" id="L209">    }</span>
+
+    public ZonedDateTime getUpdatedAt() {
+<span class="fc" id="L212">        return updatedAt;</span>
+    }
+
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+<span class="fc" id="L216">        this.updatedAt = updatedAt;</span>
+<span class="fc" id="L217">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L220">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L224">        this.metadata = metadata;</span>
+<span class="fc" id="L225">    }</span>
+
+    public List&lt;String&gt; getFeatures() {
+<span class="fc" id="L228">        return features;</span>
+    }
+
+    public void setFeatures(List&lt;String&gt; features) {
+<span class="fc" id="L232">        this.features = features;</span>
+<span class="fc" id="L233">    }</span>
+
+    public BigDecimal getSetupFee() {
+<span class="fc" id="L236">        return setupFee;</span>
+    }
+
+    public void setSetupFee(BigDecimal setupFee) {
+<span class="fc" id="L240">        this.setupFee = setupFee;</span>
+<span class="fc" id="L241">    }</span>
+
+    public Integer getMaxSubscribers() {
+<span class="fc" id="L244">        return maxSubscribers;</span>
+    }
+
+    public void setMaxSubscribers(Integer maxSubscribers) {
+<span class="fc" id="L248">        this.maxSubscribers = maxSubscribers;</span>
+<span class="fc" id="L249">    }</span>
+
+    public String getCategory() {
+<span class="fc" id="L252">        return category;</span>
+    }
+
+    public void setCategory(String category) {
+<span class="fc" id="L256">        this.category = category;</span>
+<span class="fc" id="L257">    }</span>
+
+    public Integer getSortOrder() {
+<span class="fc" id="L260">        return sortOrder;</span>
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+<span class="fc" id="L264">        this.sortOrder = sortOrder;</span>
+<span class="fc" id="L265">    }</span>
+
+    public Long getActiveSubscriptions() {
+<span class="fc" id="L268">        return activeSubscriptions;</span>
+    }
+
+    public void setActiveSubscriptions(Long activeSubscriptions) {
+<span class="fc" id="L272">        this.activeSubscriptions = activeSubscriptions;</span>
+<span class="fc" id="L273">    }</span>
+
+    public Long getTotalSubscriptions() {
+<span class="fc" id="L276">        return totalSubscriptions;</span>
+    }
+
+    public void setTotalSubscriptions(Long totalSubscriptions) {
+<span class="fc" id="L280">        this.totalSubscriptions = totalSubscriptions;</span>
+<span class="fc" id="L281">    }</span>
+
+    public BigDecimal getMonthlyRecurringRevenue() {
+<span class="fc" id="L284">        return monthlyRecurringRevenue;</span>
+    }
+
+    public void setMonthlyRecurringRevenue(BigDecimal monthlyRecurringRevenue) {
+<span class="fc" id="L288">        this.monthlyRecurringRevenue = monthlyRecurringRevenue;</span>
+<span class="fc" id="L289">    }</span>
+
+    public String getFormattedInterval() {
+<span class="fc" id="L292">        return formattedInterval;</span>
+    }
+
+    public void setFormattedInterval(String formattedInterval) {
+<span class="fc" id="L296">        this.formattedInterval = formattedInterval;</span>
+<span class="fc" id="L297">    }</span>
+
+    public String getFormattedPrice() {
+<span class="fc" id="L300">        return formattedPrice;</span>
+    }
+
+    public void setFormattedPrice(String formattedPrice) {
+<span class="fc" id="L304">        this.formattedPrice = formattedPrice;</span>
+<span class="fc" id="L305">    }</span>
+
+    public String getDisplayName() {
+<span class="fc" id="L308">        return displayName;</span>
+    }
+
+    public void setDisplayName(String displayName) {
+<span class="fc" id="L312">        this.displayName = displayName;</span>
+<span class="fc" id="L313">    }</span>
+
+    public Boolean getHasTrialPeriod() {
+<span class="fc" id="L316">        return hasTrialPeriod;</span>
+    }
+
+    public void setHasTrialPeriod(Boolean hasTrialPeriod) {
+<span class="fc" id="L320">        this.hasTrialPeriod = hasTrialPeriod;</span>
+<span class="fc" id="L321">    }</span>
+
+    public Boolean getHasSetupFee() {
+<span class="fc" id="L324">        return hasSetupFee;</span>
+    }
+
+    public void setHasSetupFee(Boolean hasSetupFee) {
+<span class="fc" id="L328">        this.hasSetupFee = hasSetupFee;</span>
+<span class="fc" id="L329">    }</span>
+
+    public Boolean getAtSubscriberLimit() {
+<span class="fc" id="L332">        return atSubscriberLimit;</span>
+    }
+
+    public void setAtSubscriberLimit(Boolean atSubscriberLimit) {
+<span class="fc" id="L336">        this.atSubscriberLimit = atSubscriberLimit;</span>
+<span class="fc" id="L337">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L341">        return &quot;PlanResponse{&quot; +</span>
+                &quot;planCode='&quot; + planCode + '\'' +
+                &quot;, name='&quot; + name + '\'' +
+                &quot;, amount=&quot; + amount +
+                &quot;, currency='&quot; + currency + '\'' +
+                &quot;, intervalUnit='&quot; + intervalUnit + '\'' +
+                &quot;, intervalCount=&quot; + intervalCount +
+                &quot;, activeSubscriptions=&quot; + activeSubscriptions +
+                &quot;, isActive=&quot; + isActive +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

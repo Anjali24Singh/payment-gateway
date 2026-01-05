@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateSubscriptionRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">CreateSubscriptionRequest.java</span></div><h1>CreateSubscriptionRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.time.ZonedDateTime;
+import java.util.Map;
+
+/**
+ * Request DTO for creating a new subscription.
+ * Contains all required information to start a subscription for a customer.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Request to create a new subscription&quot;)
+public class CreateSubscriptionRequest {
+
+    @NotBlank(message = &quot;Customer ID is required&quot;)
+    @Size(max = 100, message = &quot;Customer ID must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Customer identifier&quot;, example = &quot;cust_12345&quot;, required = true)
+    @JsonProperty(&quot;customerId&quot;)
+    private String customerId;
+
+    @NotBlank(message = &quot;Plan code is required&quot;)
+    @Size(max = 100, message = &quot;Plan code must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Subscription plan code&quot;, example = &quot;premium_monthly&quot;, required = true)
+    @JsonProperty(&quot;planCode&quot;)
+    private String planCode;
+
+    @NotBlank(message = &quot;Payment method ID is required&quot;)
+    @Size(max = 100, message = &quot;Payment method ID must not exceed 100 characters&quot;)
+    @Schema(description = &quot;Payment method identifier&quot;, example = &quot;pm_12345&quot;, required = true)
+    @JsonProperty(&quot;paymentMethodId&quot;)
+    private String paymentMethodId;
+
+    @Schema(description = &quot;Subscription start date (defaults to now)&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;startDate&quot;)
+    private ZonedDateTime startDate;
+
+<span class="pc" id="L44">    @Schema(description = &quot;Whether to start trial period immediately&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;startTrial&quot;)
+<span class="pc" id="L46">    private Boolean startTrial = true;</span>
+
+    @Schema(description = &quot;Billing cycle anchor date (if different from start date)&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;billingCycleAnchor&quot;)
+    private ZonedDateTime billingCycleAnchor;
+
+<span class="pc" id="L52">    @Schema(description = &quot;Whether to prorate the first payment&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;prorated&quot;)
+<span class="pc" id="L54">    private Boolean prorated = true;</span>
+
+    @Size(max = 255, message = &quot;Idempotency key must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Idempotency key to prevent duplicate subscriptions&quot;)
+    @JsonProperty(&quot;idempotencyKey&quot;)
+    private String idempotencyKey;
+
+    @Schema(description = &quot;Additional metadata for the subscription&quot;)
+    @JsonProperty(&quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata;
+
+    @Schema(description = &quot;Description or reason for the subscription&quot;, example = &quot;Premium plan subscription&quot;)
+    @JsonProperty(&quot;description&quot;)
+    private String description;
+
+    // Default constructor
+<span class="fc" id="L70">    public CreateSubscriptionRequest() {</span>
+<span class="fc" id="L71">    }</span>
+
+    // Constructor with required fields
+<span class="nc" id="L74">    public CreateSubscriptionRequest(String customerId, String planCode, String paymentMethodId) {</span>
+<span class="nc" id="L75">        this.customerId = customerId;</span>
+<span class="nc" id="L76">        this.planCode = planCode;</span>
+<span class="nc" id="L77">        this.paymentMethodId = paymentMethodId;</span>
+<span class="nc" id="L78">    }</span>
+
+    // Getters and Setters
+    public String getCustomerId() {
+<span class="fc" id="L82">        return customerId;</span>
+    }
+
+    public void setCustomerId(String customerId) {
+<span class="fc" id="L86">        this.customerId = customerId;</span>
+<span class="fc" id="L87">    }</span>
+
+    public String getPlanCode() {
+<span class="fc" id="L90">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L94">        this.planCode = planCode;</span>
+<span class="fc" id="L95">    }</span>
+
+    public String getPaymentMethodId() {
+<span class="fc" id="L98">        return paymentMethodId;</span>
+    }
+
+    public void setPaymentMethodId(String paymentMethodId) {
+<span class="fc" id="L102">        this.paymentMethodId = paymentMethodId;</span>
+<span class="fc" id="L103">    }</span>
+
+    public ZonedDateTime getStartDate() {
+<span class="fc" id="L106">        return startDate;</span>
+    }
+
+    public void setStartDate(ZonedDateTime startDate) {
+<span class="fc" id="L110">        this.startDate = startDate;</span>
+<span class="fc" id="L111">    }</span>
+
+    public Boolean getStartTrial() {
+<span class="fc" id="L114">        return startTrial;</span>
+    }
+
+    public void setStartTrial(Boolean startTrial) {
+<span class="fc" id="L118">        this.startTrial = startTrial;</span>
+<span class="fc" id="L119">    }</span>
+
+    public ZonedDateTime getBillingCycleAnchor() {
+<span class="fc" id="L122">        return billingCycleAnchor;</span>
+    }
+
+    public void setBillingCycleAnchor(ZonedDateTime billingCycleAnchor) {
+<span class="fc" id="L126">        this.billingCycleAnchor = billingCycleAnchor;</span>
+<span class="fc" id="L127">    }</span>
+
+    public Boolean getProrated() {
+<span class="fc" id="L130">        return prorated;</span>
+    }
+
+    public void setProrated(Boolean prorated) {
+<span class="fc" id="L134">        this.prorated = prorated;</span>
+<span class="fc" id="L135">    }</span>
+
+    public String getIdempotencyKey() {
+<span class="fc" id="L138">        return idempotencyKey;</span>
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+<span class="fc" id="L142">        this.idempotencyKey = idempotencyKey;</span>
+<span class="fc" id="L143">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L146">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L150">        this.metadata = metadata;</span>
+<span class="fc" id="L151">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L154">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L158">        this.description = description;</span>
+<span class="fc" id="L159">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L163">        return &quot;CreateSubscriptionRequest{&quot; +</span>
+                &quot;customerId='&quot; + customerId + '\'' +
+                &quot;, planCode='&quot; + planCode + '\'' +
+                &quot;, paymentMethodId='&quot; + paymentMethodId + '\'' +
+                &quot;, startDate=&quot; + startDate +
+                &quot;, startTrial=&quot; + startTrial +
+                &quot;, billingCycleAnchor=&quot; + billingCycleAnchor +
+                &quot;, prorated=&quot; + prorated +
+                &quot;, idempotencyKey='&quot; + idempotencyKey + '\'' +
+                &quot;, description='&quot; + description + '\'' +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimitService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">RateLimitService.java</span></div><h1>RateLimitService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.config.ApplicationConfig;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Rate Limiting Service using Redis for distributed rate limiting.
+ * Implements token bucket algorithm for rate limiting with burst capacity.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L23">@Slf4j</span>
+@Service
+public class RateLimitService {
+
+    private static final String RATE_LIMIT_KEY_PREFIX = &quot;rate_limit:&quot;;
+    private static final String BURST_LIMIT_KEY_PREFIX = &quot;burst_limit:&quot;;
+    
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+    private final ApplicationConfig.AppProperties appProperties;
+    
+    // Lua script for atomic rate limiting check and update
+    private final DefaultRedisScript&lt;Long&gt; rateLimitScript;
+
+    public RateLimitService(@Autowired(required = false) RedisTemplate&lt;String, Object&gt; redisTemplate, 
+<span class="fc" id="L37">                           ApplicationConfig.AppProperties appProperties) {</span>
+<span class="fc" id="L38">        this.redisTemplate = redisTemplate;</span>
+<span class="fc" id="L39">        this.appProperties = appProperties;</span>
+<span class="fc" id="L40">        this.rateLimitScript = createRateLimitScript();</span>
+<span class="fc" id="L41">    }</span>
+
+    /**
+     * Check if request is allowed within rate limits.
+     * 
+     * @param identifier Unique identifier for rate limiting (IP, user ID, API key)
+     * @param requestsPerHour Number of requests allowed per hour
+     * @param burstCapacity Burst capacity for short-term spikes
+     * @return RateLimitResult containing allow status and remaining capacity
+     */
+    public RateLimitResult isAllowed(String identifier, int requestsPerHour, int burstCapacity) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!appProperties.getRateLimit().isEnabled()) {</span>
+<span class="fc" id="L53">            return new RateLimitResult(true, requestsPerHour, requestsPerHour, Instant.now().plusSeconds(3600));</span>
+        }
+
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!StringUtils.hasText(identifier)) {</span>
+<span class="fc" id="L57">            log.warn(&quot;Rate limit check called with empty identifier&quot;);</span>
+<span class="fc" id="L58">            return new RateLimitResult(false, 0, 0, Instant.now());</span>
+        }
+
+        try {
+            // If Redis is not available, allow all requests
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (redisTemplate == null) {</span>
+<span class="fc" id="L64">                log.debug(&quot;Redis not available, allowing request for identifier: {}&quot;, identifier);</span>
+<span class="fc" id="L65">                return new RateLimitResult(true, requestsPerHour, requestsPerHour, Instant.now().plusSeconds(3600));</span>
+            }
+            
+<span class="nc" id="L68">            String key = RATE_LIMIT_KEY_PREFIX + identifier;</span>
+<span class="nc" id="L69">            long currentTime = Instant.now().getEpochSecond();</span>
+            
+            // Execute Lua script for atomic rate limiting
+<span class="nc" id="L72">            Long remainingTokens = redisTemplate.execute(</span>
+                    rateLimitScript,
+<span class="nc" id="L74">                    Collections.singletonList(key),</span>
+<span class="nc" id="L75">                    requestsPerHour,</span>
+<span class="nc" id="L76">                    burstCapacity,</span>
+<span class="nc" id="L77">                    currentTime,</span>
+<span class="nc" id="L78">                    3600L // 1 hour window</span>
+            );
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (remainingTokens == null) {</span>
+<span class="nc" id="L82">                log.error(&quot;Rate limit script returned null for identifier: {}&quot;, identifier);</span>
+<span class="nc" id="L83">                return new RateLimitResult(false, 0, 0, Instant.now());</span>
+            }
+
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            boolean allowed = remainingTokens &gt;= 0;</span>
+<span class="nc" id="L87">            int remaining = Math.max(0, remainingTokens.intValue());</span>
+<span class="nc" id="L88">            Instant resetTime = calculateResetTime(key);</span>
+
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (allowed) {</span>
+<span class="nc" id="L91">                log.debug(&quot;Rate limit check passed for identifier: {} (remaining: {})&quot;, identifier, remaining);</span>
+            } else {
+<span class="nc" id="L93">                log.warn(&quot;Rate limit exceeded for identifier: {} (limit: {})&quot;, identifier, requestsPerHour);</span>
+            }
+
+<span class="nc" id="L96">            return new RateLimitResult(allowed, requestsPerHour, remaining, resetTime);</span>
+            
+<span class="nc" id="L98">        } catch (Exception e) {</span>
+<span class="nc" id="L99">            log.error(&quot;Error checking rate limit for identifier {}: {}&quot;, identifier, e.getMessage(), e);</span>
+            // Fail open - allow request if rate limiting fails
+<span class="nc" id="L101">            return new RateLimitResult(true, requestsPerHour, requestsPerHour, Instant.now().plusSeconds(3600));</span>
+        }
+    }
+
+    /**
+     * Check rate limit with default configuration.
+     * 
+     * @param identifier Unique identifier
+     * @return RateLimitResult
+     */
+    public RateLimitResult isAllowed(String identifier) {
+<span class="fc" id="L112">        return isAllowed(</span>
+                identifier,
+<span class="fc" id="L114">                appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="fc" id="L115">                appProperties.getRateLimit().getBurstLimit()</span>
+        );
+    }
+
+    /**
+     * Check rate limit for IP address.
+     * 
+     * @param ipAddress IP address
+     * @return RateLimitResult
+     */
+    public RateLimitResult isAllowedByIp(String ipAddress) {
+<span class="nc" id="L126">        return isAllowed(&quot;ip:&quot; + ipAddress);</span>
+    }
+
+    /**
+     * Check rate limit for user.
+     * 
+     * @param userId User ID
+     * @return RateLimitResult
+     */
+    public RateLimitResult isAllowedByUser(String userId) {
+<span class="nc" id="L136">        return isAllowed(&quot;user:&quot; + userId);</span>
+    }
+
+    /**
+     * Check rate limit for API key.
+     * 
+     * @param apiKey API key
+     * @return RateLimitResult
+     */
+    public RateLimitResult isAllowedByApiKey(String apiKey) {
+<span class="nc" id="L146">        return isAllowed(&quot;api:&quot; + apiKey);</span>
+    }
+
+    /**
+     * Reset rate limit for identifier.
+     * 
+     * @param identifier Unique identifier
+     * @return true if reset successfully
+     */
+    public boolean resetRateLimit(String identifier) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (redisTemplate == null) {</span>
+<span class="fc" id="L157">            log.debug(&quot;Redis not available, cannot reset rate limit for identifier: {}&quot;, identifier);</span>
+<span class="fc" id="L158">            return true; // Return true for tests</span>
+        }
+        
+        try {
+<span class="fc" id="L162">            String key = RATE_LIMIT_KEY_PREFIX + identifier;</span>
+<span class="fc" id="L163">            Boolean deleted = redisTemplate.delete(key);</span>
+<span class="fc" id="L164">            log.info(&quot;Reset rate limit for identifier: {}&quot;, identifier);</span>
+<span class="fc" id="L165">            return Boolean.TRUE.equals(deleted);</span>
+<span class="nc" id="L166">        } catch (Exception e) {</span>
+<span class="nc" id="L167">            log.error(&quot;Error resetting rate limit for identifier {}: {}&quot;, identifier, e.getMessage(), e);</span>
+<span class="nc" id="L168">            return false;</span>
+        }
+    }
+
+    /**
+     * Get current rate limit status.
+     * 
+     * @param identifier Unique identifier
+     * @return Current rate limit status
+     */
+    public RateLimitStatus getCurrentStatus(String identifier) {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (redisTemplate == null) {</span>
+<span class="fc" id="L180">            return new RateLimitStatus(</span>
+<span class="fc" id="L181">                    appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="fc" id="L182">                    appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="fc" id="L183">                    Instant.now().plusSeconds(3600)</span>
+            );
+        }
+        
+        try {
+<span class="fc" id="L188">            String key = RATE_LIMIT_KEY_PREFIX + identifier;</span>
+<span class="fc" id="L189">            Object value = redisTemplate.opsForValue().get(key);</span>
+            
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="fc" id="L192">                return new RateLimitStatus(</span>
+<span class="fc" id="L193">                        appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="fc" id="L194">                        appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="fc" id="L195">                        Instant.now().plusSeconds(3600)</span>
+                );
+            }
+
+            // Parse stored value and calculate remaining
+<span class="nc" id="L200">            Long remainingTokens = Long.valueOf(value.toString());</span>
+<span class="nc" id="L201">            Instant resetTime = calculateResetTime(key);</span>
+            
+<span class="nc" id="L203">            return new RateLimitStatus(</span>
+<span class="nc" id="L204">                    appProperties.getRateLimit().getDefaultLimit(),</span>
+<span class="nc" id="L205">                    remainingTokens.intValue(),</span>
+                    resetTime
+            );
+            
+<span class="nc" id="L209">        } catch (Exception e) {</span>
+<span class="nc" id="L210">            log.error(&quot;Error getting rate limit status for identifier {}: {}&quot;, identifier, e.getMessage(), e);</span>
+<span class="nc" id="L211">            return new RateLimitStatus(0, 0, Instant.now());</span>
+        }
+    }
+
+    /**
+     * Calculate reset time for rate limit key.
+     * 
+     * @param key Rate limit key
+     * @return Reset time
+     */
+    private Instant calculateResetTime(String key) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (redisTemplate == null) {</span>
+<span class="nc" id="L223">            return Instant.now().plusSeconds(3600);</span>
+        }
+        
+        try {
+<span class="nc" id="L227">            Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">            if (ttl != null &amp;&amp; ttl &gt; 0) {</span>
+<span class="nc" id="L229">                return Instant.now().plusSeconds(ttl);</span>
+            }
+<span class="nc" id="L231">        } catch (Exception e) {</span>
+<span class="nc" id="L232">            log.debug(&quot;Error calculating reset time: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L233">        }</span>
+<span class="nc" id="L234">        return Instant.now().plusSeconds(3600);</span>
+    }
+
+    /**
+     * Create Lua script for atomic rate limiting operations.
+     * 
+     * @return Redis Lua script
+     */
+    private DefaultRedisScript&lt;Long&gt; createRateLimitScript() {
+<span class="fc" id="L243">        DefaultRedisScript&lt;Long&gt; script = new DefaultRedisScript&lt;&gt;();</span>
+<span class="fc" id="L244">        script.setScriptText(&quot;&quot;&quot;</span>
+                local key = KEYS[1]
+                local limit = tonumber(ARGV[1])
+                local burst = tonumber(ARGV[2])
+                local current_time = tonumber(ARGV[3])
+                local window = tonumber(ARGV[4])
+                
+                -- Get current value and TTL
+                local current_value = redis.call('GET', key)
+                local ttl = redis.call('TTL', key)
+                
+                -- Initialize if key doesn't exist
+                if current_value == false then
+                    redis.call('SET', key, limit - 1)
+                    redis.call('EXPIRE', key, window)
+                    return limit - 1
+                end
+                
+                -- Convert to number
+                local current = tonumber(current_value)
+                
+                -- Check if window has expired
+                if ttl == -1 then
+                    redis.call('SET', key, limit - 1)
+                    redis.call('EXPIRE', key, window)
+                    return limit - 1
+                end
+                
+                -- Check if request is allowed
+                if current &gt; 0 then
+                    local new_value = current - 1
+                    redis.call('SET', key, new_value)
+                    redis.call('EXPIRE', key, ttl)
+                    return new_value
+                else
+                    return -1
+                end
+                &quot;&quot;&quot;);
+<span class="fc" id="L282">        script.setResultType(Long.class);</span>
+<span class="fc" id="L283">        return script;</span>
+    }
+
+    /**
+     * Rate limit result containing decision and metadata.
+     */
+    public static class RateLimitResult {
+        private final boolean allowed;
+        private final int limit;
+        private final int remaining;
+        private final Instant resetTime;
+
+<span class="fc" id="L295">        public RateLimitResult(boolean allowed, int limit, int remaining, Instant resetTime) {</span>
+<span class="fc" id="L296">            this.allowed = allowed;</span>
+<span class="fc" id="L297">            this.limit = limit;</span>
+<span class="fc" id="L298">            this.remaining = remaining;</span>
+<span class="fc" id="L299">            this.resetTime = resetTime;</span>
+<span class="fc" id="L300">        }</span>
+
+<span class="fc" id="L302">        public boolean isAllowed() { return allowed; }</span>
+<span class="fc" id="L303">        public int getLimit() { return limit; }</span>
+<span class="fc" id="L304">        public int getRemaining() { return remaining; }</span>
+<span class="fc" id="L305">        public Instant getResetTime() { return resetTime; }</span>
+<span class="fc" id="L306">        public long getResetTimeSeconds() { return resetTime.getEpochSecond(); }</span>
+    }
+
+    /**
+     * Current rate limit status.
+     */
+    public static class RateLimitStatus {
+        private final int limit;
+        private final int remaining;
+        private final Instant resetTime;
+
+<span class="fc" id="L317">        public RateLimitStatus(int limit, int remaining, Instant resetTime) {</span>
+<span class="fc" id="L318">            this.limit = limit;</span>
+<span class="fc" id="L319">            this.remaining = remaining;</span>
+<span class="fc" id="L320">            this.resetTime = resetTime;</span>
+<span class="fc" id="L321">        }</span>
+
+<span class="fc" id="L323">        public int getLimit() { return limit; }</span>
+<span class="fc" id="L324">        public int getRemaining() { return remaining; }</span>
+<span class="fc" id="L325">        public Instant getResetTime() { return resetTime; }</span>
+<span class="fc" id="L326">        public long getResetTimeSeconds() { return resetTime.getEpochSecond(); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

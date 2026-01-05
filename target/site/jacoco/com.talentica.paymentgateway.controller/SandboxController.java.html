@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SandboxController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">SandboxController.java</span></div><h1>SandboxController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.config.SandboxConfig;
+import com.talentica.paymentgateway.dto.common.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.*;
+
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.entity.PaymentMethod;
+import com.talentica.paymentgateway.repository.CustomerRepository;
+import com.talentica.paymentgateway.repository.PaymentMethodRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
+
+/**
+ * Sandbox environment controller for testing and development.
+ * Provides test data, mock responses, and sandbox-specific utilities.
+ * Only available in development, sandbox, and test profiles.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L31">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/api/v1/sandbox&quot;)
+@Tag(name = &quot;Sandbox&quot;, description = &quot;Sandbox environment utilities and test data&quot;)
+@Profile({&quot;dev&quot;, &quot;sandbox&quot;, &quot;test&quot;})
+@ConditionalOnProperty(name = &quot;app.sandbox.enabled&quot;, havingValue = &quot;true&quot;, matchIfMissing = true)
+public class SandboxController {
+
+    private final SandboxConfig sandboxConfig;
+    private final CustomerRepository customerRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+
+    public SandboxController(SandboxConfig sandboxConfig, 
+                           CustomerRepository customerRepository,
+<span class="fc" id="L45">                           PaymentMethodRepository paymentMethodRepository) {</span>
+<span class="fc" id="L46">        this.sandboxConfig = sandboxConfig;</span>
+<span class="fc" id="L47">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L48">        this.paymentMethodRepository = paymentMethodRepository;</span>
+<span class="fc" id="L49">    }</span>
+
+    /**
+     * Get sandbox environment information and configuration.
+     */
+    @GetMapping(&quot;/info&quot;)
+    @Operation(
+        summary = &quot;Get sandbox information&quot;,
+        description = &quot;Returns sandbox environment configuration and available test utilities&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Sandbox information retrieved successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;SandboxInfo&gt;&gt; getSandboxInfo() {
+<span class="fc" id="L63">        log.info(&quot;Sandbox info requested&quot;);</span>
+
+<span class="fc" id="L65">        SandboxInfo info = new SandboxInfo(</span>
+            true,
+            &quot;Sandbox environment for Payment Gateway API testing&quot;,
+<span class="fc" id="L68">            sandboxConfig.getDefaultApiKey(),</span>
+<span class="fc" id="L69">            sandboxConfig.getTestCards(),</span>
+<span class="fc" id="L70">            getTestScenarios(),</span>
+<span class="fc" id="L71">            getApiEndpoints()</span>
+        );
+
+<span class="fc" id="L74">        return ResponseEntity.ok(ApiResponse.success(info));</span>
+    }
+
+    /**
+     * Get test credit card numbers for different scenarios.
+     */
+    @GetMapping(&quot;/test-cards&quot;)
+    @Operation(
+        summary = &quot;Get test credit card numbers&quot;,
+        description = &quot;Returns test credit card numbers for different testing scenarios&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Test cards retrieved successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;Map&lt;String, TestCard&gt;&gt;&gt; getTestCards() {
+<span class="fc" id="L89">        log.info(&quot;Test cards requested&quot;);</span>
+
+<span class="fc" id="L91">        Map&lt;String, TestCard&gt; testCards = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L93">        testCards.put(&quot;success&quot;, new TestCard(</span>
+<span class="fc" id="L94">            sandboxConfig.getTestCards().getSuccessCard(),</span>
+            &quot;12/28&quot;,
+            &quot;123&quot;,
+            &quot;Successful payment - transaction will be approved&quot;
+        ));
+        
+<span class="fc" id="L100">        testCards.put(&quot;decline&quot;, new TestCard(</span>
+<span class="fc" id="L101">            sandboxConfig.getTestCards().getDeclineCard(),</span>
+            &quot;12/28&quot;,
+            &quot;123&quot;,
+            &quot;Declined payment - insufficient funds&quot;
+        ));
+        
+<span class="fc" id="L107">        testCards.put(&quot;error&quot;, new TestCard(</span>
+<span class="fc" id="L108">            sandboxConfig.getTestCards().getErrorCard(),</span>
+            &quot;12/28&quot;,
+            &quot;123&quot;,
+            &quot;Processing error - general processing error&quot;
+        ));
+        
+<span class="fc" id="L114">        testCards.put(&quot;expired&quot;, new TestCard(</span>
+<span class="fc" id="L115">            sandboxConfig.getTestCards().getExpiredCard(),</span>
+            &quot;12/20&quot;,
+            &quot;123&quot;,
+            &quot;Expired card error&quot;
+        ));
+        
+<span class="fc" id="L121">        testCards.put(&quot;cvv_fail&quot;, new TestCard(</span>
+<span class="fc" id="L122">            sandboxConfig.getTestCards().getCvvFailCard(),</span>
+            &quot;12/28&quot;,
+            &quot;123&quot;,
+            &quot;CVV verification failure&quot;
+        ));
+
+<span class="fc" id="L128">        return ResponseEntity.ok(ApiResponse.success(testCards));</span>
+    }
+
+    /**
+     * Generate test transaction data for development.
+     */
+    @PostMapping(&quot;/generate-test-data&quot;)
+    @Operation(
+        summary = &quot;Generate test transaction data&quot;,
+        description = &quot;Generates sample transaction data for testing and development purposes&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Test data generated successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;Map&lt;String, Object&gt;&gt;&gt; generateTestData(
+            @RequestParam(defaultValue = &quot;10&quot;) int count,
+            @RequestParam(defaultValue = &quot;PURCHASE&quot;) String transactionType) {
+        
+<span class="fc" id="L146">        log.info(&quot;Generating {} test transactions of type {}&quot;, count, transactionType);</span>
+
+<span class="fc" id="L148">        List&lt;Map&lt;String, Object&gt;&gt; testTransactions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L149">        Random random = new Random();</span>
+
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L152">            Map&lt;String, Object&gt; transaction = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L153">            transaction.put(&quot;transaction_id&quot;, &quot;test_&quot; + UUID.randomUUID().toString().substring(0, 8));</span>
+<span class="fc" id="L154">            transaction.put(&quot;amount&quot;, 10.00 + (random.nextDouble() * 990.00));</span>
+<span class="fc" id="L155">            transaction.put(&quot;currency&quot;, &quot;USD&quot;);</span>
+<span class="fc" id="L156">            transaction.put(&quot;status&quot;, getRandomStatus(random));</span>
+<span class="fc" id="L157">            transaction.put(&quot;type&quot;, transactionType);</span>
+<span class="fc" id="L158">            transaction.put(&quot;created_at&quot;, LocalDateTime.now().minusHours(random.nextInt(24)));</span>
+<span class="fc" id="L159">            transaction.put(&quot;card_last_four&quot;, String.format(&quot;%04d&quot;, random.nextInt(10000)));</span>
+<span class="fc" id="L160">            transaction.put(&quot;merchant_id&quot;, &quot;test_merchant_&quot; + (random.nextInt(100) + 1));</span>
+            
+<span class="fc" id="L162">            testTransactions.add(transaction);</span>
+        }
+
+<span class="fc" id="L165">        Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L166">        result.put(&quot;generated_count&quot;, count);</span>
+<span class="fc" id="L167">        result.put(&quot;transaction_type&quot;, transactionType);</span>
+<span class="fc" id="L168">        result.put(&quot;transactions&quot;, testTransactions);</span>
+
+<span class="fc" id="L170">        return ResponseEntity.ok(ApiResponse.success(result));</span>
+    }
+
+    /**
+     * Reset sandbox environment to initial state.
+     */
+    @PostMapping(&quot;/reset&quot;)
+    @Operation(
+        summary = &quot;Reset sandbox environment&quot;,
+        description = &quot;Resets the sandbox environment to its initial state, clearing test data&quot;
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = &quot;200&quot;, description = &quot;Sandbox reset successfully&quot;)
+    })
+    public ResponseEntity&lt;ApiResponse&lt;Map&lt;String, Object&gt;&gt;&gt; resetSandbox() {
+<span class="fc" id="L185">        log.info(&quot;Resetting sandbox environment&quot;);</span>
+
+<span class="fc" id="L187">        Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L188">        result.put(&quot;status&quot;, &quot;reset_complete&quot;);</span>
+<span class="fc" id="L189">        result.put(&quot;timestamp&quot;, LocalDateTime.now());</span>
+<span class="fc" id="L190">        result.put(&quot;message&quot;, &quot;Sandbox environment has been reset to initial state&quot;);</span>
+
+<span class="fc" id="L192">        return ResponseEntity.ok(ApiResponse.success(result));</span>
+    }
+
+    /**
+     * Get available test scenarios and their descriptions.
+     */
+    private List&lt;TestScenario&gt; getTestScenarios() {
+<span class="fc" id="L199">        return Arrays.asList(</span>
+            new TestScenario(&quot;successful_payment&quot;, &quot;Test successful payment processing&quot;),
+            new TestScenario(&quot;declined_payment&quot;, &quot;Test payment decline scenarios&quot;),
+            new TestScenario(&quot;processing_error&quot;, &quot;Test payment processing errors&quot;),
+            new TestScenario(&quot;network_timeout&quot;, &quot;Test network timeout handling&quot;),
+            new TestScenario(&quot;invalid_card&quot;, &quot;Test invalid card number validation&quot;),
+            new TestScenario(&quot;expired_card&quot;, &quot;Test expired card handling&quot;),
+            new TestScenario(&quot;cvv_failure&quot;, &quot;Test CVV verification failure&quot;),
+            new TestScenario(&quot;insufficient_funds&quot;, &quot;Test insufficient funds scenario&quot;),
+            new TestScenario(&quot;refund_processing&quot;, &quot;Test refund transaction processing&quot;),
+            new TestScenario(&quot;subscription_billing&quot;, &quot;Test recurring subscription billing&quot;)
+        );
+    }
+
+    /**
+     * Get available API endpoints for testing.
+     */
+    private List&lt;ApiEndpoint&gt; getApiEndpoints() {
+<span class="fc" id="L217">        return Arrays.asList(</span>
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/payments/purchase&quot;, &quot;Process purchase transaction&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/payments/authorize&quot;, &quot;Process authorization&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/payments/capture&quot;, &quot;Capture authorized payment&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/payments/void&quot;, &quot;Void authorized payment&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/payments/refund&quot;, &quot;Process refund&quot;),
+            new ApiEndpoint(&quot;GET&quot;, &quot;/api/v1/payments/{id}&quot;, &quot;Get transaction status&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/auth/login&quot;, &quot;User authentication&quot;),
+            new ApiEndpoint(&quot;POST&quot;, &quot;/api/v1/subscriptions&quot;, &quot;Create subscription&quot;),
+            new ApiEndpoint(&quot;GET&quot;, &quot;/api/v1/analytics/transactions&quot;, &quot;Get transaction analytics&quot;)
+        );
+    }
+
+    /**
+     * Get random transaction status for test data generation.
+     */
+    private String getRandomStatus(Random random) {
+<span class="fc" id="L234">        String[] statuses = {&quot;COMPLETED&quot;, &quot;PENDING&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;};</span>
+<span class="fc" id="L235">        return statuses[random.nextInt(statuses.length)];</span>
+    }
+
+    // Data classes for response structures
+    public static class SandboxInfo {
+        private boolean enabled;
+        private String description;
+        private String defaultApiKey;
+        private SandboxConfig.TestCards testCards;
+        private List&lt;TestScenario&gt; testScenarios;
+        private List&lt;ApiEndpoint&gt; apiEndpoints;
+
+        public SandboxInfo(boolean enabled, String description, String defaultApiKey, 
+                          SandboxConfig.TestCards testCards, List&lt;TestScenario&gt; testScenarios, 
+<span class="fc" id="L249">                          List&lt;ApiEndpoint&gt; apiEndpoints) {</span>
+<span class="fc" id="L250">            this.enabled = enabled;</span>
+<span class="fc" id="L251">            this.description = description;</span>
+<span class="fc" id="L252">            this.defaultApiKey = defaultApiKey;</span>
+<span class="fc" id="L253">            this.testCards = testCards;</span>
+<span class="fc" id="L254">            this.testScenarios = testScenarios;</span>
+<span class="fc" id="L255">            this.apiEndpoints = apiEndpoints;</span>
+<span class="fc" id="L256">        }</span>
+
+        // Getters
+<span class="fc" id="L259">        public boolean isEnabled() { return enabled; }</span>
+<span class="fc" id="L260">        public String getDescription() { return description; }</span>
+<span class="fc" id="L261">        public String getDefaultApiKey() { return defaultApiKey; }</span>
+<span class="fc" id="L262">        public SandboxConfig.TestCards getTestCards() { return testCards; }</span>
+<span class="fc" id="L263">        public List&lt;TestScenario&gt; getTestScenarios() { return testScenarios; }</span>
+<span class="fc" id="L264">        public List&lt;ApiEndpoint&gt; getApiEndpoints() { return apiEndpoints; }</span>
+    }
+
+    public static class TestCard {
+        private String number;
+        private String expiry;
+        private String cvv;
+        private String description;
+
+<span class="fc" id="L273">        public TestCard(String number, String expiry, String cvv, String description) {</span>
+<span class="fc" id="L274">            this.number = number;</span>
+<span class="fc" id="L275">            this.expiry = expiry;</span>
+<span class="fc" id="L276">            this.cvv = cvv;</span>
+<span class="fc" id="L277">            this.description = description;</span>
+<span class="fc" id="L278">        }</span>
+
+        // Getters
+<span class="fc" id="L281">        public String getNumber() { return number; }</span>
+<span class="fc" id="L282">        public String getExpiry() { return expiry; }</span>
+<span class="fc" id="L283">        public String getCvv() { return cvv; }</span>
+<span class="fc" id="L284">        public String getDescription() { return description; }</span>
+    }
+
+    public static class TestScenario {
+        private String name;
+        private String description;
+
+<span class="fc" id="L291">        public TestScenario(String name, String description) {</span>
+<span class="fc" id="L292">            this.name = name;</span>
+<span class="fc" id="L293">            this.description = description;</span>
+<span class="fc" id="L294">        }</span>
+
+        // Getters
+<span class="fc" id="L297">        public String getName() { return name; }</span>
+<span class="fc" id="L298">        public String getDescription() { return description; }</span>
+    }
+
+    public static class ApiEndpoint {
+        private String method;
+        private String path;
+        private String description;
+
+<span class="fc" id="L306">        public ApiEndpoint(String method, String path, String description) {</span>
+<span class="fc" id="L307">            this.method = method;</span>
+<span class="fc" id="L308">            this.path = path;</span>
+<span class="fc" id="L309">            this.description = description;</span>
+<span class="fc" id="L310">        }</span>
+
+        // Getters
+<span class="fc" id="L313">        public String getMethod() { return method; }</span>
+<span class="fc" id="L314">        public String getPath() { return path; }</span>
+<span class="fc" id="L315">        public String getDescription() { return description; }</span>
+    }
+
+    /**
+     * Create a test payment method for subscription testing.
+     */
+    @PostMapping(&quot;/create-test-payment-method&quot;)
+    @Operation(
+        summary = &quot;Create test payment method&quot;,
+        description = &quot;Creates a test payment method for the specified customer for testing subscriptions&quot;
+    )
+    @PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; createTestPaymentMethod(
+            @RequestParam String customerId,
+            @RequestParam(defaultValue = &quot;pm_test_&quot;) String tokenPrefix) {
+        
+        try {
+            // Find customer
+<span class="fc" id="L333">            Optional&lt;Customer&gt; customerOpt = customerRepository.findByCustomerId(customerId);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (customerOpt.isEmpty()) {</span>
+<span class="fc" id="L335">                return ResponseEntity.notFound().build();</span>
+            }
+            
+<span class="fc" id="L338">            Customer customer = customerOpt.get();</span>
+<span class="fc" id="L339">            String paymentToken = tokenPrefix + customerId + &quot;_&quot; + System.currentTimeMillis();</span>
+            
+            // Create test payment method
+<span class="fc" id="L342">            PaymentMethod paymentMethod = new PaymentMethod();</span>
+<span class="fc" id="L343">            paymentMethod.setCustomer(customer);</span>
+<span class="fc" id="L344">            paymentMethod.setPaymentToken(paymentToken);</span>
+<span class="fc" id="L345">            paymentMethod.setPaymentType(&quot;CREDIT_CARD&quot;);</span>
+<span class="fc" id="L346">            paymentMethod.setCardLastFour(&quot;1111&quot;);</span>
+<span class="fc" id="L347">            paymentMethod.setCardBrand(&quot;VISA&quot;);</span>
+<span class="fc" id="L348">            paymentMethod.setCardExpiryMonth(12);</span>
+<span class="fc" id="L349">            paymentMethod.setCardExpiryYear(2028);</span>
+<span class="fc" id="L350">            paymentMethod.setCardholderName(&quot;Test User&quot;);</span>
+<span class="fc" id="L351">            paymentMethod.setIsDefault(true);</span>
+<span class="fc" id="L352">            paymentMethod.setIsActive(true);</span>
+<span class="fc" id="L353">            paymentMethod.setCardNumber(&quot;encrypted_test_card&quot;);</span>
+<span class="fc" id="L354">            paymentMethod.setExpiryMonth(&quot;12&quot;);</span>
+<span class="fc" id="L355">            paymentMethod.setExpiryYear(&quot;2028&quot;);</span>
+<span class="fc" id="L356">            paymentMethod.setCvv(&quot;encrypted_cvv&quot;);</span>
+            
+<span class="fc" id="L358">            PaymentMethod saved = paymentMethodRepository.save(paymentMethod);</span>
+            
+<span class="fc" id="L360">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L361">            response.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L362">            response.put(&quot;paymentMethodId&quot;, saved.getPaymentToken());</span>
+<span class="fc" id="L363">            response.put(&quot;customerId&quot;, customerId);</span>
+<span class="fc" id="L364">            response.put(&quot;message&quot;, &quot;Test payment method created successfully&quot;);</span>
+            
+<span class="fc" id="L366">            log.info(&quot;Created test payment method: {} for customer: {}&quot;, saved.getPaymentToken(), customerId);</span>
+            
+<span class="fc" id="L368">            return ResponseEntity.ok(response);</span>
+            
+<span class="fc" id="L370">        } catch (Exception e) {</span>
+<span class="fc" id="L371">            log.error(&quot;Failed to create test payment method for customer: {}&quot;, customerId, e);</span>
+            
+<span class="fc" id="L373">            Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L374">            response.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L375">            response.put(&quot;error&quot;, e.getMessage());</span>
+            
+<span class="fc" id="L377">            return ResponseEntity.internalServerError().body(response);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

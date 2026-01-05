@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.service</a> &gt; <span class="el_source">JwtService.java</span></div><h1>JwtService.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.service;
+
+import com.talentica.paymentgateway.config.ApplicationConfig;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+/**
+ * JWT Service for token generation, validation, and management.
+ * Handles access tokens and refresh tokens with proper security measures.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+<span class="fc" id="L25">@Slf4j</span>
+@Service
+public class JwtService {
+
+    private static final String TOKEN_TYPE_CLAIM = &quot;token_type&quot;;
+    private static final String ACCESS_TOKEN_TYPE = &quot;access&quot;;
+    private static final String REFRESH_TOKEN_TYPE = &quot;refresh&quot;;
+    private static final String AUTHORITIES_CLAIM = &quot;authorities&quot;;
+    private static final String USER_ID_CLAIM = &quot;user_id&quot;;
+    
+    private final ApplicationConfig.AppProperties appProperties;
+
+<span class="fc" id="L37">    public JwtService(ApplicationConfig.AppProperties appProperties) {</span>
+<span class="fc" id="L38">        this.appProperties = appProperties;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Generate access token for authenticated user.
+     * 
+     * @param userDetails User details
+     * @return JWT access token
+     */
+    public String generateAccessToken(UserDetails userDetails) {
+<span class="fc" id="L48">        return generateAccessToken(new HashMap&lt;&gt;(), userDetails);</span>
+    }
+
+    /**
+     * Generate access token with extra claims.
+     * 
+     * @param extraClaims Additional claims to include
+     * @param userDetails User details
+     * @return JWT access token
+     */
+    public String generateAccessToken(Map&lt;String, Object&gt; extraClaims, UserDetails userDetails) {
+<span class="fc" id="L59">        return buildToken(extraClaims, userDetails, appProperties.getJwt().getExpiration(), ACCESS_TOKEN_TYPE);</span>
+    }
+
+    /**
+     * Generate refresh token for user.
+     * 
+     * @param userDetails User details
+     * @return JWT refresh token
+     */
+    public String generateRefreshToken(UserDetails userDetails) {
+<span class="fc" id="L69">        Map&lt;String, Object&gt; claims = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L70">        return buildToken(claims, userDetails, appProperties.getJwt().getRefreshExpiration(), REFRESH_TOKEN_TYPE);</span>
+    }
+
+    /**
+     * Extract username from JWT token.
+     * 
+     * @param token JWT token
+     * @return Username
+     */
+    public String extractUsername(String token) {
+<span class="fc" id="L80">        return extractClaim(token, Claims::getSubject);</span>
+    }
+
+    /**
+     * Extract user ID from JWT token.
+     * 
+     * @param token JWT token
+     * @return User ID
+     */
+    public String extractUserId(String token) {
+<span class="fc" id="L90">        return extractClaim(token, claims -&gt; claims.get(USER_ID_CLAIM, String.class));</span>
+    }
+
+    /**
+     * Extract authorities from JWT token.
+     * 
+     * @param token JWT token
+     * @return Authorities string
+     */
+    public String extractAuthorities(String token) {
+<span class="fc" id="L100">        return extractClaim(token, claims -&gt; claims.get(AUTHORITIES_CLAIM, String.class));</span>
+    }
+
+    /**
+     * Extract token type from JWT token.
+     * 
+     * @param token JWT token
+     * @return Token type
+     */
+    public String extractTokenType(String token) {
+<span class="fc" id="L110">        return extractClaim(token, claims -&gt; claims.get(TOKEN_TYPE_CLAIM, String.class));</span>
+    }
+
+    /**
+     * Extract specific claim from JWT token.
+     * 
+     * @param token JWT token
+     * @param claimsResolver Function to resolve claim
+     * @param &lt;T&gt; Claim type
+     * @return Extracted claim
+     */
+    public &lt;T&gt; T extractClaim(String token, Function&lt;Claims, T&gt; claimsResolver) {
+<span class="fc" id="L122">        final Claims claims = extractAllClaims(token);</span>
+<span class="fc" id="L123">        return claimsResolver.apply(claims);</span>
+    }
+
+    /**
+     * Check if token is valid for user.
+     * 
+     * @param token JWT token
+     * @param userDetails User details
+     * @return True if valid
+     */
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        try {
+<span class="fc" id="L135">            final String username = extractUsername(token);</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">            return (username.equals(userDetails.getUsername())) &amp;&amp; !isTokenExpired(token);</span>
+<span class="fc" id="L137">        } catch (Exception e) {</span>
+<span class="fc" id="L138">            log.warn(&quot;Token validation failed: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L139">            return false;</span>
+        }
+    }
+
+    /**
+     * Check if token is an access token.
+     * 
+     * @param token JWT token
+     * @return True if access token
+     */
+    public boolean isAccessToken(String token) {
+        try {
+<span class="fc" id="L151">            String tokenType = extractTokenType(token);</span>
+<span class="fc" id="L152">            return ACCESS_TOKEN_TYPE.equals(tokenType);</span>
+<span class="fc" id="L153">        } catch (Exception e) {</span>
+<span class="fc" id="L154">            log.warn(&quot;Failed to extract token type: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L155">            return false;</span>
+        }
+    }
+
+    /**
+     * Check if token is a refresh token.
+     * 
+     * @param token JWT token
+     * @return True if refresh token
+     */
+    public boolean isRefreshToken(String token) {
+        try {
+<span class="fc" id="L167">            String tokenType = extractTokenType(token);</span>
+<span class="fc" id="L168">            return REFRESH_TOKEN_TYPE.equals(tokenType);</span>
+<span class="fc" id="L169">        } catch (Exception e) {</span>
+<span class="fc" id="L170">            log.warn(&quot;Failed to extract token type: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L171">            return false;</span>
+        }
+    }
+
+    /**
+     * Check if token is expired.
+     * 
+     * @param token JWT token
+     * @return True if expired
+     */
+    private boolean isTokenExpired(String token) {
+<span class="fc" id="L182">        return extractExpiration(token).before(new Date());</span>
+    }
+
+    /**
+     * Extract expiration date from token.
+     * 
+     * @param token JWT token
+     * @return Expiration date
+     */
+    private Date extractExpiration(String token) {
+<span class="fc" id="L192">        return extractClaim(token, Claims::getExpiration);</span>
+    }
+
+    /**
+     * Extract all claims from JWT token.
+     * 
+     * @param token JWT token
+     * @return Claims
+     * @throws JwtException if token is invalid
+     */
+    private Claims extractAllClaims(String token) {
+        try {
+<span class="fc" id="L204">            return Jwts.parser()</span>
+<span class="fc" id="L205">                    .verifyWith(getSignInKey())</span>
+<span class="fc" id="L206">                    .build()</span>
+<span class="fc" id="L207">                    .parseSignedClaims(token)</span>
+<span class="fc" id="L208">                    .getPayload();</span>
+<span class="fc" id="L209">        } catch (ExpiredJwtException e) {</span>
+<span class="fc" id="L210">            log.warn(&quot;JWT token is expired: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L211">            throw e;</span>
+<span class="nc" id="L212">        } catch (UnsupportedJwtException e) {</span>
+<span class="nc" id="L213">            log.warn(&quot;JWT token is unsupported: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L214">            throw e;</span>
+<span class="fc" id="L215">        } catch (MalformedJwtException e) {</span>
+<span class="fc" id="L216">            log.warn(&quot;JWT token is malformed: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L217">            throw e;</span>
+<span class="fc" id="L218">        } catch (SignatureException e) {</span>
+<span class="fc" id="L219">            log.warn(&quot;JWT signature does not match: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L220">            throw e;</span>
+<span class="nc" id="L221">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L222">            log.warn(&quot;JWT token compact is invalid: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L223">            throw e;</span>
+        }
+    }
+
+    /**
+     * Build JWT token with claims and expiration.
+     * 
+     * @param extraClaims Additional claims
+     * @param userDetails User details
+     * @param expiration Token expiration time
+     * @param tokenType Type of token (access/refresh)
+     * @return JWT token
+     */
+    private String buildToken(
+            Map&lt;String, Object&gt; extraClaims,
+            UserDetails userDetails,
+            long expiration,
+            String tokenType
+    ) {
+<span class="fc" id="L242">        Date now = new Date(System.currentTimeMillis());</span>
+<span class="fc" id="L243">        Date expirationDate = new Date(System.currentTimeMillis() + expiration);</span>
+
+<span class="fc" id="L245">        JwtBuilder builder = Jwts.builder()</span>
+<span class="fc" id="L246">                .claims(extraClaims)</span>
+<span class="fc" id="L247">                .subject(userDetails.getUsername())</span>
+<span class="fc" id="L248">                .claim(TOKEN_TYPE_CLAIM, tokenType)</span>
+<span class="fc" id="L249">                .claim(AUTHORITIES_CLAIM, userDetails.getAuthorities().toString())</span>
+<span class="fc" id="L250">                .issuedAt(now)</span>
+<span class="fc" id="L251">                .expiration(expirationDate)</span>
+<span class="fc" id="L252">                .signWith(getSignInKey(), Jwts.SIG.HS256);</span>
+
+<span class="fc" id="L254">        return builder.compact();</span>
+    }
+
+    /**
+     * Get signing key for JWT tokens.
+     * 
+     * @return Secret key for signing
+     */
+    private SecretKey getSignInKey() {
+        try {
+<span class="fc" id="L264">            String secret = appProperties.getJwt().getSecret();</span>
+<span class="fc" id="L265">            log.debug(&quot;JWT secret length: {}&quot;, secret.length());</span>
+            
+            // Try to decode as base64 first, if it fails, use the secret directly as bytes
+            byte[] keyBytes;
+            try {
+<span class="fc" id="L270">                keyBytes = Decoders.BASE64.decode(secret);</span>
+<span class="fc" id="L271">                log.debug(&quot;Successfully decoded JWT secret as base64&quot;);</span>
+<span class="nc" id="L272">            } catch (Exception e) {</span>
+<span class="nc" id="L273">                log.debug(&quot;JWT secret is not base64 encoded, using UTF-8 bytes: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L274">                keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);</span>
+<span class="fc" id="L275">            }</span>
+            
+            // Ensure the key is at least 256 bits (32 bytes) for HS256
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (keyBytes.length &lt; 32) {</span>
+<span class="fc" id="L279">                log.debug(&quot;JWT secret too short ({}), padding to 32 bytes&quot;, keyBytes.length);</span>
+<span class="fc" id="L280">                byte[] paddedKey = new byte[32];</span>
+<span class="fc" id="L281">                System.arraycopy(keyBytes, 0, paddedKey, 0, Math.min(keyBytes.length, 32));</span>
+                // Fill remaining bytes with the secret repeated
+<span class="fc bfc" id="L283" title="All 2 branches covered.">                for (int i = keyBytes.length; i &lt; 32; i++) {</span>
+<span class="fc" id="L284">                    paddedKey[i] = keyBytes[i % keyBytes.length];</span>
+                }
+<span class="fc" id="L286">                keyBytes = paddedKey;</span>
+            }
+            
+<span class="fc" id="L289">            SecretKey key = Keys.hmacShaKeyFor(keyBytes);</span>
+<span class="fc" id="L290">            log.debug(&quot;Successfully created JWT signing key&quot;);</span>
+<span class="fc" id="L291">            return key;</span>
+<span class="nc" id="L292">        } catch (Exception e) {</span>
+<span class="nc" id="L293">            log.error(&quot;Error creating JWT signing key: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L294">            throw new RuntimeException(&quot;Failed to create JWT signing key&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Get expiration time from token.
+     * 
+     * @param token JWT token
+     * @return Expiration time in milliseconds
+     */
+    public long getExpirationTime(String token) {
+<span class="fc" id="L305">        Date expiration = extractExpiration(token);</span>
+<span class="fc" id="L306">        return expiration.getTime();</span>
+    }
+
+    /**
+     * Get remaining time until token expires.
+     * 
+     * @param token JWT token
+     * @return Remaining time in milliseconds
+     */
+    public long getRemainingTime(String token) {
+<span class="fc" id="L316">        long expirationTime = getExpirationTime(token);</span>
+<span class="fc" id="L317">        long currentTime = System.currentTimeMillis();</span>
+<span class="fc" id="L318">        return Math.max(0, expirationTime - currentTime);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

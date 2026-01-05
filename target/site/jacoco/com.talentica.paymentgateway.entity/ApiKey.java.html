@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">ApiKey.java</span></div><h1>ApiKey.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Entity representing API keys for authentication and authorization.
+ * Each API key belongs to a user and has specific permissions and rate limits.
+ */
+@Entity
+@Table(name = &quot;api_keys&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;keyHash&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_api_keys_user_id&quot;, columnList = &quot;user_id&quot;),
+           @Index(name = &quot;idx_api_keys_key_hash&quot;, columnList = &quot;keyHash&quot;),
+           @Index(name = &quot;idx_api_keys_active&quot;, columnList = &quot;isActive&quot;)
+       })
+public class ApiKey extends BaseEntity {
+
+    @NotNull(message = &quot;User is required&quot;)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;user_id&quot;, nullable = false)
+    private User user;
+
+    @NotBlank(message = &quot;Key name is required&quot;)
+    @Size(max = 100, message = &quot;Key name must not exceed 100 characters&quot;)
+    @Column(name = &quot;key_name&quot;, nullable = false, length = 100)
+    private String keyName;
+
+    @NotBlank(message = &quot;Key hash is required&quot;)
+    @Size(max = 255, message = &quot;Key hash must not exceed 255 characters&quot;)
+    @Column(name = &quot;key_hash&quot;, nullable = false, unique = true, length = 255)
+    private String keyHash;
+
+    @NotBlank(message = &quot;Key prefix is required&quot;)
+    @Size(max = 20, message = &quot;Key prefix must not exceed 20 characters&quot;)
+    @Column(name = &quot;key_prefix&quot;, nullable = false, length = 20)
+    private String keyPrefix;
+
+<span class="fc" id="L50">    @Column(name = &quot;permissions&quot;, columnDefinition = &quot;TEXT[]&quot;)</span>
+    private String[] permissions = new String[0];
+
+<span class="fc" id="L53">    @Positive(message = &quot;Rate limit must be positive&quot;)</span>
+    @Column(name = &quot;rate_limit_per_hour&quot;, nullable = false)
+<span class="fc" id="L55">    private Integer rateLimitPerHour = 1000;</span>
+
+<span class="fc" id="L57">    @Column(name = &quot;is_active&quot;, nullable = false)</span>
+<span class="fc" id="L58">    private Boolean isActive = true;</span>
+
+    @Column(name = &quot;expires_at&quot;)
+    private ZonedDateTime expiresAt;
+
+    @Column(name = &quot;last_used_at&quot;)
+    private ZonedDateTime lastUsedAt;
+
+    // Relationships
+<span class="fc" id="L67">    @OneToMany(mappedBy = &quot;apiKey&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;AuditLog&gt; auditLogs = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public ApiKey() {
+<span class="fc" id="L72">        super();</span>
+<span class="fc" id="L73">    }</span>
+
+    public ApiKey(User user, String keyName, String keyHash, String keyPrefix) {
+<span class="nc" id="L76">        this();</span>
+<span class="nc" id="L77">        this.user = user;</span>
+<span class="nc" id="L78">        this.keyName = keyName;</span>
+<span class="nc" id="L79">        this.keyHash = keyHash;</span>
+<span class="nc" id="L80">        this.keyPrefix = keyPrefix;</span>
+<span class="nc" id="L81">    }</span>
+
+    // Getters and Setters
+    public User getUser() {
+<span class="fc" id="L85">        return user;</span>
+    }
+
+    public void setUser(User user) {
+<span class="fc" id="L89">        this.user = user;</span>
+<span class="fc" id="L90">    }</span>
+
+    public String getKeyName() {
+<span class="fc" id="L93">        return keyName;</span>
+    }
+
+    public void setKeyName(String keyName) {
+<span class="fc" id="L97">        this.keyName = keyName;</span>
+<span class="fc" id="L98">    }</span>
+
+    public String getKeyHash() {
+<span class="fc" id="L101">        return keyHash;</span>
+    }
+
+    public void setKeyHash(String keyHash) {
+<span class="fc" id="L105">        this.keyHash = keyHash;</span>
+<span class="fc" id="L106">    }</span>
+
+    public String getKeyPrefix() {
+<span class="fc" id="L109">        return keyPrefix;</span>
+    }
+
+    public void setKeyPrefix(String keyPrefix) {
+<span class="fc" id="L113">        this.keyPrefix = keyPrefix;</span>
+<span class="fc" id="L114">    }</span>
+
+    public String[] getPermissions() {
+<span class="fc" id="L117">        return permissions;</span>
+    }
+
+    public void setPermissions(String[] permissions) {
+<span class="fc" id="L121">        this.permissions = permissions;</span>
+<span class="fc" id="L122">    }</span>
+
+    public Integer getRateLimitPerHour() {
+<span class="fc" id="L125">        return rateLimitPerHour;</span>
+    }
+
+    public void setRateLimitPerHour(Integer rateLimitPerHour) {
+<span class="fc" id="L129">        this.rateLimitPerHour = rateLimitPerHour;</span>
+<span class="fc" id="L130">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L133">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L137">        this.isActive = isActive;</span>
+<span class="fc" id="L138">    }</span>
+
+    public ZonedDateTime getExpiresAt() {
+<span class="fc" id="L141">        return expiresAt;</span>
+    }
+
+    public void setExpiresAt(ZonedDateTime expiresAt) {
+<span class="fc" id="L145">        this.expiresAt = expiresAt;</span>
+<span class="fc" id="L146">    }</span>
+
+    public ZonedDateTime getLastUsedAt() {
+<span class="fc" id="L149">        return lastUsedAt;</span>
+    }
+
+    public void setLastUsedAt(ZonedDateTime lastUsedAt) {
+<span class="fc" id="L153">        this.lastUsedAt = lastUsedAt;</span>
+<span class="fc" id="L154">    }</span>
+
+    public List&lt;AuditLog&gt; getAuditLogs() {
+<span class="fc" id="L157">        return auditLogs;</span>
+    }
+
+    public void setAuditLogs(List&lt;AuditLog&gt; auditLogs) {
+<span class="fc" id="L161">        this.auditLogs = auditLogs;</span>
+<span class="fc" id="L162">    }</span>
+
+    // Utility methods
+    public boolean isExpired() {
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        return expiresAt != null &amp;&amp; ZonedDateTime.now().isAfter(expiresAt);</span>
+    }
+
+    public boolean hasPermission(String permission) {
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        return permissions != null &amp;&amp; Arrays.asList(permissions).contains(permission);</span>
+    }
+
+    public List&lt;String&gt; getPermissionsList() {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        return permissions != null ? Arrays.asList(permissions) : new ArrayList&lt;&gt;();</span>
+    }
+
+    public void setPermissionsList(List&lt;String&gt; permissionsList) {
+<span class="fc" id="L178">        this.permissions = permissionsList.toArray(new String[0]);</span>
+<span class="fc" id="L179">    }</span>
+
+    public void addPermission(String permission) {
+<span class="nc" id="L182">        List&lt;String&gt; currentPermissions = getPermissionsList();</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (!currentPermissions.contains(permission)) {</span>
+<span class="nc" id="L184">            currentPermissions.add(permission);</span>
+<span class="nc" id="L185">            setPermissionsList(currentPermissions);</span>
+        }
+<span class="nc" id="L187">    }</span>
+
+    public void removePermission(String permission) {
+<span class="nc" id="L190">        List&lt;String&gt; currentPermissions = getPermissionsList();</span>
+<span class="nc" id="L191">        currentPermissions.remove(permission);</span>
+<span class="nc" id="L192">        setPermissionsList(currentPermissions);</span>
+<span class="nc" id="L193">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

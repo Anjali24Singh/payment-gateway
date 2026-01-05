@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreatePlanRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">CreatePlanRequest.java</span></div><h1>CreatePlanRequest.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.talentica.paymentgateway.validation.ValidAmount;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.*;
+
+import java.math.BigDecimal;
+import java.util.Map;
+
+/**
+ * Request DTO for creating a new subscription plan.
+ * Contains plan pricing, billing cycle, and feature configuration.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Request to create a new subscription plan&quot;)
+public class CreatePlanRequest {
+
+    @NotBlank(message = &quot;Plan code is required&quot;)
+    @Size(max = 100, message = &quot;Plan code must not exceed 100 characters&quot;)
+    @Pattern(regexp = &quot;^[a-zA-Z0-9_-]+$&quot;, message = &quot;Plan code can only contain letters, numbers, underscores, and hyphens&quot;)
+    @Schema(description = &quot;Unique plan identifier&quot;, example = &quot;premium_monthly&quot;, required = true)
+    @JsonProperty(&quot;planCode&quot;)
+    private String planCode;
+
+    @NotBlank(message = &quot;Plan name is required&quot;)
+    @Size(max = 255, message = &quot;Plan name must not exceed 255 characters&quot;)
+    @Schema(description = &quot;Plan display name&quot;, example = &quot;Premium Monthly Plan&quot;, required = true)
+    @JsonProperty(&quot;name&quot;)
+    private String name;
+
+    @Size(max = 1000, message = &quot;Description must not exceed 1000 characters&quot;)
+    @Schema(description = &quot;Plan description&quot;, example = &quot;Premium features with monthly billing&quot;)
+    @JsonProperty(&quot;description&quot;)
+    private String description;
+
+    @NotNull(message = &quot;Amount is required&quot;)
+    @ValidAmount
+    @DecimalMin(value = &quot;0.01&quot;, message = &quot;Amount must be greater than zero&quot;)
+    @Schema(description = &quot;Plan price&quot;, example = &quot;29.99&quot;, required = true)
+    @JsonProperty(&quot;amount&quot;)
+    private BigDecimal amount;
+
+<span class="pc" id="L46">    @NotBlank(message = &quot;Currency is required&quot;)</span>
+    @Size(min = 3, max = 3, message = &quot;Currency must be a 3-letter ISO code&quot;)
+    @Pattern(regexp = &quot;^[A-Z]{3}$&quot;, message = &quot;Currency must be a valid 3-letter ISO code&quot;)
+    @Schema(description = &quot;Currency code&quot;, example = &quot;USD&quot;, required = true)
+    @JsonProperty(&quot;currency&quot;)
+    private String currency = &quot;USD&quot;;
+
+<span class="pc" id="L53">    @NotBlank(message = &quot;Interval unit is required&quot;)</span>
+    @Pattern(regexp = &quot;^(DAY|WEEK|MONTH|YEAR)$&quot;, message = &quot;Interval unit must be DAY, WEEK, MONTH, or YEAR&quot;)
+    @Schema(description = &quot;Billing interval unit&quot;, example = &quot;MONTH&quot;, required = true,
+            allowableValues = {&quot;DAY&quot;, &quot;WEEK&quot;, &quot;MONTH&quot;, &quot;YEAR&quot;})
+    @JsonProperty(&quot;intervalUnit&quot;)
+    private String intervalUnit = &quot;MONTH&quot;;
+
+<span class="pc" id="L60">    @NotNull(message = &quot;Interval count is required&quot;)</span>
+    @Min(value = 1, message = &quot;Interval count must be at least 1&quot;)
+    @Max(value = 365, message = &quot;Interval count must not exceed 365&quot;)
+    @Schema(description = &quot;Number of interval units between billings&quot;, example = &quot;1&quot;, required = true)
+    @JsonProperty(&quot;intervalCount&quot;)
+<span class="pc" id="L65">    private Integer intervalCount = 1;</span>
+
+<span class="pc" id="L67">    @Min(value = 0, message = &quot;Trial period days must be non-negative&quot;)</span>
+    @Max(value = 365, message = &quot;Trial period days must not exceed 365&quot;)
+    @Schema(description = &quot;Trial period length in days&quot;, example = &quot;14&quot;)
+    @JsonProperty(&quot;trialPeriodDays&quot;)
+<span class="pc" id="L71">    private Integer trialPeriodDays = 0;</span>
+
+<span class="pc" id="L73">    @Schema(description = &quot;Whether the plan is active&quot;, example = &quot;true&quot;)</span>
+    @JsonProperty(&quot;isActive&quot;)
+<span class="pc" id="L75">    private Boolean isActive = true;</span>
+
+    @Schema(description = &quot;Additional plan metadata&quot;)
+    @JsonProperty(&quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata;
+
+    @Schema(description = &quot;Plan features list&quot;)
+    @JsonProperty(&quot;features&quot;)
+    private java.util.List&lt;String&gt; features;
+
+<span class="pc" id="L85">    @Schema(description = &quot;Setup fee for the plan&quot;, example = &quot;0.00&quot;)</span>
+    @JsonProperty(&quot;setupFee&quot;)
+    private BigDecimal setupFee = BigDecimal.ZERO;
+
+<span class="pc" id="L89">    @Min(value = 0, message = &quot;Max subscribers must be non-negative&quot;)</span>
+    @Schema(description = &quot;Maximum number of subscribers allowed (0 for unlimited)&quot;, example = &quot;1000&quot;)
+    @JsonProperty(&quot;maxSubscribers&quot;)
+<span class="pc" id="L92">    private Integer maxSubscribers = 0;</span>
+
+    @Schema(description = &quot;Plan category or type&quot;, example = &quot;Premium&quot;)
+    @JsonProperty(&quot;category&quot;)
+    private String category;
+
+<span class="pc" id="L98">    @Schema(description = &quot;Plan display order&quot;, example = &quot;1&quot;)</span>
+    @JsonProperty(&quot;sortOrder&quot;)
+<span class="pc" id="L100">    private Integer sortOrder = 0;</span>
+
+    // Default constructor
+<span class="fc" id="L103">    public CreatePlanRequest() {</span>
+<span class="fc" id="L104">    }</span>
+
+    // Constructor with required fields
+<span class="nc" id="L107">    public CreatePlanRequest(String planCode, String name, BigDecimal amount, String intervalUnit, Integer intervalCount) {</span>
+<span class="nc" id="L108">        this.planCode = planCode;</span>
+<span class="nc" id="L109">        this.name = name;</span>
+<span class="nc" id="L110">        this.amount = amount;</span>
+<span class="nc" id="L111">        this.intervalUnit = intervalUnit;</span>
+<span class="nc" id="L112">        this.intervalCount = intervalCount;</span>
+<span class="nc" id="L113">    }</span>
+
+    // Getters and Setters
+    public String getPlanCode() {
+<span class="fc" id="L117">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L121">        this.planCode = planCode;</span>
+<span class="fc" id="L122">    }</span>
+
+    public String getName() {
+<span class="fc" id="L125">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L129">        this.name = name;</span>
+<span class="fc" id="L130">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L133">        return description;</span>
+    }
+
+    public void setDescription(String description) {
+<span class="fc" id="L137">        this.description = description;</span>
+<span class="fc" id="L138">    }</span>
+
+    public BigDecimal getAmount() {
+<span class="fc" id="L141">        return amount;</span>
+    }
+
+    public void setAmount(BigDecimal amount) {
+<span class="fc" id="L145">        this.amount = amount;</span>
+<span class="fc" id="L146">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L149">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L153">        this.currency = currency;</span>
+<span class="fc" id="L154">    }</span>
+
+    public String getIntervalUnit() {
+<span class="fc" id="L157">        return intervalUnit;</span>
+    }
+
+    public void setIntervalUnit(String intervalUnit) {
+<span class="fc" id="L161">        this.intervalUnit = intervalUnit;</span>
+<span class="fc" id="L162">    }</span>
+
+    public Integer getIntervalCount() {
+<span class="fc" id="L165">        return intervalCount;</span>
+    }
+
+    public void setIntervalCount(Integer intervalCount) {
+<span class="fc" id="L169">        this.intervalCount = intervalCount;</span>
+<span class="fc" id="L170">    }</span>
+
+    public Integer getTrialPeriodDays() {
+<span class="fc" id="L173">        return trialPeriodDays;</span>
+    }
+
+    public void setTrialPeriodDays(Integer trialPeriodDays) {
+<span class="fc" id="L177">        this.trialPeriodDays = trialPeriodDays;</span>
+<span class="fc" id="L178">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L181">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L185">        this.isActive = isActive;</span>
+<span class="fc" id="L186">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L189">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L193">        this.metadata = metadata;</span>
+<span class="fc" id="L194">    }</span>
+
+    public java.util.List&lt;String&gt; getFeatures() {
+<span class="fc" id="L197">        return features;</span>
+    }
+
+    public void setFeatures(java.util.List&lt;String&gt; features) {
+<span class="fc" id="L201">        this.features = features;</span>
+<span class="fc" id="L202">    }</span>
+
+    public BigDecimal getSetupFee() {
+<span class="fc" id="L205">        return setupFee;</span>
+    }
+
+    public void setSetupFee(BigDecimal setupFee) {
+<span class="fc" id="L209">        this.setupFee = setupFee;</span>
+<span class="fc" id="L210">    }</span>
+
+    public Integer getMaxSubscribers() {
+<span class="fc" id="L213">        return maxSubscribers;</span>
+    }
+
+    public void setMaxSubscribers(Integer maxSubscribers) {
+<span class="fc" id="L217">        this.maxSubscribers = maxSubscribers;</span>
+<span class="fc" id="L218">    }</span>
+
+    public String getCategory() {
+<span class="fc" id="L221">        return category;</span>
+    }
+
+    public void setCategory(String category) {
+<span class="fc" id="L225">        this.category = category;</span>
+<span class="fc" id="L226">    }</span>
+
+    public Integer getSortOrder() {
+<span class="fc" id="L229">        return sortOrder;</span>
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+<span class="fc" id="L233">        this.sortOrder = sortOrder;</span>
+<span class="fc" id="L234">    }</span>
+
+    public boolean hasTrialPeriod() {
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        return trialPeriodDays != null &amp;&amp; trialPeriodDays &gt; 0;</span>
+    }
+
+    public boolean hasSetupFee() {
+<span class="nc bnc" id="L241" title="All 4 branches missed.">        return setupFee != null &amp;&amp; setupFee.compareTo(BigDecimal.ZERO) &gt; 0;</span>
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getFormattedInterval() {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (intervalCount == 1) {</span>
+<span class="nc" id="L247">            return &quot;Every &quot; + intervalUnit.toLowerCase();</span>
+        } else {
+<span class="nc" id="L249">            return &quot;Every &quot; + intervalCount + &quot; &quot; + intervalUnit.toLowerCase() + &quot;s&quot;;</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L255">        return &quot;CreatePlanRequest{&quot; +</span>
+                &quot;planCode='&quot; + planCode + '\'' +
+                &quot;, name='&quot; + name + '\'' +
+                &quot;, amount=&quot; + amount +
+                &quot;, currency='&quot; + currency + '\'' +
+                &quot;, intervalUnit='&quot; + intervalUnit + '\'' +
+                &quot;, intervalCount=&quot; + intervalCount +
+                &quot;, trialPeriodDays=&quot; + trialPeriodDays +
+                &quot;, isActive=&quot; + isActive +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

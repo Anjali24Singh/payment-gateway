@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">HealthController.java</span></div><h1>HealthController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Health check controller for monitoring application status and dependencies.
+ * Provides custom health endpoints beyond Spring Boot Actuator.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@RestController
+@RequestMapping(&quot;/health&quot;)
+@Tag(name = &quot;Health&quot;, description = &quot;Health check and monitoring endpoints&quot;)
+<span class="fc" id="L26">public class HealthController {</span>
+
+    /**
+     * Basic health check endpoint.
+     * 
+     * @return Health status with timestamp
+     */
+    @GetMapping(&quot;/status&quot;)
+    @Operation(summary = &quot;Get application health status&quot;, 
+               description = &quot;Returns basic health status of the application&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Application is healthy&quot;),
+        @ApiResponse(responseCode = &quot;503&quot;, description = &quot;Application is unhealthy&quot;)
+    })
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getHealthStatus() {
+<span class="fc" id="L41">        Map&lt;String, Object&gt; health = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L42">        health.put(&quot;status&quot;, &quot;UP&quot;);</span>
+<span class="fc" id="L43">        health.put(&quot;timestamp&quot;, LocalDateTime.now());</span>
+<span class="fc" id="L44">        health.put(&quot;application&quot;, &quot;Payment Gateway Platform&quot;);</span>
+<span class="fc" id="L45">        health.put(&quot;version&quot;, &quot;1.0.0&quot;);</span>
+        
+<span class="fc" id="L47">        return ResponseEntity.ok(health);</span>
+    }
+
+    /**
+     * Detailed health check with system information.
+     * 
+     * @return Detailed health information
+     */
+    @GetMapping(&quot;/detailed&quot;)
+    @Operation(summary = &quot;Get detailed health information&quot;, 
+               description = &quot;Returns detailed health status with system information&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Detailed health information retrieved&quot;)
+    })
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getDetailedHealth() {
+<span class="fc" id="L62">        Map&lt;String, Object&gt; health = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L63">        Map&lt;String, Object&gt; components = new HashMap&lt;&gt;();</span>
+        
+        // Application info
+<span class="fc" id="L66">        health.put(&quot;status&quot;, &quot;UP&quot;);</span>
+<span class="fc" id="L67">        health.put(&quot;timestamp&quot;, LocalDateTime.now());</span>
+<span class="fc" id="L68">        health.put(&quot;application&quot;, &quot;Payment Gateway Platform&quot;);</span>
+<span class="fc" id="L69">        health.put(&quot;version&quot;, &quot;1.0.0&quot;);</span>
+<span class="fc" id="L70">        health.put(&quot;java_version&quot;, System.getProperty(&quot;java.version&quot;));</span>
+<span class="fc" id="L71">        health.put(&quot;memory_info&quot;, getMemoryInfo());</span>
+<span class="fc" id="L72">        health.put(&quot;components&quot;, components);</span>
+        
+<span class="fc" id="L74">        return ResponseEntity.ok(health);</span>
+    }
+
+    /**
+     * Readiness probe for Kubernetes deployments.
+     * 
+     * @return Readiness status
+     */
+    @GetMapping(&quot;/ready&quot;)
+    @Operation(summary = &quot;Readiness probe&quot;, 
+               description = &quot;Indicates if the application is ready to serve traffic&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Application is ready&quot;)
+    })
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getReadiness() {
+<span class="fc" id="L89">        Map&lt;String, Object&gt; readiness = new HashMap&lt;&gt;();</span>
+        
+<span class="fc" id="L91">        readiness.put(&quot;status&quot;, &quot;READY&quot;);</span>
+<span class="fc" id="L92">        readiness.put(&quot;timestamp&quot;, LocalDateTime.now());</span>
+        
+<span class="fc" id="L94">        return ResponseEntity.ok(readiness);</span>
+    }
+
+    /**
+     * Liveness probe for Kubernetes deployments.
+     * 
+     * @return Liveness status
+     */
+    @GetMapping(&quot;/live&quot;)
+    @Operation(summary = &quot;Liveness probe&quot;, 
+               description = &quot;Indicates if the application is alive and should not be restarted&quot;)
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Application is alive&quot;),
+        @ApiResponse(responseCode = &quot;503&quot;, description = &quot;Application should be restarted&quot;)
+    })
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getLiveness() {
+<span class="fc" id="L110">        Map&lt;String, Object&gt; liveness = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L111">        liveness.put(&quot;status&quot;, &quot;ALIVE&quot;);</span>
+<span class="fc" id="L112">        liveness.put(&quot;timestamp&quot;, LocalDateTime.now());</span>
+        
+<span class="fc" id="L114">        return ResponseEntity.ok(liveness);</span>
+    }
+
+    /**
+     * Get memory information.
+     * 
+     * @return Memory usage details
+     */
+    private Map&lt;String, Object&gt; getMemoryInfo() {
+<span class="fc" id="L123">        Map&lt;String, Object&gt; memoryInfo = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L124">        Runtime runtime = Runtime.getRuntime();</span>
+        
+<span class="fc" id="L126">        long maxMemory = runtime.maxMemory();</span>
+<span class="fc" id="L127">        long totalMemory = runtime.totalMemory();</span>
+<span class="fc" id="L128">        long freeMemory = runtime.freeMemory();</span>
+<span class="fc" id="L129">        long usedMemory = totalMemory - freeMemory;</span>
+        
+<span class="fc" id="L131">        memoryInfo.put(&quot;max_memory_mb&quot;, maxMemory / (1024 * 1024));</span>
+<span class="fc" id="L132">        memoryInfo.put(&quot;total_memory_mb&quot;, totalMemory / (1024 * 1024));</span>
+<span class="fc" id="L133">        memoryInfo.put(&quot;free_memory_mb&quot;, freeMemory / (1024 * 1024));</span>
+<span class="fc" id="L134">        memoryInfo.put(&quot;used_memory_mb&quot;, usedMemory / (1024 * 1024));</span>
+<span class="fc" id="L135">        memoryInfo.put(&quot;memory_usage_percent&quot;, Math.round((double) usedMemory / totalMemory * 100));</span>
+        
+<span class="fc" id="L137">        return memoryInfo;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

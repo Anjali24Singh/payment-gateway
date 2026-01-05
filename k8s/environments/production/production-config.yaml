@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000
+globalDefault: false
+description: "High priority class for payment gateway production workloads"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: payment-gateway-limits
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: "500m"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "250m"
+      memory: "512Mi"
+    max:
+      cpu: "2000m"
+      memory: "4Gi"
+    min:
+      cpu: "100m"
+      memory: "256Mi"
+  - type: PersistentVolumeClaim
+    max:
+      storage: "100Gi"
+    min:
+      storage: "1Gi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: payment-gateway-quota
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    limits.cpu: "20"
+    limits.memory: "40Gi"
+    persistentvolumeclaims: "10"
+    requests.storage: "500Gi"
+    pods: "50"
+    services: "20"
+    secrets: "30"
+    configmaps: "30"
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-gateway-pdb
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: payment-gateway
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-gateway-production-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from ingress controller only
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow from monitoring namespace for metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8081
+
+  egress:
+  # DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Database (managed PostgreSQL)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Redis (managed Redis)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 6379
+
+  # HTTPS for external APIs (Authorize.Net)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+  # HTTP for health checks and non-sensitive external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+
+  # Zipkin tracing
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: tracing
+    ports:
+    - protocol: TCP
+      port: 9411
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: production-secrets-template
+type: Opaque
+stringData:
+  # Database connection (replace with actual values)
+  db-host: "production-db.payment-gateway.com"
+  db-port: "5432"
+  db-name: "payment_gateway_prod"
+  db-username: "payment_gateway_user"
+  db-password: "REPLACE_WITH_ACTUAL_PASSWORD"
+  
+  # Redis connection (replace with actual values)
+  redis-host: "production-redis.payment-gateway.com"
+  redis-port: "6379"
+  redis-password: "REPLACE_WITH_ACTUAL_PASSWORD"
+  
+  # JWT secret (replace with actual value)
+  jwt-secret: "REPLACE_WITH_ACTUAL_JWT_SECRET"
+  
+  # Authorize.Net production credentials (replace with actual values)
+  authnet-login-id: "REPLACE_WITH_ACTUAL_LOGIN_ID"
+  authnet-transaction-key: "REPLACE_WITH_ACTUAL_TRANSACTION_KEY"
+  
+  # Additional production secrets
+  encryption-key: "REPLACE_WITH_ACTUAL_ENCRYPTION_KEY"
+  api-key-salt: "REPLACE_WITH_ACTUAL_SALT"

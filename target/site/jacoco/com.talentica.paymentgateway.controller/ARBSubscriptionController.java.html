@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARBSubscriptionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.controller</a> &gt; <span class="el_source">ARBSubscriptionController.java</span></div><h1>ARBSubscriptionController.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.controller;
+
+import com.talentica.paymentgateway.dto.ARBSubscriptionsResponse;
+import com.talentica.paymentgateway.dto.subscription.ARBSubscriptionRequest;
+import com.talentica.paymentgateway.dto.subscription.ARBSubscriptionResponse;
+import com.talentica.paymentgateway.entity.Customer;
+import com.talentica.paymentgateway.entity.PaymentMethod;
+import com.talentica.paymentgateway.entity.SubscriptionPlan;
+import com.talentica.paymentgateway.exception.PaymentProcessingException;
+import com.talentica.paymentgateway.repository.CustomerRepository;
+import com.talentica.paymentgateway.repository.PaymentMethodRepository;
+import com.talentica.paymentgateway.repository.SubscriptionPlanRepository;
+import com.talentica.paymentgateway.service.AuthorizeNetARBService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import net.authorize.api.contract.v1.ARBGetSubscriptionResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+/**
+ * REST Controller for Authorize.Net ARB (Automatic Recurring Billing) subscriptions.
+ * These subscriptions appear directly in the Authorize.Net merchant portal.
+ */
+<span class="fc" id="L29">@Slf4j</span>
+@RestController
+@RequestMapping(&quot;/arb-subscriptions&quot;)
+@Tag(name = &quot;ARB Subscriptions&quot;, description = &quot;Authorize.Net ARB subscription management&quot;)
+public class ARBSubscriptionController {
+
+    private final AuthorizeNetARBService arbService;
+    private final CustomerRepository customerRepository;
+    private final SubscriptionPlanRepository planRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+
+    public ARBSubscriptionController(
+            AuthorizeNetARBService arbService,
+            CustomerRepository customerRepository,
+            SubscriptionPlanRepository planRepository,
+<span class="fc" id="L44">            PaymentMethodRepository paymentMethodRepository) {</span>
+<span class="fc" id="L45">        this.arbService = arbService;</span>
+<span class="fc" id="L46">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L47">        this.planRepository = planRepository;</span>
+<span class="fc" id="L48">        this.paymentMethodRepository = paymentMethodRepository;</span>
+<span class="fc" id="L49">    }</span>
+
+    /**
+     * Lists all ARB subscriptions (placeholder for future implementation).
+     */
+    @GetMapping
+    @PreAuthorize(&quot;hasRole('USER') or hasRole('ADMIN')&quot;)
+    @Operation(summary = &quot;List ARB subscriptions&quot;, 
+               description = &quot;Lists all ARB subscriptions from Authorize.Net&quot;)
+    public ResponseEntity&lt;ARBSubscriptionsResponse&gt; listARBSubscriptions() {
+<span class="fc" id="L59">        log.info(&quot;Listing ARB subscriptions&quot;);</span>
+        
+        // For now, return a placeholder response
+        // In a full implementation, this would query Authorize.Net for all subscriptions
+<span class="fc" id="L63">        ARBSubscriptionsResponse response = ARBSubscriptionsResponse.builder()</span>
+<span class="fc" id="L64">                .message(&quot;ARB subscriptions list endpoint - implementation pending&quot;)</span>
+<span class="fc" id="L65">                .build();</span>
+        
+<span class="fc" id="L67">        return ResponseEntity.ok(response);</span>
+    }
+
+    /**
+     * Creates an ARB subscription that appears in Authorize.Net portal.
+     */
+    @PostMapping
+    @PreAuthorize(&quot;hasRole('USER') or hasRole('ADMIN')&quot;)
+    @Operation(summary = &quot;Create ARB subscription&quot;, 
+               description = &quot;Creates an Authorize.Net ARB subscription that appears in the merchant portal&quot;)
+    public ResponseEntity&lt;ARBSubscriptionResponse&gt; createARBSubscription(@Valid @RequestBody ARBSubscriptionRequest request) {
+<span class="fc" id="L78">        log.info(&quot;Creating ARB subscription for customer: {} with plan: {}&quot;, </span>
+<span class="fc" id="L79">                   request.getCustomerId(), request.getPlanCode());</span>
+
+        try {
+            // Validate customer exists
+<span class="fc" id="L83">            Customer customer = customerRepository.findByCustomerId(request.getCustomerId())</span>
+<span class="fc" id="L84">                .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L85">                    &quot;Customer not found: &quot; + request.getCustomerId(), &quot;CUSTOMER_NOT_FOUND&quot;));</span>
+
+            // Validate plan exists
+<span class="fc" id="L88">            SubscriptionPlan plan = planRepository.findByPlanCode(request.getPlanCode())</span>
+<span class="fc" id="L89">                .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L90">                    &quot;Plan not found: &quot; + request.getPlanCode(), &quot;PLAN_NOT_FOUND&quot;));</span>
+
+            // Validate payment method exists
+<span class="fc" id="L93">            PaymentMethod paymentMethod = paymentMethodRepository.findByPaymentMethodId(request.getPaymentMethodId())</span>
+<span class="fc" id="L94">                .orElseThrow(() -&gt; new PaymentProcessingException(</span>
+<span class="fc" id="L95">                    &quot;Payment method not found: &quot; + request.getPaymentMethodId(), &quot;PAYMENT_METHOD_NOT_FOUND&quot;));</span>
+
+            // Create ARB subscription
+<span class="fc" id="L98">            String arbSubscriptionId = arbService.createARBSubscription(customer, plan, paymentMethod);</span>
+
+            // Create response
+<span class="fc" id="L101">            ARBSubscriptionResponse response = new ARBSubscriptionResponse();</span>
+<span class="fc" id="L102">            response.setArbSubscriptionId(arbSubscriptionId);</span>
+<span class="fc" id="L103">            response.setCustomerId(customer.getCustomerId());</span>
+<span class="fc" id="L104">            response.setCustomerName(customer.getFirstName() + &quot; &quot; + customer.getLastName());</span>
+<span class="fc" id="L105">            response.setCustomerEmail(customer.getEmail());</span>
+<span class="fc" id="L106">            response.setPlanCode(plan.getPlanCode());</span>
+<span class="fc" id="L107">            response.setPlanName(plan.getName());</span>
+<span class="fc" id="L108">            response.setPlanAmount(plan.getAmount());</span>
+<span class="fc" id="L109">            response.setCurrency(plan.getCurrency());</span>
+<span class="fc" id="L110">            response.setIntervalUnit(plan.getIntervalUnit().toString());</span>
+<span class="fc" id="L111">            response.setIntervalCount(plan.getIntervalCount());</span>
+<span class="fc" id="L112">            response.setStatus(&quot;ACTIVE&quot;);</span>
+<span class="fc" id="L113">            response.setMessage(&quot;ARB subscription created successfully and is visible in Authorize.Net portal&quot;);</span>
+
+<span class="fc" id="L115">            log.info(&quot;✅ ARB subscription created successfully - ARB ID: {}, Customer: {}&quot;, </span>
+<span class="fc" id="L116">                       arbSubscriptionId, customer.getCustomerId());</span>
+
+<span class="fc" id="L118">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L120">        } catch (PaymentProcessingException e) {</span>
+<span class="fc" id="L121">            log.error(&quot;❌ ARB subscription creation failed: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L122">            throw e;</span>
+<span class="fc" id="L123">        } catch (Exception e) {</span>
+<span class="fc" id="L124">            log.error(&quot;❌ Unexpected error creating ARB subscription&quot;, e);</span>
+<span class="fc" id="L125">            throw new PaymentProcessingException(&quot;Failed to create ARB subscription: &quot; + e.getMessage(), &quot;ARB_CREATION_ERROR&quot;);</span>
+        }
+    }
+
+    /**
+     * Gets ARB subscription details from Authorize.Net.
+     */
+    @GetMapping(&quot;/{arbSubscriptionId}&quot;)
+    @PreAuthorize(&quot;hasRole('USER') or hasRole('ADMIN')&quot;)
+    @Operation(summary = &quot;Get ARB subscription&quot;, 
+               description = &quot;Gets ARB subscription details from Authorize.Net&quot;)
+    public ResponseEntity&lt;ARBGetSubscriptionResponse&gt; getARBSubscription(@PathVariable String arbSubscriptionId) {
+<span class="fc" id="L137">        log.info(&quot;Getting ARB subscription details: {}&quot;, arbSubscriptionId);</span>
+
+        try {
+<span class="fc" id="L140">            ARBGetSubscriptionResponse response = arbService.getARBSubscription(arbSubscriptionId);</span>
+<span class="fc" id="L141">            return ResponseEntity.ok(response);</span>
+
+<span class="fc" id="L143">        } catch (Exception e) {</span>
+<span class="fc" id="L144">            log.error(&quot;❌ Failed to get ARB subscription: {}&quot;, arbSubscriptionId, e);</span>
+<span class="fc" id="L145">            throw new PaymentProcessingException(&quot;Failed to get ARB subscription: &quot; + e.getMessage(), &quot;ARB_GET_ERROR&quot;);</span>
+        }
+    }
+
+    /**
+     * Cancels an ARB subscription in Authorize.Net.
+     */
+    @DeleteMapping(&quot;/{arbSubscriptionId}&quot;)
+    @PreAuthorize(&quot;hasRole('USER') or hasRole('ADMIN')&quot;)
+    @Operation(summary = &quot;Cancel ARB subscription&quot;, 
+               description = &quot;Cancels ARB subscription in Authorize.Net portal&quot;)
+    public ResponseEntity&lt;String&gt; cancelARBSubscription(@PathVariable String arbSubscriptionId) {
+<span class="fc" id="L157">        log.info(&quot;Cancelling ARB subscription: {}&quot;, arbSubscriptionId);</span>
+
+        try {
+<span class="fc" id="L160">            boolean cancelled = arbService.cancelARBSubscription(arbSubscriptionId);</span>
+            
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (cancelled) {</span>
+<span class="fc" id="L163">                return ResponseEntity.ok(&quot;ARB subscription cancelled successfully&quot;);</span>
+            } else {
+<span class="fc" id="L165">                throw new PaymentProcessingException(&quot;Failed to cancel ARB subscription&quot;, &quot;ARB_CANCEL_FAILED&quot;);</span>
+            }
+
+<span class="fc" id="L168">        } catch (Exception e) {</span>
+<span class="fc" id="L169">            log.error(&quot;❌ Failed to cancel ARB subscription: {}&quot;, arbSubscriptionId, e);</span>
+<span class="fc" id="L170">            throw new PaymentProcessingException(&quot;Failed to cancel ARB subscription: &quot; + e.getMessage(), &quot;ARB_CANCEL_ERROR&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

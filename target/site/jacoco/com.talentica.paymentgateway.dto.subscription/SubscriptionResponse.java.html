@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.dto.subscription</a> &gt; <span class="el_source">SubscriptionResponse.java</span></div><h1>SubscriptionResponse.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.dto.subscription;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.talentica.paymentgateway.entity.SubscriptionStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.Map;
+
+/**
+ * Response DTO for subscription operations.
+ * Contains subscription details and current state information.
+ * 
+ * @author Payment Gateway Team
+ * @version 1.0.0
+ */
+@Schema(description = &quot;Subscription response containing current subscription state&quot;)
+public class SubscriptionResponse {
+
+    @Schema(description = &quot;Subscription identifier&quot;, example = &quot;sub_12345&quot;)
+    @JsonProperty(&quot;subscriptionId&quot;)
+    private String subscriptionId;
+
+    @Schema(description = &quot;Customer identifier&quot;, example = &quot;cust_12345&quot;)
+    @JsonProperty(&quot;customerId&quot;)
+    private String customerId;
+
+    @Schema(description = &quot;Customer name&quot;, example = &quot;John Doe&quot;)
+    @JsonProperty(&quot;customerName&quot;)
+    private String customerName;
+
+    @Schema(description = &quot;Customer email&quot;, example = &quot;john.doe@example.com&quot;)
+    @JsonProperty(&quot;customerEmail&quot;)
+    private String customerEmail;
+
+    @Schema(description = &quot;Plan code&quot;, example = &quot;premium_monthly&quot;)
+    @JsonProperty(&quot;planCode&quot;)
+    private String planCode;
+
+    @Schema(description = &quot;Plan name&quot;, example = &quot;Premium Monthly Plan&quot;)
+    @JsonProperty(&quot;planName&quot;)
+    private String planName;
+
+    @Schema(description = &quot;Plan amount&quot;, example = &quot;29.99&quot;)
+    @JsonProperty(&quot;planAmount&quot;)
+    private BigDecimal planAmount;
+
+    @Schema(description = &quot;Plan currency&quot;, example = &quot;USD&quot;)
+    @JsonProperty(&quot;currency&quot;)
+    private String currency;
+
+    @Schema(description = &quot;Billing interval&quot;, example = &quot;MONTH&quot;)
+    @JsonProperty(&quot;intervalUnit&quot;)
+    private String intervalUnit;
+
+    @Schema(description = &quot;Billing interval count&quot;, example = &quot;1&quot;)
+    @JsonProperty(&quot;intervalCount&quot;)
+    private Integer intervalCount;
+
+    @Schema(description = &quot;Current subscription status&quot;, example = &quot;ACTIVE&quot;)
+    @JsonProperty(&quot;status&quot;)
+    private SubscriptionStatus status;
+
+    @Schema(description = &quot;Subscription creation date&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;createdAt&quot;)
+    private ZonedDateTime createdAt;
+
+    @Schema(description = &quot;Current billing period start&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;currentPeriodStart&quot;)
+    private ZonedDateTime currentPeriodStart;
+
+    @Schema(description = &quot;Current billing period end&quot;, example = &quot;2024-02-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;currentPeriodEnd&quot;)
+    private ZonedDateTime currentPeriodEnd;
+
+    @Schema(description = &quot;Trial period start date&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;trialStart&quot;)
+    private ZonedDateTime trialStart;
+
+    @Schema(description = &quot;Trial period end date&quot;, example = &quot;2024-01-15T00:00:00Z&quot;)
+    @JsonProperty(&quot;trialEnd&quot;)
+    private ZonedDateTime trialEnd;
+
+    @Schema(description = &quot;Next billing date&quot;, example = &quot;2024-02-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;nextBillingDate&quot;)
+    private ZonedDateTime nextBillingDate;
+
+    @Schema(description = &quot;Billing cycle anchor date&quot;, example = &quot;2024-01-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;billingCycleAnchor&quot;)
+    private ZonedDateTime billingCycleAnchor;
+
+    @Schema(description = &quot;Cancellation date (if cancelled)&quot;, example = &quot;2024-01-15T00:00:00Z&quot;)
+    @JsonProperty(&quot;cancelledAt&quot;)
+    private ZonedDateTime cancelledAt;
+
+    @Schema(description = &quot;Cancellation reason&quot;, example = &quot;Customer requested cancellation&quot;)
+    @JsonProperty(&quot;cancellationReason&quot;)
+    private String cancellationReason;
+
+    @Schema(description = &quot;Payment method identifier&quot;, example = &quot;pm_12345&quot;)
+    @JsonProperty(&quot;paymentMethodId&quot;)
+    private String paymentMethodId;
+
+    @Schema(description = &quot;Payment method type&quot;, example = &quot;CREDIT_CARD&quot;)
+    @JsonProperty(&quot;paymentMethodType&quot;)
+    private String paymentMethodType;
+
+    @Schema(description = &quot;Last 4 digits of payment method&quot;, example = &quot;1234&quot;)
+    @JsonProperty(&quot;paymentMethodLast4&quot;)
+    private String paymentMethodLast4;
+
+    @Schema(description = &quot;Days until next billing&quot;, example = &quot;15&quot;)
+    @JsonProperty(&quot;daysUntilNextBilling&quot;)
+    private Integer daysUntilNextBilling;
+
+    @Schema(description = &quot;Whether subscription is in trial period&quot;, example = &quot;false&quot;)
+    @JsonProperty(&quot;inTrialPeriod&quot;)
+    private Boolean inTrialPeriod;
+
+    @Schema(description = &quot;Whether trial has expired&quot;, example = &quot;true&quot;)
+    @JsonProperty(&quot;trialExpired&quot;)
+    private Boolean trialExpired;
+
+    @Schema(description = &quot;Latest invoice ID&quot;, example = &quot;inv_12345&quot;)
+    @JsonProperty(&quot;latestInvoiceId&quot;)
+    private String latestInvoiceId;
+
+    @Schema(description = &quot;Number of unpaid invoices&quot;, example = &quot;0&quot;)
+    @JsonProperty(&quot;unpaidInvoicesCount&quot;)
+    private Integer unpaidInvoicesCount;
+
+    @Schema(description = &quot;Additional subscription metadata&quot;)
+    @JsonProperty(&quot;metadata&quot;)
+    private Map&lt;String, Object&gt; metadata;
+
+    @Schema(description = &quot;Whether subscription has changes pending&quot;, example = &quot;false&quot;)
+    @JsonProperty(&quot;hasPendingChanges&quot;)
+    private Boolean hasPendingChanges;
+
+    @Schema(description = &quot;When pending changes will take effect&quot;, example = &quot;2024-02-01T00:00:00Z&quot;)
+    @JsonProperty(&quot;pendingChangesDate&quot;)
+    private ZonedDateTime pendingChangesDate;
+
+    @Schema(description = &quot;Last update timestamp&quot;, example = &quot;2024-01-01T12:00:00Z&quot;)
+    @JsonProperty(&quot;updatedAt&quot;)
+    private ZonedDateTime updatedAt;
+
+    // Default constructor
+<span class="fc" id="L150">    public SubscriptionResponse() {</span>
+<span class="fc" id="L151">    }</span>
+
+    // Getters and Setters
+    public String getSubscriptionId() {
+<span class="fc" id="L155">        return subscriptionId;</span>
+    }
+
+    public void setSubscriptionId(String subscriptionId) {
+<span class="fc" id="L159">        this.subscriptionId = subscriptionId;</span>
+<span class="fc" id="L160">    }</span>
+
+    public String getCustomerId() {
+<span class="fc" id="L163">        return customerId;</span>
+    }
+
+    public void setCustomerId(String customerId) {
+<span class="fc" id="L167">        this.customerId = customerId;</span>
+<span class="fc" id="L168">    }</span>
+
+    public String getCustomerName() {
+<span class="fc" id="L171">        return customerName;</span>
+    }
+
+    public void setCustomerName(String customerName) {
+<span class="fc" id="L175">        this.customerName = customerName;</span>
+<span class="fc" id="L176">    }</span>
+
+    public String getCustomerEmail() {
+<span class="fc" id="L179">        return customerEmail;</span>
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+<span class="fc" id="L183">        this.customerEmail = customerEmail;</span>
+<span class="fc" id="L184">    }</span>
+
+    public String getPlanCode() {
+<span class="fc" id="L187">        return planCode;</span>
+    }
+
+    public void setPlanCode(String planCode) {
+<span class="fc" id="L191">        this.planCode = planCode;</span>
+<span class="fc" id="L192">    }</span>
+
+    public String getPlanName() {
+<span class="fc" id="L195">        return planName;</span>
+    }
+
+    public void setPlanName(String planName) {
+<span class="fc" id="L199">        this.planName = planName;</span>
+<span class="fc" id="L200">    }</span>
+
+    public BigDecimal getPlanAmount() {
+<span class="fc" id="L203">        return planAmount;</span>
+    }
+
+    public void setPlanAmount(BigDecimal planAmount) {
+<span class="fc" id="L207">        this.planAmount = planAmount;</span>
+<span class="fc" id="L208">    }</span>
+
+    public String getCurrency() {
+<span class="fc" id="L211">        return currency;</span>
+    }
+
+    public void setCurrency(String currency) {
+<span class="fc" id="L215">        this.currency = currency;</span>
+<span class="fc" id="L216">    }</span>
+
+    public String getIntervalUnit() {
+<span class="fc" id="L219">        return intervalUnit;</span>
+    }
+
+    public void setIntervalUnit(String intervalUnit) {
+<span class="fc" id="L223">        this.intervalUnit = intervalUnit;</span>
+<span class="fc" id="L224">    }</span>
+
+    public Integer getIntervalCount() {
+<span class="fc" id="L227">        return intervalCount;</span>
+    }
+
+    public void setIntervalCount(Integer intervalCount) {
+<span class="fc" id="L231">        this.intervalCount = intervalCount;</span>
+<span class="fc" id="L232">    }</span>
+
+    public SubscriptionStatus getStatus() {
+<span class="fc" id="L235">        return status;</span>
+    }
+
+    public void setStatus(SubscriptionStatus status) {
+<span class="fc" id="L239">        this.status = status;</span>
+<span class="fc" id="L240">    }</span>
+
+    public ZonedDateTime getCreatedAt() {
+<span class="fc" id="L243">        return createdAt;</span>
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+<span class="fc" id="L247">        this.createdAt = createdAt;</span>
+<span class="fc" id="L248">    }</span>
+
+    public ZonedDateTime getCurrentPeriodStart() {
+<span class="fc" id="L251">        return currentPeriodStart;</span>
+    }
+
+    public void setCurrentPeriodStart(ZonedDateTime currentPeriodStart) {
+<span class="fc" id="L255">        this.currentPeriodStart = currentPeriodStart;</span>
+<span class="fc" id="L256">    }</span>
+
+    public ZonedDateTime getCurrentPeriodEnd() {
+<span class="fc" id="L259">        return currentPeriodEnd;</span>
+    }
+
+    public void setCurrentPeriodEnd(ZonedDateTime currentPeriodEnd) {
+<span class="fc" id="L263">        this.currentPeriodEnd = currentPeriodEnd;</span>
+<span class="fc" id="L264">    }</span>
+
+    public ZonedDateTime getTrialStart() {
+<span class="fc" id="L267">        return trialStart;</span>
+    }
+
+    public void setTrialStart(ZonedDateTime trialStart) {
+<span class="fc" id="L271">        this.trialStart = trialStart;</span>
+<span class="fc" id="L272">    }</span>
+
+    public ZonedDateTime getTrialEnd() {
+<span class="fc" id="L275">        return trialEnd;</span>
+    }
+
+    public void setTrialEnd(ZonedDateTime trialEnd) {
+<span class="fc" id="L279">        this.trialEnd = trialEnd;</span>
+<span class="fc" id="L280">    }</span>
+
+    public ZonedDateTime getNextBillingDate() {
+<span class="fc" id="L283">        return nextBillingDate;</span>
+    }
+
+    public void setNextBillingDate(ZonedDateTime nextBillingDate) {
+<span class="fc" id="L287">        this.nextBillingDate = nextBillingDate;</span>
+<span class="fc" id="L288">    }</span>
+
+    public ZonedDateTime getBillingCycleAnchor() {
+<span class="fc" id="L291">        return billingCycleAnchor;</span>
+    }
+
+    public void setBillingCycleAnchor(ZonedDateTime billingCycleAnchor) {
+<span class="fc" id="L295">        this.billingCycleAnchor = billingCycleAnchor;</span>
+<span class="fc" id="L296">    }</span>
+
+    public ZonedDateTime getCancelledAt() {
+<span class="fc" id="L299">        return cancelledAt;</span>
+    }
+
+    public void setCancelledAt(ZonedDateTime cancelledAt) {
+<span class="fc" id="L303">        this.cancelledAt = cancelledAt;</span>
+<span class="fc" id="L304">    }</span>
+
+    public String getCancellationReason() {
+<span class="fc" id="L307">        return cancellationReason;</span>
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+<span class="fc" id="L311">        this.cancellationReason = cancellationReason;</span>
+<span class="fc" id="L312">    }</span>
+
+    public String getPaymentMethodId() {
+<span class="fc" id="L315">        return paymentMethodId;</span>
+    }
+
+    public void setPaymentMethodId(String paymentMethodId) {
+<span class="fc" id="L319">        this.paymentMethodId = paymentMethodId;</span>
+<span class="fc" id="L320">    }</span>
+
+    public String getPaymentMethodType() {
+<span class="fc" id="L323">        return paymentMethodType;</span>
+    }
+
+    public void setPaymentMethodType(String paymentMethodType) {
+<span class="fc" id="L327">        this.paymentMethodType = paymentMethodType;</span>
+<span class="fc" id="L328">    }</span>
+
+    public String getPaymentMethodLast4() {
+<span class="fc" id="L331">        return paymentMethodLast4;</span>
+    }
+
+    public void setPaymentMethodLast4(String paymentMethodLast4) {
+<span class="fc" id="L335">        this.paymentMethodLast4 = paymentMethodLast4;</span>
+<span class="fc" id="L336">    }</span>
+
+    public Integer getDaysUntilNextBilling() {
+<span class="fc" id="L339">        return daysUntilNextBilling;</span>
+    }
+
+    public void setDaysUntilNextBilling(Integer daysUntilNextBilling) {
+<span class="fc" id="L343">        this.daysUntilNextBilling = daysUntilNextBilling;</span>
+<span class="fc" id="L344">    }</span>
+
+    public Boolean getInTrialPeriod() {
+<span class="fc" id="L347">        return inTrialPeriod;</span>
+    }
+
+    public void setInTrialPeriod(Boolean inTrialPeriod) {
+<span class="fc" id="L351">        this.inTrialPeriod = inTrialPeriod;</span>
+<span class="fc" id="L352">    }</span>
+
+    public Boolean getTrialExpired() {
+<span class="fc" id="L355">        return trialExpired;</span>
+    }
+
+    public void setTrialExpired(Boolean trialExpired) {
+<span class="fc" id="L359">        this.trialExpired = trialExpired;</span>
+<span class="fc" id="L360">    }</span>
+
+    public String getLatestInvoiceId() {
+<span class="fc" id="L363">        return latestInvoiceId;</span>
+    }
+
+    public void setLatestInvoiceId(String latestInvoiceId) {
+<span class="fc" id="L367">        this.latestInvoiceId = latestInvoiceId;</span>
+<span class="fc" id="L368">    }</span>
+
+    public Integer getUnpaidInvoicesCount() {
+<span class="fc" id="L371">        return unpaidInvoicesCount;</span>
+    }
+
+    public void setUnpaidInvoicesCount(Integer unpaidInvoicesCount) {
+<span class="fc" id="L375">        this.unpaidInvoicesCount = unpaidInvoicesCount;</span>
+<span class="fc" id="L376">    }</span>
+
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L379">        return metadata;</span>
+    }
+
+    public void setMetadata(Map&lt;String, Object&gt; metadata) {
+<span class="fc" id="L383">        this.metadata = metadata;</span>
+<span class="fc" id="L384">    }</span>
+
+    public Boolean getHasPendingChanges() {
+<span class="fc" id="L387">        return hasPendingChanges;</span>
+    }
+
+    public void setHasPendingChanges(Boolean hasPendingChanges) {
+<span class="fc" id="L391">        this.hasPendingChanges = hasPendingChanges;</span>
+<span class="fc" id="L392">    }</span>
+
+    public ZonedDateTime getPendingChangesDate() {
+<span class="fc" id="L395">        return pendingChangesDate;</span>
+    }
+
+    public void setPendingChangesDate(ZonedDateTime pendingChangesDate) {
+<span class="fc" id="L399">        this.pendingChangesDate = pendingChangesDate;</span>
+<span class="fc" id="L400">    }</span>
+
+    public ZonedDateTime getUpdatedAt() {
+<span class="fc" id="L403">        return updatedAt;</span>
+    }
+
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+<span class="fc" id="L407">        this.updatedAt = updatedAt;</span>
+<span class="fc" id="L408">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L412">        return &quot;SubscriptionResponse{&quot; +</span>
+                &quot;subscriptionId='&quot; + subscriptionId + '\'' +
+                &quot;, customerId='&quot; + customerId + '\'' +
+                &quot;, planCode='&quot; + planCode + '\'' +
+                &quot;, status=&quot; + status +
+                &quot;, planAmount=&quot; + planAmount +
+                &quot;, currency='&quot; + currency + '\'' +
+                &quot;, nextBillingDate=&quot; + nextBillingDate +
+                &quot;, inTrialPeriod=&quot; + inTrialPeriod +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

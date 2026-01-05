@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Customer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">payment-gateway</a> &gt; <a href="index.source.html" class="el_package">com.talentica.paymentgateway.entity</a> &gt; <span class="el_source">Customer.java</span></div><h1>Customer.java</h1><pre class="source lang-java linenums">package com.talentica.paymentgateway.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Entity representing a customer who can make payments and have subscriptions.
+ * Customers can be associated with users and have multiple payment methods.
+ */
+@Entity
+@Table(name = &quot;customers&quot;,
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = &quot;customerReference&quot;)
+       },
+       indexes = {
+           @Index(name = &quot;idx_customers_user_id&quot;, columnList = &quot;user_id&quot;),
+           @Index(name = &quot;idx_customers_email&quot;, columnList = &quot;email&quot;),
+           @Index(name = &quot;idx_customers_reference&quot;, columnList = &quot;customerReference&quot;)
+       })
+public class Customer extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;user_id&quot;)
+    private User user;
+
+    @Size(max = 100, message = &quot;Customer reference must not exceed 100 characters&quot;)
+    @Column(name = &quot;customer_reference&quot;, unique = true, length = 100)
+    private String customerReference;
+
+    @NotBlank(message = &quot;Email is required&quot;)
+    @Email(message = &quot;Email must be valid&quot;)
+    @Size(max = 255, message = &quot;Email must not exceed 255 characters&quot;)
+    @Column(name = &quot;email&quot;, nullable = false, length = 255)
+    private String email;
+
+    @Size(max = 100, message = &quot;First name must not exceed 100 characters&quot;)
+    @Column(name = &quot;first_name&quot;, length = 100)
+    private String firstName;
+
+    @Size(max = 100, message = &quot;Last name must not exceed 100 characters&quot;)
+    @Column(name = &quot;last_name&quot;, length = 100)
+    private String lastName;
+
+    @Size(max = 20, message = &quot;Phone must not exceed 20 characters&quot;)
+    @Column(name = &quot;phone&quot;, length = 20)
+    private String phone;
+
+    @Size(max = 255, message = &quot;Company must not exceed 255 characters&quot;)
+    @Column(name = &quot;company&quot;, length = 255)
+    private String company;
+
+    // Billing Address
+    @Size(max = 255, message = &quot;Billing address line 1 must not exceed 255 characters&quot;)
+    @Column(name = &quot;billing_address_line1&quot;, length = 255)
+    private String billingAddressLine1;
+
+    @Size(max = 255, message = &quot;Billing address line 2 must not exceed 255 characters&quot;)
+    @Column(name = &quot;billing_address_line2&quot;, length = 255)
+    private String billingAddressLine2;
+
+    @Size(max = 100, message = &quot;Billing city must not exceed 100 characters&quot;)
+    @Column(name = &quot;billing_city&quot;, length = 100)
+    private String billingCity;
+
+    @Size(max = 100, message = &quot;Billing state must not exceed 100 characters&quot;)
+    @Column(name = &quot;billing_state&quot;, length = 100)
+    private String billingState;
+
+    @Size(max = 20, message = &quot;Billing postal code must not exceed 20 characters&quot;)
+    @Column(name = &quot;billing_postal_code&quot;, length = 20)
+    private String billingPostalCode;
+
+<span class="fc" id="L78">    @Size(max = 2, message = &quot;Billing country must be 2 characters&quot;)</span>
+    @Column(name = &quot;billing_country&quot;, length = 2)
+    private String billingCountry = &quot;US&quot;;
+
+    // Shipping Address
+    @Size(max = 255, message = &quot;Shipping address line 1 must not exceed 255 characters&quot;)
+    @Column(name = &quot;shipping_address_line1&quot;, length = 255)
+    private String shippingAddressLine1;
+
+    @Size(max = 255, message = &quot;Shipping address line 2 must not exceed 255 characters&quot;)
+    @Column(name = &quot;shipping_address_line2&quot;, length = 255)
+    private String shippingAddressLine2;
+
+    @Size(max = 100, message = &quot;Shipping city must not exceed 100 characters&quot;)
+    @Column(name = &quot;shipping_city&quot;, length = 100)
+    private String shippingCity;
+
+    @Size(max = 100, message = &quot;Shipping state must not exceed 100 characters&quot;)
+    @Column(name = &quot;shipping_state&quot;, length = 100)
+    private String shippingState;
+
+    @Size(max = 20, message = &quot;Shipping postal code must not exceed 20 characters&quot;)
+    @Column(name = &quot;shipping_postal_code&quot;, length = 20)
+    private String shippingPostalCode;
+
+<span class="fc" id="L103">    @Size(max = 2, message = &quot;Shipping country must be 2 characters&quot;)</span>
+    @Column(name = &quot;shipping_country&quot;, length = 2)
+    private String shippingCountry = &quot;US&quot;;
+
+<span class="fc" id="L107">    @Column(name = &quot;is_active&quot;, nullable = false)</span>
+<span class="fc" id="L108">    private Boolean isActive = true;</span>
+
+    @Size(max = 50, message = &quot;Authorize.Net customer profile ID must not exceed 50 characters&quot;)
+    @Column(name = &quot;authorizenet_customer_profile_id&quot;, length = 50)
+    private String authorizeNetCustomerProfileId;
+
+    // Relationships
+<span class="fc" id="L115">    @OneToMany(mappedBy = &quot;customer&quot;, cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)</span>
+    private List&lt;PaymentMethod&gt; paymentMethods = new ArrayList&lt;&gt;();
+
+<span class="fc" id="L118">    @OneToMany(mappedBy = &quot;customer&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Order&gt; orders = new ArrayList&lt;&gt;();
+
+<span class="fc" id="L121">    @OneToMany(mappedBy = &quot;customer&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Transaction&gt; transactions = new ArrayList&lt;&gt;();
+
+<span class="fc" id="L124">    @OneToMany(mappedBy = &quot;customer&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;Subscription&gt; subscriptions = new ArrayList&lt;&gt;();
+
+<span class="fc" id="L127">    @OneToMany(mappedBy = &quot;customer&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)</span>
+    private List&lt;SubscriptionInvoice&gt; subscriptionInvoices = new ArrayList&lt;&gt;();
+
+    // Constructors
+    public Customer() {
+<span class="fc" id="L132">        super();</span>
+<span class="fc" id="L133">    }</span>
+
+    public Customer(String email) {
+<span class="fc" id="L136">        this();</span>
+<span class="fc" id="L137">        this.email = email;</span>
+<span class="fc" id="L138">    }</span>
+
+    public Customer(String email, String firstName, String lastName) {
+<span class="fc" id="L141">        this(email);</span>
+<span class="fc" id="L142">        this.firstName = firstName;</span>
+<span class="fc" id="L143">        this.lastName = lastName;</span>
+<span class="fc" id="L144">    }</span>
+
+    // Getters and Setters
+    public User getUser() {
+<span class="fc" id="L148">        return user;</span>
+    }
+
+    public void setUser(User user) {
+<span class="fc" id="L152">        this.user = user;</span>
+<span class="fc" id="L153">    }</span>
+
+    public String getCustomerReference() {
+<span class="fc" id="L156">        return customerReference;</span>
+    }
+
+    public void setCustomerReference(String customerReference) {
+<span class="fc" id="L160">        this.customerReference = customerReference;</span>
+<span class="fc" id="L161">    }</span>
+
+    public String getCustomerId() {
+<span class="fc" id="L164">        return customerReference;</span>
+    }
+
+    public String getEmail() {
+<span class="fc" id="L168">        return email;</span>
+    }
+
+    public void setEmail(String email) {
+<span class="fc" id="L172">        this.email = email;</span>
+<span class="fc" id="L173">    }</span>
+
+    public String getFirstName() {
+<span class="fc" id="L176">        return firstName;</span>
+    }
+
+    public void setFirstName(String firstName) {
+<span class="fc" id="L180">        this.firstName = firstName;</span>
+<span class="fc" id="L181">    }</span>
+
+    public String getLastName() {
+<span class="fc" id="L184">        return lastName;</span>
+    }
+
+    public void setLastName(String lastName) {
+<span class="fc" id="L188">        this.lastName = lastName;</span>
+<span class="fc" id="L189">    }</span>
+
+    public String getPhone() {
+<span class="fc" id="L192">        return phone;</span>
+    }
+
+    public void setPhone(String phone) {
+<span class="fc" id="L196">        this.phone = phone;</span>
+<span class="fc" id="L197">    }</span>
+
+    public String getCompany() {
+<span class="fc" id="L200">        return company;</span>
+    }
+
+    public void setCompany(String company) {
+<span class="fc" id="L204">        this.company = company;</span>
+<span class="fc" id="L205">    }</span>
+
+    public String getBillingAddressLine1() {
+<span class="fc" id="L208">        return billingAddressLine1;</span>
+    }
+
+    public void setBillingAddressLine1(String billingAddressLine1) {
+<span class="fc" id="L212">        this.billingAddressLine1 = billingAddressLine1;</span>
+<span class="fc" id="L213">    }</span>
+
+    public String getBillingAddressLine2() {
+<span class="fc" id="L216">        return billingAddressLine2;</span>
+    }
+
+    public void setBillingAddressLine2(String billingAddressLine2) {
+<span class="fc" id="L220">        this.billingAddressLine2 = billingAddressLine2;</span>
+<span class="fc" id="L221">    }</span>
+
+    public String getBillingCity() {
+<span class="fc" id="L224">        return billingCity;</span>
+    }
+
+    public void setBillingCity(String billingCity) {
+<span class="fc" id="L228">        this.billingCity = billingCity;</span>
+<span class="fc" id="L229">    }</span>
+
+    public String getBillingState() {
+<span class="fc" id="L232">        return billingState;</span>
+    }
+
+    public void setBillingState(String billingState) {
+<span class="fc" id="L236">        this.billingState = billingState;</span>
+<span class="fc" id="L237">    }</span>
+
+    public String getBillingPostalCode() {
+<span class="fc" id="L240">        return billingPostalCode;</span>
+    }
+
+    public void setBillingPostalCode(String billingPostalCode) {
+<span class="fc" id="L244">        this.billingPostalCode = billingPostalCode;</span>
+<span class="fc" id="L245">    }</span>
+
+    public String getBillingCountry() {
+<span class="fc" id="L248">        return billingCountry;</span>
+    }
+
+    public void setBillingCountry(String billingCountry) {
+<span class="fc" id="L252">        this.billingCountry = billingCountry;</span>
+<span class="fc" id="L253">    }</span>
+
+    public String getShippingAddressLine1() {
+<span class="fc" id="L256">        return shippingAddressLine1;</span>
+    }
+
+    public void setShippingAddressLine1(String shippingAddressLine1) {
+<span class="fc" id="L260">        this.shippingAddressLine1 = shippingAddressLine1;</span>
+<span class="fc" id="L261">    }</span>
+
+    public String getShippingAddressLine2() {
+<span class="fc" id="L264">        return shippingAddressLine2;</span>
+    }
+
+    public void setShippingAddressLine2(String shippingAddressLine2) {
+<span class="fc" id="L268">        this.shippingAddressLine2 = shippingAddressLine2;</span>
+<span class="fc" id="L269">    }</span>
+
+    public String getShippingCity() {
+<span class="fc" id="L272">        return shippingCity;</span>
+    }
+
+    public void setShippingCity(String shippingCity) {
+<span class="fc" id="L276">        this.shippingCity = shippingCity;</span>
+<span class="fc" id="L277">    }</span>
+
+    public String getShippingState() {
+<span class="fc" id="L280">        return shippingState;</span>
+    }
+
+    public void setShippingState(String shippingState) {
+<span class="fc" id="L284">        this.shippingState = shippingState;</span>
+<span class="fc" id="L285">    }</span>
+
+    public String getShippingPostalCode() {
+<span class="fc" id="L288">        return shippingPostalCode;</span>
+    }
+
+    public void setShippingPostalCode(String shippingPostalCode) {
+<span class="fc" id="L292">        this.shippingPostalCode = shippingPostalCode;</span>
+<span class="fc" id="L293">    }</span>
+
+    public String getShippingCountry() {
+<span class="fc" id="L296">        return shippingCountry;</span>
+    }
+
+    public void setShippingCountry(String shippingCountry) {
+<span class="fc" id="L300">        this.shippingCountry = shippingCountry;</span>
+<span class="fc" id="L301">    }</span>
+
+    public Boolean getIsActive() {
+<span class="fc" id="L304">        return isActive;</span>
+    }
+
+    public void setIsActive(Boolean isActive) {
+<span class="fc" id="L308">        this.isActive = isActive;</span>
+<span class="fc" id="L309">    }</span>
+
+    public String getAuthorizeNetCustomerProfileId() {
+<span class="fc" id="L312">        return authorizeNetCustomerProfileId;</span>
+    }
+
+    public void setAuthorizeNetCustomerProfileId(String authorizeNetCustomerProfileId) {
+<span class="fc" id="L316">        this.authorizeNetCustomerProfileId = authorizeNetCustomerProfileId;</span>
+<span class="fc" id="L317">    }</span>
+
+    public List&lt;PaymentMethod&gt; getPaymentMethods() {
+<span class="fc" id="L320">        return paymentMethods;</span>
+    }
+
+    public void setPaymentMethods(List&lt;PaymentMethod&gt; paymentMethods) {
+<span class="fc" id="L324">        this.paymentMethods = paymentMethods;</span>
+<span class="fc" id="L325">    }</span>
+
+    public List&lt;Order&gt; getOrders() {
+<span class="fc" id="L328">        return orders;</span>
+    }
+
+    public void setOrders(List&lt;Order&gt; orders) {
+<span class="fc" id="L332">        this.orders = orders;</span>
+<span class="fc" id="L333">    }</span>
+
+    public List&lt;Transaction&gt; getTransactions() {
+<span class="fc" id="L336">        return transactions;</span>
+    }
+
+    public void setTransactions(List&lt;Transaction&gt; transactions) {
+<span class="fc" id="L340">        this.transactions = transactions;</span>
+<span class="fc" id="L341">    }</span>
+
+    public List&lt;Subscription&gt; getSubscriptions() {
+<span class="fc" id="L344">        return subscriptions;</span>
+    }
+
+    public void setSubscriptions(List&lt;Subscription&gt; subscriptions) {
+<span class="fc" id="L348">        this.subscriptions = subscriptions;</span>
+<span class="fc" id="L349">    }</span>
+
+    public List&lt;SubscriptionInvoice&gt; getSubscriptionInvoices() {
+<span class="fc" id="L352">        return subscriptionInvoices;</span>
+    }
+
+    public void setSubscriptionInvoices(List&lt;SubscriptionInvoice&gt; subscriptionInvoices) {
+<span class="fc" id="L356">        this.subscriptionInvoices = subscriptionInvoices;</span>
+<span class="fc" id="L357">    }</span>
+
+    // Utility methods
+    public String getFullName() {
+<span class="fc bfc" id="L361" title="All 4 branches covered.">        boolean hasFirstName = firstName != null &amp;&amp; !firstName.trim().isEmpty();</span>
+<span class="fc bfc" id="L362" title="All 4 branches covered.">        boolean hasLastName = lastName != null &amp;&amp; !lastName.trim().isEmpty();</span>
+        
+<span class="fc bfc" id="L364" title="All 4 branches covered.">        if (hasFirstName &amp;&amp; hasLastName) {</span>
+<span class="fc" id="L365">            return firstName.trim() + &quot; &quot; + lastName.trim();</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        } else if (hasFirstName) {</span>
+<span class="fc" id="L367">            return firstName.trim();</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        } else if (hasLastName) {</span>
+<span class="fc" id="L369">            return lastName.trim();</span>
+        }
+<span class="fc" id="L371">        return email;</span>
+    }
+
+    public PaymentMethod getDefaultPaymentMethod() {
+<span class="fc" id="L375">        return paymentMethods.stream()</span>
+<span class="fc" id="L376">                .filter(PaymentMethod::getIsDefault)</span>
+<span class="fc" id="L377">                .findFirst()</span>
+<span class="fc" id="L378">                .orElse(null);</span>
+    }
+
+    public void addPaymentMethod(PaymentMethod paymentMethod) {
+<span class="fc" id="L382">        paymentMethods.add(paymentMethod);</span>
+<span class="fc" id="L383">        paymentMethod.setCustomer(this);</span>
+<span class="fc" id="L384">    }</span>
+
+    public void removePaymentMethod(PaymentMethod paymentMethod) {
+<span class="fc" id="L387">        paymentMethods.remove(paymentMethod);</span>
+<span class="fc" id="L388">        paymentMethod.setCustomer(null);</span>
+<span class="fc" id="L389">    }</span>
+
+    public boolean hasBillingAddress() {
+<span class="pc bpc" id="L392" title="2 of 8 branches missed.">        return billingAddressLine1 != null &amp;&amp; billingCity != null &amp;&amp; </span>
+               billingState != null &amp;&amp; billingPostalCode != null;
+    }
+
+    public boolean hasShippingAddress() {
+<span class="pc bpc" id="L397" title="3 of 8 branches missed.">        return shippingAddressLine1 != null &amp;&amp; shippingCity != null &amp;&amp; </span>
+               shippingState != null &amp;&amp; shippingPostalCode != null;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
