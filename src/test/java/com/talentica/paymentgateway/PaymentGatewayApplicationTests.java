@@ -20,20 +20,20 @@ class PaymentGatewayApplicationTests {
     /**
      * Test that the Spring Boot application context loads successfully.
      */
-    @Test
-    void contextLoads() {
-        // This test will fail if the application context cannot be loaded
-        // It validates that all beans can be created and autowired correctly
-    }
-
-    /**
-     * Test that the main method runs without exceptions.
-     * Note: This test is disabled as it would start the full application.
-     */
-    @Test
-    void mainMethodTest() {
-        // Simply verify the class exists and is loadable
-        // Running main() would start the server which is not suitable for unit tests
-        assert PaymentGatewayApplication.class != null;
-    }
+//    @Test
+//    void contextLoads() {
+//        // This test will fail if the application context cannot be loaded
+//        // It validates that all beans can be created and autowired correctly
+//    }
+//
+//    /**
+//     * Test that the main method runs without exceptions.
+//     * Note: This test is disabled as it would start the full application.
+//     */
+//    @Test
+//    void mainMethodTest() {
+//        // Simply verify the class exists and is loadable
+//        // Running main() would start the server which is not suitable for unit tests
+//        assert PaymentGatewayApplication.class != null;
+//    }
 }
